@@ -1,0 +1,16 @@
+# Ambiente Virtual do Python
+.venv/
+env/
+venv/
+
+# Arquivos temporários do Python e Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Configurações do VS Code
+.vscode/
+
+# Arquivos temporários do Sistema Operativo
+.DS_Store
+Thumbs.db
