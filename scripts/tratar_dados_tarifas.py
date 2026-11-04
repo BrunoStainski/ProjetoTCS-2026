@@ -1,10 +1,10 @@
 
 import pandas as pd
-from pathlib import Path
 
-# Arquivos de entrada e saída
-arquivo_entrada = Path("dataset_tarifas/tarifas_wattwise.csv")
-arquivo_saida = Path("dataset_tarifas/tarifas_wattwise_final.csv")
+from config import PASTA_RAW, salvar_processado
+
+# Arquivo de entrada (dados abertos ANEEL, separador ';')
+arquivo_entrada = PASTA_RAW / "tarifas_aneel.csv"
 
 # Data atual
 hoje = pd.Timestamp.today().normalize()
@@ -30,6 +30,7 @@ if not arquivo_entrada.exists():
 df = pd.read_csv(
     arquivo_entrada,
     sep=";",
+    encoding="utf-8-sig",
     dtype=str,
     keep_default_na=False
 )
@@ -76,13 +77,13 @@ for coluna in df.columns:
 # Converter datas para comparação
 inicio = pd.to_datetime(
     df["DatInicioVigencia"],
-    dayfirst=True,
+    format="%Y-%m-%d",
     errors="coerce"
 )
 
 fim = pd.to_datetime(
     df["DatFimVigencia"],
-    dayfirst=True,
+    format="%Y-%m-%d",
     errors="coerce"
 )
 
@@ -110,19 +111,16 @@ df = df[
 # Remover linhas totalmente duplicadas
 df = df.drop_duplicates()
 
-# Criar pasta de saída, se necessário
-arquivo_saida.parent.mkdir(parents=True, exist_ok=True)
+# Valores vêm com vírgula decimal ("696,40") -> número
+for coluna in ["VlrTUSD", "VlrTE"]:
+    df[coluna] = pd.to_numeric(
+        df[coluna].str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
 
-# Salvar resultado
-df.to_csv(
-    arquivo_saida,
-    sep=";",
-    index=False,
-    encoding="utf-8-sig"
-)
+# Tarifa final por kWh (TUSD + TE), convertendo de R$/MWh quando necessário
+fator = df["DscUnidadeTerciaria"].str.upper().map({"MWH": 1000, "KWH": 1}).fillna(1)
+df["tarifa_r_kwh"] = (df["VlrTUSD"] + df["VlrTE"]) / fator
 
-print("\nLimpeza concluída!")
+salvar_processado(df, "tarifas_aneel_limpo.csv")
 print("Linhas finais:", len(df))
-print("Colunas finais:", len(df.columns))
-print("Colunas mantidas:", df.columns.tolist())
-print("Arquivo salvo em:", arquivo_saida)

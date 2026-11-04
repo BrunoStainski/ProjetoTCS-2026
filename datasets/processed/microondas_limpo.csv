@@ -1,4 +1,4 @@
-Marca,Modelo,Tensão_V,Volume_l,Potência_Nominal_W,Consumo_Modo_Espera_Stand-by_kWh_dia,Eficiência_Energética_%,Classificação_Eficiência_Energética
+marca,modelo,tensao_v,volume_l,potencia_nominal_w,consumo_modo_espera_stand_by_kwh_dia,eficiencia_energetica_pct,classificacao_eficiencia_energetica
 Panasonic,NN-ST54RBRUN,127.0,27.0,1270.0,0.01,54.1,A
 TECNO,TK38EXDBP,220.0,38.0,1600.0,0.02,47.4,C
 TECNO,TK38EXDB,220.0,38.0,1600.0,0.02,47.4,C

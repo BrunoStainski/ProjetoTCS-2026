@@ -4,25 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-arquivo_nome = "ventiladores-de-mesa-de-coluna-e-circulador-de-ar.csv"
-
-diretorio_atual = Path.cwd()
-caminhos_encontrados = list(diretorio_atual.rglob(arquivo_nome))
-
-if not caminhos_encontrados:
-    caminhos_encontrados = list(diretorio_atual.parent.rglob(arquivo_nome))
-
-if caminhos_encontrados:
-    caminho_final = caminhos_encontrados[0]
-    print(f"Arquivo localizado com sucesso em: {caminho_final}")
-else:
-    caminho_final = Path("../Datasets Itens de casa/ventiladores-de-mesa-de-coluna-e-circulador-de-ar.csv")
-    print(f"Carregado via caminho manual: {caminho_final}")
-
-# encoding utf-8-sig por causa do BOM
-df = pd.read_csv(caminho_final, encoding='utf-8-sig')
+df = ler_csv_inmetro("ventiladores-de-mesa-de-coluna-e-circulador-de-ar.csv")
 
 # Padronização dos nomes das colunas
 df.columns = (
@@ -205,8 +190,8 @@ colunas_regulatorias = [
 
 for col in colunas_regulatorias:
     if col in df.columns:
-        # 1. Preenche os nulos reais (NaN) com a string
-        df[col] = df[col].fillna('Não Informado')
+        # 1. Converte para texto (objeto) e preenche os nulos reais
+        df[col] = df[col].astype(object).fillna('Não Informado')
         
         # 2. Força a conversão para texto para conseguir manipular
         df[col] = df[col].astype(str)
@@ -227,6 +212,4 @@ df = df.dropna(subset=['Marca', 'Tipo_de_Produto'])
 print(f"✓ Processo finalizado! Linhas prontas para uso: {len(df)}")
 print(f"Colunas finais: {list(df.columns)}")
 
-caminho_saida = caminho_final.parent / "ventiladores_limpo.csv"
-df.to_csv(caminho_saida, index=False)
-print(f"✓ Dataset limpo salvo com sucesso em: {caminho_saida}")
+salvar_processado(df, "ventiladores_de_mesa_limpo.csv")

@@ -1,6 +1,6 @@
 """
 Pipeline de Limpeza e Tratamento de Dados - Refrigeradores e Assemelhados (INMETRO)
-Projeto: EcoEnergy AI
+Projeto: iamp
 
 Etapas:
 1. Configuração e Padronização de Colunas
@@ -11,26 +11,9 @@ Etapas:
 """
 
 import sys
-from pathlib import Path
-import numpy as np
 import pandas as pd
 
-
-def localizar_arquivo_entrada(nome_arquivo: str) -> Path:
-    """Busca o arquivo CSV de entrada dinamicamente no diretório atual e subdiretórios."""
-    diretorio_atual = Path.cwd()
-    caminhos = list(diretorio_atual.rglob(nome_arquivo))
-
-    if not caminhos:
-        caminhos = list(diretorio_atual.parent.rglob(nome_arquivo))
-
-    if caminhos:
-        print(f"✓ Arquivo localizado: {caminhos[0]}")
-        return caminhos[0]
-
-    raise FileNotFoundError(
-        f"Arquivo '{nome_arquivo}' não foi encontrado na pasta do projeto."
-    )
+from config import filtrar_modelos_incluidos, ler_csv_inmetro, salvar_processado
 
 
 def etapa_1_padronizar_colunas(df: pd.DataFrame) -> pd.DataFrame:
@@ -81,11 +64,11 @@ def etapa_3_tratar_duplicatas(df: pd.DataFrame) -> pd.DataFrame:
     duplicatas_exatas = qtd_inicial - len(df_clean)
 
     # 2. Modelos repetidos (mantém a linha com menor número de valores nulos)
-    if "Modelo" in df_clean.columns:
+    if {"Marca", "Modelo"}.issubset(df_clean.columns):
         df_clean["_qtd_nulos"] = df_clean.isnull().sum(axis=1)
         df_clean = (
             df_clean.sort_values("_qtd_nulos")
-            .drop_duplicates(subset=["Modelo"], keep="first")
+            .drop_duplicates(subset=["Marca", "Modelo"], keep="first")
             .drop(columns=["_qtd_nulos"])
         )
 
@@ -123,11 +106,9 @@ def etapa_4_filtrar_erros_outliers(df: pd.DataFrame) -> pd.DataFrame:
     return df_clean
 
 
-def etapa_5_imputacao_e_exportacao(
-    df: pd.DataFrame, caminho_saida: Path
-) -> pd.DataFrame:
+def etapa_5_imputacao(df: pd.DataFrame) -> pd.DataFrame:
     """Etapa 5: Realiza a imputação inteligente agrupada por Marca + Tipo e exporta o CSV limpo."""
-    print("\n--- [Etapa 5/5] Imputação Inteligente e Exportação ---")
+    print("\n--- [Etapa 5/5] Imputação Inteligente ---")
     df_clean = df.copy()
 
     cols_numericas = [
@@ -155,33 +136,28 @@ def etapa_5_imputacao_e_exportacao(
     if col_alvo in df_clean.columns:
         df_clean = df_clean.dropna(subset=[col_alvo])
 
-    # Exportação para CSV
-    df_clean.to_csv(caminho_saida, index=False, encoding="utf-8-sig")
-    print(f"✓ Imputação concluída com sucesso.")
-    print(f"✓ Base limpa final exportada para: {caminho_saida}")
-    print(f"  Shape final da base: {df_clean.shape[0]} linhas x {df_clean.shape[1]} colunas")
+    print(f"✓ Imputação concluída. Shape final: {df_clean.shape}")
 
     return df_clean
 
 
 def main():
-    nome_arquivo_entrada = "refrigeradores-e-assemelhados.csv"
     nome_arquivo_saida = "refrigeradores-e-assemelhados_limpo.csv"
 
     try:
-        caminho_entrada = localizar_arquivo_entrada(nome_arquivo_entrada)
-        caminho_saida = caminho_entrada.parent / nome_arquivo_saida
-
-        print(f"Lendo dataset inicial de: {caminho_entrada}")
-        df_raw = pd.read_csv(caminho_entrada)
+        df_raw = ler_csv_inmetro("refrigeradores-e-assemelhados.csv")
         print(f"Linhas carregadas originalmente: {len(df_raw)}")
+
+        # Mantém apenas modelos vigentes antes de descartar a coluna de status
+        df_raw = filtrar_modelos_incluidos(df_raw)
 
         # Execução sequencial da pipeline
         df_e1 = etapa_1_padronizar_colunas(df_raw)
         df_e2 = etapa_2_selecionar_atributos(df_e1)
         df_e3 = etapa_3_tratar_duplicatas(df_e2)
         df_e4 = etapa_4_filtrar_erros_outliers(df_e3)
-        df_final = etapa_5_imputacao_e_exportacao(df_e4, caminho_saida)
+        df_final = etapa_5_imputacao(df_e4)
+        salvar_processado(df_final, nome_arquivo_saida)
 
         print("\n==================================================")
         print(" PIPELINE DE LIMPEZA CONCLUÍDA COM SUCESSO! ")

@@ -1,26 +1,10 @@
 
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-# 1. Identificar a pasta do projeto
-diretorio_script = Path(__file__).resolve().parent
-diretorio_projeto = diretorio_script.parent
-
-# 2. Localizar o CSV na pasta Datasets
-arquivo = (
-    diretorio_projeto
-    / "Datasets"
-    / "lampadas-fluorecentes-com-reator-integrado-a-base.csv"
-)
-
-print("Procurando arquivo em:", arquivo)
-
-if not arquivo.is_file():
-    raise FileNotFoundError(f"Arquivo não encontrado: {arquivo}")
-
-# 3. Ler o CSV
-df = pd.read_csv(arquivo, encoding="utf-8-sig")
+df = ler_csv_inmetro("lampadas-fluorescentes-com-reator-integrado-a-base.csv")
 
 print("Dados originais:", df.shape)
 
@@ -101,22 +85,10 @@ df = (
     .drop(columns=["_completude"])
 )
 
-# 13. Salvar arquivo limpo na pasta Datasets
-arquivo_saida = (
-    diretorio_projeto
-    / "Datasets"
-    / "lampadas_fluorescentes_limpo.csv"
-)
-
-df.to_csv(
-    arquivo_saida,
-    index=False,
-    encoding="utf-8-sig"
-)
+salvar_processado(df, "lampadas_fluorescentes_limpo.csv")
 
 # 14. Exibir resultado
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)
-print("Arquivo salvo em:", arquivo_saida)
 print("\nColunas mantidas:")
 print(df.columns.tolist())

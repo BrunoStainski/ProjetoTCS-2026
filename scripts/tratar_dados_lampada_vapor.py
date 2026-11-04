@@ -1,21 +1,9 @@
 
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 
-# Caminhos
-diretorio_atual = Path.cwd()
-
-arquivo = (
-    diretorio_atual.parent
-    / "Datasets"
-    / "lampadas-de-vapor-de-sodio-de-alta-pressao.csv"
-)
-
-if not arquivo.is_file():
-    raise FileNotFoundError(f"Arquivo não encontrado: {arquivo}")
-
-# Leitura
-df = pd.read_csv(arquivo, encoding="utf-8-sig")
+df = ler_csv_inmetro("lampadas-de-vapor-de-sodio-de-alta-pressao.csv")
 
 print("Dados originais:", df.shape)
 
@@ -45,14 +33,7 @@ df = df[
 # Remover duplicatas
 df = df.drop_duplicates(subset=["Marca", "Modelo"])
 
-# Salvar
-saida = (
-    diretorio_atual
-    / "lampadas_vapor_sodio_limpo.csv"
-)
-
-df.to_csv(saida, index=False, encoding="utf-8-sig")
+salvar_processado(df, "lampadas_vapor_sodio_limpo.csv")
 
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)
-print("Arquivo salvo em:", saida)

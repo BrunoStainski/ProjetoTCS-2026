@@ -1,51 +1,48 @@
-import os
+"""Limpeza do dataset INMETRO de ar-condicionado."""
+
 import re
-from pathlib import Path
+
 import pandas as pd
 
-caminho_projeto = Path.cwd()
-if caminho_projeto.name == "Notebook_limpeza_dados":
-    caminho_projeto = caminho_projeto.parent
+from config import filtrar_modelos_incluidos, ler_csv_inmetro, salvar_processado
 
-caminho_entrada = caminho_projeto / "Datasets" / "Ar-condicionado.csv"
-caminho_saida = caminho_projeto / "Datasets" / "ar-condicionado_limpo.csv"
+COLUNAS_ADMINISTRATIVAS = ["Status do Modelo", "Código de Barras", "Status do Registro", "Número do Registro"]
+COL_BTU = "Capacidade de Refrigeração Nominal (Btu/h)"
+COL_CONSUMO = "Consumo Anual de Energia (kWh)"
+COL_POTENCIA = "Potência Consumida a 35 °C e em Carga Total (W)"
 
-try:
-    df = pd.read_csv(caminho_entrada, encoding='utf-8')
-    if len(df.columns) == 1:
-        df = pd.read_csv(caminho_entrada, encoding='utf-8', sep=';')
-except:
-    df = pd.read_csv(caminho_entrada, encoding='latin1', sep=';')
+CAPACIDADES_BTU = "07|09|12|18|22|24|30|36|48|60"
 
-df.columns = df.columns.str.replace('ï»¿', '').str.strip()
 
-df = df.dropna(subset=['Marca', 'Modelo']).drop_duplicates()
+def extrair_btu(modelo) -> float | None:
+    """Extrai a capacidade do nome do modelo (ex.: 'XYZ12FC' -> 12000).
 
-def extrair_btu(modelo):
-    match = re.search(r'(07|09|12|18|22|24|30|36|48|60)', str(modelo))
+    Só aceita o número isolado (sem outros dígitos colados), para não
+    confundir códigos como '2012' ou '120' com 12.000 BTU.
+    """
+    match = re.search(rf"(?<!\d)({CAPACIDADES_BTU})(?!\d)", str(modelo))
     return float(match.group(1)) * 1000 if match else None
 
-df['BTU_Extraido'] = df['Modelo'].apply(extrair_btu)
-df['Capacidade_BTU'] = df['Capacidade de Refrigeração Nominal (Btu/h)'].fillna(df['BTU_Extraido'])
 
-df['Consumo_Anual_kWh'] = df.groupby(['Marca', 'Capacidade_BTU'])['Consumo Anual de Energia (kWh)'].transform(lambda x: x.fillna(x.mean()))
-df['Potencia_W'] = df.groupby(['Marca', 'Capacidade_BTU'])['Potência Consumida a 35 °C e em Carga Total (W)'].transform(lambda x: x.fillna(x.mean()))
+df = ler_csv_inmetro("ar-condicionado.csv")
+print("Dados originais:", df.shape)
 
-df = df.dropna(subset=['Consumo_Anual_kWh', 'Potencia_W'], how='all').copy()
+df = filtrar_modelos_incluidos(df)
+df = df.drop(columns=COLUNAS_ADMINISTRATIVAS, errors="ignore")
+df = df.dropna(subset=["Marca", "Modelo"]).drop_duplicates()
 
-if "Código de Barras" in df.columns:
-    df["Código de Barras"] = (
-        df["Código de Barras"]
-        .fillna("N/A")
-        .astype(str)
-        .str.replace(r"\.0$", "", regex=True)
-    )
+for col in (COL_BTU, COL_CONSUMO, COL_POTENCIA):
+    df[col] = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
 
-df = df.drop(columns=['BTU_Extraido'])
-df.to_csv(caminho_saida, index=False, encoding="utf-8")
+# Capacidade: usa o valor oficial; só recorre ao nome do modelo quando falta
+df["Capacidade_BTU"] = df[COL_BTU].fillna(df["Modelo"].apply(extrair_btu))
 
-if caminho_entrada.exists():
-    os.remove(caminho_entrada)
-    print(f"✓ Arquivo original deletado: {caminho_entrada.name}")
+# Imputa consumo/potência pela média de aparelhos da mesma marca e capacidade
+grupos = df.groupby(["Marca", "Capacidade_BTU"])
+df["Consumo_Anual_kWh"] = grupos[COL_CONSUMO].transform(lambda x: x.fillna(x.mean()))
+df["Potencia_W"] = grupos[COL_POTENCIA].transform(lambda x: x.fillna(x.mean()))
 
-print(f"✓ Dataset limpo salvo em: {caminho_saida}")
+df = df.dropna(subset=["Consumo_Anual_kWh", "Potencia_W"], how="all")
+df = df.drop_duplicates(subset=["Marca", "Modelo"])
+
+salvar_processado(df, "ar-condicionado_limpo.csv")

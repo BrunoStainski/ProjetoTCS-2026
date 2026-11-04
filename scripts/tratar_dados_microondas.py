@@ -4,26 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-arquivo_nome = "microondas.csv"
-
-diretorio_atual = Path.cwd()
-
-caminhos_encontrados = list(diretorio_atual.rglob(arquivo_nome))
-
-if not caminhos_encontrados:
-    caminhos_encontrados = list(diretorio_atual.parent.rglob(arquivo_nome))
-
-if caminhos_encontrados:
-    caminho_final = caminhos_encontrados[0]
-    print(f"Arquivo localizado com sucesso em: {caminho_final}")
-else:
-    caminho_final = Path("../Datasets Itens de casa/microondas.csv")
-    print(f"Carregado via caminho manual: {caminho_final}")
-
-# encoding utf-8-sig por causa do BOM no início do arquivo
-df = pd.read_csv(caminho_final, encoding='utf-8-sig')
+df = ler_csv_inmetro("microondas.csv")
 
 df.columns = (
     df.columns
@@ -104,7 +88,12 @@ if 'Tensão_V' in df.columns:
 
 print("✓ Tipos convertidos para numérico.")
 
-# --- Correção de typos conhecidos ---
+# --- Recuperação de registros com erro de escala ---
+# Alguns cadastros do INMETRO vêm com a vírgula decimal deslocada
+# (ex.: eficiência 5,8 em vez de 58%; stand-by 2,3 em vez de 0,023 kWh/dia).
+# Em vez de descartar esses modelos, a escala é corrigida para manter
+# mais micro-ondas na base. Os filtros de faixa abaixo removem o que
+# continuar fora do plausível depois da correção.
 if 'Eficiência_Energética_%' in df.columns:
     mask_ef = df['Eficiência_Energética_%'] < 20
     df.loc[mask_ef, 'Eficiência_Energética_%'] = df.loc[mask_ef, 'Eficiência_Energética_%'] * 10
@@ -114,7 +103,7 @@ if 'Consumo_Modo_Espera_Stand-by_kWh_dia' in df.columns:
     df.loc[mask_cons, 'Consumo_Modo_Espera_Stand-by_kWh_dia'] = (
         df.loc[mask_cons, 'Consumo_Modo_Espera_Stand-by_kWh_dia'] / 100
     )
-print("✓ Typos corrigidos.")
+print("✓ Erros de escala corrigidos.")
 
 # --- Filtros de inconsistência ---
 antes = len(df)
@@ -162,6 +151,4 @@ df = df.dropna(subset=colunas_validas)
 print(f"✓ Processo finalizado! Linhas prontas para uso: {len(df)}")
 print(f"Colunas finais: {list(df.columns)}")
 
-caminho_saida = caminho_final.parent / "microondas_limpo.csv"
-df.to_csv(caminho_saida, index=False)
-print(f"✓ Dataset limpo salvo com sucesso em: {caminho_saida}")
+salvar_processado(df, "microondas_limpo.csv")

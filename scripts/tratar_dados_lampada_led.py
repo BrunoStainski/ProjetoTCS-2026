@@ -1,22 +1,10 @@
 
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-# 1. Caminho do arquivo
-diretorio_atual = Path.cwd()
-
-arquivo = (
-    diretorio_atual.parent
-    / "Datasets"
-    / "Lampadas-led-dispositivo-integrado-a-base.csv"
-)
-
-if not arquivo.is_file():
-    raise FileNotFoundError(f"Arquivo não encontrado: {arquivo}")
-
-# 2. Ler o CSV
-df = pd.read_csv(arquivo, encoding="utf-8-sig")
+df = ler_csv_inmetro("lampadas-led-dispositivo-integrado-a-base.csv")
 
 print("Dados originais:", df.shape)
 
@@ -79,19 +67,9 @@ df = (
     .drop(columns=["_completude"])
 )
 
-# 10. Salvar arquivo limpo
-arquivo_saida = (
-    diretorio_atual / "lampadas_led_limpo.csv"
-)
-
-df.to_csv(
-    arquivo_saida,
-    index=False,
-    encoding="utf-8-sig"
-)
+salvar_processado(df, "lampadas_led_limpo.csv")
 
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)
-print("Arquivo salvo em:", arquivo_saida)
 print("\nColunas mantidas:")
 print(df.columns.tolist())
