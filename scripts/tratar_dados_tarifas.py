@@ -13,7 +13,12 @@ hoje = pd.Timestamp.today().normalize()
 colunas_uteis = [
     "SigAgente",
     "DscClasse",
+    "DscBaseTarifaria",        # "Tarifa de Aplicação" x "Base Econômica"
+    "DscSubGrupo",             # B1 = residencial de baixa tensão
     "DscModalidadeTarifaria",
+    "DscSubClasse",            # separa residencial comum de baixa renda
+    "DscDetalhe",
+    "NomPostoTarifario",       # tarifa branca tem um valor por horário
     "DscUnidadeTerciaria",
     "DatInicioVigencia",
     "DatFimVigencia",
