@@ -1,64 +1,52 @@
-import os
-from pathlib import Path
+"""Carrega os CSVs de datasets/processed no PostgreSQL (uma tabela por arquivo).
+
+Só substitui as tabelas dos próprios datasets; outras tabelas do banco
+(clientes, inventário etc.) não são tocadas.
+"""
+
+import sys
+
 import pandas as pd
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 
-# 1. Configuração dos Caminhos (Robusto a qualquer diretório de execução)
-# Localiza a raiz 'ProjetoTCS' subindo um nível a partir de 'Scripts/'
-raiz_projeto = Path(__file__).resolve().parent.parent
-pasta_datasets = raiz_projeto / "Datasets"
-
-# 2. String de Conexão do PostgreSQL no Docker
-# (Ajuste a porta 5433 ou 5432 e as credenciais conforme seu docker-compose.yml)
-DATABASE_URL = ("postgresql+psycopg2://admin:admin123@localhost:5434/banco_projeto")
-engine = create_engine(DATABASE_URL)
+from config import PASTA_PROCESSED, database_url
 
 
-def resetar_banco(conn):
-    """Limpa o schema public, removendo todas as tabelas anteriores."""
-    print("🧹 Apagando tabelas existentes no banco de dados...")
-    conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
-    conn.commit()
-    print("✓ Banco de dados limpo com sucesso!\n")
+def nome_tabela(caminho) -> str:
+    """'ar-condicionado_limpo.csv' -> 'ar_condicionado_limpo'."""
+    return caminho.stem.replace("-", "_").lower()
 
 
-def importar_csvs():
-    if not pasta_datasets.exists():
-        print(f"❌ [ERRO] A pasta 'Datasets' não foi encontrada em: {pasta_datasets}")
-        return
-
-    # Busca todos os arquivos .csv na pasta Datasets
-    arquivos_csv = sorted(list(pasta_datasets.glob("*.csv")))
-
+def importar_csvs() -> int:
+    arquivos_csv = sorted(PASTA_PROCESSED.glob("*.csv"))
     if not arquivos_csv:
-        print(f"⚠️ [AVISO] Nenhum arquivo CSV encontrado em: {pasta_datasets}")
-        return
+        print(f"❌ Nenhum CSV encontrado em: {PASTA_PROCESSED}")
+        return 1
 
-    print(f"🚀 Encontrados {len(arquivos_csv)} arquivos CSV para importar.\n")
+    print(f"🚀 {len(arquivos_csv)} arquivos CSV para importar.\n")
+    engine = create_engine(database_url())
+    falhas = []
 
-    # Conecta ao banco de dados e reseta as tabelas
-    with engine.connect() as conn:
-        resetar_banco(conn)
+    for caminho_csv in arquivos_csv:
+        tabela = nome_tabela(caminho_csv)
+        print(f"📦 '{caminho_csv.name}' -> tabela '{tabela}'")
+        try:
+            df = pd.read_csv(caminho_csv, encoding="utf-8")
+            # Uma transação por tabela: se falhar, a versão anterior é mantida
+            with engine.begin() as conn:
+                df.to_sql(tabela, con=conn, if_exists="replace", index=False)
+            print(f"   ✓ {len(df)} linhas inseridas.")
+        except Exception as erro:
+            print(f"   ❌ Erro: {erro}")
+            falhas.append(caminho_csv.name)
 
-        for caminho_csv in arquivos_csv:
-            # Padroniza o nome da tabela (ex: chuveiros-eletricos_limpo.csv -> chuveiros_eletricos_limpo)
-            nome_tabela = caminho_csv.stem.replace("-", "_")
+    if falhas:
+        print(f"\n⚠️ Importação concluída com {len(falhas)} falha(s): {', '.join(falhas)}")
+        return 1
 
-            print(f"📦 Importando '{caminho_csv.name}' -> Tabela '{nome_tabela}'...")
-
-            try:
-                # Lê o CSV com UTF-8
-                df = pd.read_csv(caminho_csv, encoding="utf-8")
-                
-                # Envia para o PostgreSQL
-                df.to_sql(nome_tabela, con=conn, if_exists="replace", index=False)
-                
-                print(f"   ✓ Sucesso: {len(df)} linhas inseridas.\n")
-            except Exception as e:
-                print(f"   ❌ Erro ao importar {caminho_csv.name}: {e}\n")
-
-    print("🎉 Processo de importação concluído com sucesso!")
+    print("\n🎉 Importação concluída com sucesso!")
+    return 0
 
 
 if __name__ == "__main__":
-    importar_csvs()
+    sys.exit(importar_csvs())

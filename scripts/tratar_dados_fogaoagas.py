@@ -4,26 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-arquivo_nome = "fogoes-e-fornos-a-gas-de-uso-domestico.csv"
-
-diretorio_atual = Path.cwd()
-
-caminhos_encontrados = list(diretorio_atual.rglob(arquivo_nome))
-
-if not caminhos_encontrados:
-    caminhos_encontrados = list(diretorio_atual.parent.rglob(arquivo_nome))
-
-if caminhos_encontrados:
-    caminho_final = caminhos_encontrados[0]
-    print(f"Arquivo localizado com sucesso em: {caminho_final}")
-else:
-    caminho_final = Path("../Datasets Itens de casa/fogoes-e-fornos-a-gas-de-uso-domestico.csv")
-    print(f"Carregado via caminho manual: {caminho_final}")
-
-# encoding utf-8-sig por causa do BOM no início do arquivo
-df = pd.read_csv(caminho_final, encoding='utf-8-sig')
+df = ler_csv_inmetro("fogoes-e-fornos-a-gas-de-uso-domestico.csv")
 
 df.columns = (
     df.columns
@@ -153,6 +137,4 @@ df = df.dropna(subset=colunas_validas)
 print(f"✓ Processo finalizado! Linhas prontas para uso: {len(df)}")
 print(f"Colunas finais: {list(df.columns)}")
 
-caminho_saida = caminho_final.parent / "fogoes_limpo.csv"
-df.to_csv(caminho_saida, index=False)
-print(f"✓ Dataset limpo salvo com sucesso em: {caminho_saida}")
+salvar_processado(df, "fogoes_fornos_gas_limpo.csv")

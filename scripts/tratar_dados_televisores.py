@@ -1,19 +1,9 @@
 
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 
-diretorio_atual = Path.cwd()
-
-arquivo = (
-    diretorio_atual.parent
-    / "Datasets"
-    / "televisores.csv"
-)
-
-if not arquivo.is_file():
-    raise FileNotFoundError(f"Arquivo não encontrado: {arquivo}")
-
-df = pd.read_csv(arquivo, encoding="utf-8-sig")
+df = ler_csv_inmetro("televisores.csv")
 
 print("Dados originais:", df.shape)
 
@@ -52,11 +42,7 @@ df = (
     .drop(columns=["_completude"])
 )
 
-# Salvar
-saida = diretorio_atual / "televisores_limpo.csv"
-
-df.to_csv(saida, index=False, encoding="utf-8-sig")
+salvar_processado(df, "televisores_limpo.csv")
 
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)
-print("Arquivo salvo em:", saida)

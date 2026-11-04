@@ -1,44 +1,27 @@
-import os
-import re
-from pathlib import Path
+"""Limpeza do dataset INMETRO de aquecedores de água a gás."""
+
 import pandas as pd
 
-caminho_projeto = Path.cwd()
-if caminho_projeto.name == "Notebook_limpeza_dados":
-    caminho_projeto = caminho_projeto.parent
+from config import filtrar_modelos_incluidos, ler_csv_inmetro, salvar_processado
 
-caminho_entrada = caminho_projeto / "Datasets" / "sistemas-acoplados-equipamentos-solar-de-agua.csv"
-caminho_saida = caminho_projeto / "Datasets" / "aquecedores_limpo.csv"
+COLUNAS_ADMINISTRATIVAS = ["Status do Modelo", "Código de Barras", "Status do Registro", "Número do Registro"]
 
-try:
-    df = pd.read_csv(caminho_entrada, encoding='utf-8')
-    if len(df.columns) == 1:
-        df = pd.read_csv(caminho_entrada, encoding='utf-8', sep=';')
-except:
-    df = pd.read_csv(caminho_entrada, encoding='latin1', sep=';')
+df = ler_csv_inmetro("aquecedores-de-agua-e-gas.csv")
+print("Dados originais:", df.shape)
 
-df.columns = df.columns.str.replace('ï»¿', '').str.strip()
+df = filtrar_modelos_incluidos(df)
+df = df.drop(columns=COLUNAS_ADMINISTRATIVAS, errors="ignore")
+df = df.dropna(subset=["Marca", "Modelo"]).drop_duplicates()
 
-df = df.dropna(subset=['Marca', 'Modelo']).drop_duplicates()
+col_consumo = next((c for c in df.columns if "Consumo" in c), None)
+col_vazao = next((c for c in df.columns if "Vazão" in c or "Capacidade" in c), None)
 
-col_consumo = [c for c in df.columns if 'kWh' in c or 'Consumo' in c]
-col_volume = [c for c in df.columns if 'Volume' in c or 'Capacidade' in c or 'litros' in c.lower()]
+if col_consumo and col_vazao:
+    for col in (col_consumo, col_vazao):
+        df[col] = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
+    # Imputa consumo pela média de aparelhos da mesma marca e mesma vazão
+    df[col_consumo] = df.groupby(["Marca", col_vazao])[col_consumo].transform(lambda x: x.fillna(x.mean()))
 
-if col_consumo and col_volume:
-    df[col_consumo[0]] = df.groupby(['Marca', col_volume[0]])[col_consumo[0]].transform(lambda x: x.fillna(x.mean()))
+df = df.drop_duplicates(subset=["Marca", "Modelo"])
 
-if "Código de Barras" in df.columns:
-    df["Código de Barras"] = (
-        df["Código de Barras"]
-        .fillna("N/A")
-        .astype(str)
-        .str.replace(r"\.0$", "", regex=True)
-    )
-
-df.to_csv(caminho_saida, index=False, encoding="utf-8")
-
-if caminho_entrada.exists():
-    os.remove(caminho_entrada)
-    print(f"✓ Arquivo original deletado: {caminho_entrada.name}")
-
-print(f"✓ Dataset limpo salvo em: {caminho_saida}")
+salvar_processado(df, "aquecedores-de-agua-e-gas_limpo.csv")

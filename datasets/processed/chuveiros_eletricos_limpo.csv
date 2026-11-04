@@ -1,4 +1,4 @@
-﻿marca,familia,modelo,tensao_v,potencia_w,consumo_mensal_max_kwh,elevacao_temperatura_c,consumo_mensal_min_kwh,vazao_l_min
+marca,familia,modelo,tensao_v,potencia_w,consumo_mensal_max_kwh,elevacao_temperatura_c,consumo_mensal_min_kwh,vazao_l_min
 BOSCH,EWI,EWI 5.5,127,5500,24.8,25.2,11.2,3.6
 BOSCH,EWI,EWI 7.7,220,7700,30.8,37.3,14.4,4.6
 BOSCH,EWI,EWI 5.5 CONFORT,127,5500,24.4,23.2,11.1,3.5

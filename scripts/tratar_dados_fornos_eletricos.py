@@ -1,53 +1,26 @@
-import os
-import re
-from pathlib import Path
+"""Limpeza do dataset INMETRO de fornos elétricos comerciais."""
+
 import pandas as pd
 
-caminho_projeto = Path.cwd()
-if caminho_projeto.name == "Notebook_limpeza_dados":
-    caminho_projeto = caminho_projeto.parent
+from config import filtrar_modelos_incluidos, ler_csv_inmetro, salvar_processado
 
-caminho_entrada = caminho_projeto / "Datasets" / "fornos-eletricos-comerciais.csv"
-caminho_saida = caminho_projeto / "Datasets" / "fornos-eletricos-comerciais_limpo.csv"
+COLUNAS_ADMINISTRATIVAS = ["Status do Modelo", "Código de Barras", "Status do Registro", "Número do Registro"]
+COL_CONSUMO = "Consumo de Energia Elétrica (kWh)"
+COL_POTENCIA = "Potência Nominal (kW)"
 
-try:
-    df = pd.read_csv(caminho_entrada, encoding='utf-8')
-    if len(df.columns) == 1:
-        df = pd.read_csv(caminho_entrada, encoding='utf-8', sep=';')
-except:
-    df = pd.read_csv(caminho_entrada, encoding='latin1', sep=';')
+df = ler_csv_inmetro("fornos-eletricos-comerciais.csv")
+print("Dados originais:", df.shape)
 
-df.columns = df.columns.str.replace('ï»¿', '').str.strip()
+df = filtrar_modelos_incluidos(df)
+df = df.drop(columns=COLUNAS_ADMINISTRATIVAS, errors="ignore")
+df = df.dropna(subset=["Marca", "Modelo"]).drop_duplicates()
 
-df = df.dropna(subset=['Marca', 'Modelo']).drop_duplicates()
+for col in (COL_CONSUMO, COL_POTENCIA):
+    df[col] = pd.to_numeric(df[col].astype(str).str.replace(",", "."), errors="coerce")
+    # Imputa pela média da própria marca
+    df[col] = df.groupby("Marca")[col].transform(lambda x: x.fillna(x.mean()))
 
-if 'Consumo de Energia Elétrica (kWh)' in df.columns:
-    df['Consumo de Energia Elétrica (kWh)'] = pd.to_numeric(df['Consumo de Energia Elétrica (kWh)'].astype(str).str.replace(',', '.'), errors='coerce')
+df = df.dropna(subset=[COL_CONSUMO])
+df = df.drop_duplicates(subset=["Marca", "Modelo"])
 
-if 'Potência Nominal (kW)' in df.columns:
-    df['Potência Nominal (kW)'] = pd.to_numeric(df['Potência Nominal (kW)'].astype(str).str.replace(',', '.'), errors='coerce')
-
-if 'Consumo de Energia Elétrica (kWh)' in df.columns:
-    df['Consumo de Energia Elétrica (kWh)'] = df.groupby('Marca')['Consumo de Energia Elétrica (kWh)'].transform(lambda x: x.fillna(x.mean()))
-    
-if 'Potência Nominal (kW)' in df.columns:
-    df['Potência Nominal (kW)'] = df.groupby('Marca')['Potência Nominal (kW)'].transform(lambda x: x.fillna(x.mean()))
-
-if 'Consumo de Energia Elétrica (kWh)' in df.columns:
-    df = df.dropna(subset=['Consumo de Energia Elétrica (kWh)']).copy()
-
-if "Código de Barras" in df.columns:
-    df["Código de Barras"] = (
-        df["Código de Barras"]
-        .fillna("N/A")
-        .astype(str)
-        .str.replace(r"\.0$", "", regex=True)
-    )
-
-df.to_csv(caminho_saida, index=False, encoding="utf-8")
-
-if caminho_entrada.exists():
-    os.remove(caminho_entrada)
-    print(f"✓ Arquivo original deletado: {caminho_entrada.name}")
-
-print(f"✓ Dataset limpo salvo em: {caminho_saida}")
+salvar_processado(df, "fornos-eletricos-comerciais_limpo.csv")

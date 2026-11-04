@@ -4,25 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
+from config import ler_csv_inmetro, salvar_processado
 import numpy as np
 
-arquivo_nome = "maquinas-de-lavar.csv"
-
-diretorio_atual = Path.cwd()
-
-caminhos_encontrados = list(diretorio_atual.rglob(arquivo_nome))
-
-if not caminhos_encontrados:
-    caminhos_encontrados = list(diretorio_atual.parent.rglob(arquivo_nome))
-
-if caminhos_encontrados:
-    caminho_final = caminhos_encontrados[0]
-    print(f"Arquivo localizado com sucesso em: {caminho_final}")
-else:
-    caminho_final = Path("../Datasets Itens de casa/maquinas-de-lavar.csv")
-    print(f"Carregado via caminho manual: {caminho_final}")
-
-df = pd.read_csv(caminho_final, encoding='utf-8-sig')
+df = ler_csv_inmetro("maquinas-de-lavar.csv")
 
 df.columns = (
     df.columns
@@ -179,6 +164,4 @@ print(f"Colunas finais: {list(df.columns)}")
 print("Nulos restantes por coluna:")
 print(df.isnull().sum())
 
-caminho_saida = caminho_final.parent / "maquinas-de-lavar_limpo.csv"
-df.to_csv(caminho_saida, index=False)
-print(f"✓ Dataset limpo salvo com sucesso em: {caminho_saida}")
+salvar_processado(df, "maquinas-de-lavar_limpo.csv")

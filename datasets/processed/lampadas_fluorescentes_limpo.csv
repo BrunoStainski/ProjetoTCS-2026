@@ -1,4 +1,4 @@
-﻿Marca,Modelo,Tensão (V),Potência (W),Tipo de Bulbo,Fluxo Luminoso (lm),Temperatura de Cor (K),Vida Mediana (horas),Eficiência Luminosa (lm/W),Fator de Potência (cos ?),Classificação Eficiência Energética
+marca,modelo,tensao_v,potencia_w,tipo_de_bulbo,fluxo_luminoso_lm,temperatura_de_cor_k,vida_mediana_horas,eficiencia_luminosa_lm_w,fator_de_potencia_cos,classificacao_eficiencia_energetica
 ULTRALUZ,5U 100 W,220,100.0,5U,6300.0,6400.0,8000.0,60.8,0.97,B
 FORLUZ,100011,220,15.0,3u,945.0,6400.0,6000.0,63.0,0.5,A
 FORLUZ,100014,220,25.0,3u,1650.0,6400.0,6000.0,66.0,0.5,A

@@ -1,4 +1,4 @@
-Marca,Modelo,Tipo_de_Produto,Piso_ou_Embutir,Convencional_ou_com_Dispositivos_Eletricos,Tipo_de_Gas,Numerode_Bocas,Rendimento_Medio_dos_Queimadores_%,Classificacão_PBE_Mesa_de_Coccão,Volume_do_Forno_litros,Consumo_do_Forno_GLPkg_h_GNm3_h,Índice_de_Consumo_do_Forno_%,Classificacão_PBE_Forno
+marca,modelo,tipo_de_produto,piso_ou_embutir,convencional_ou_com_dispositivos_eletricos,tipo_de_gas,numerode_bocas,rendimento_medio_dos_queimadores_pct,classificacao_pbe_mesa_de_coccao,volume_do_forno_litros,consumo_do_forno_glpkg_h_gnm3_h,indice_de_consumo_do_forno_pct,classificacao_pbe_forno
 Mueller,Fogão Fratello G6 Preto Fosco 6B,Fogão gás,Piso,Com dispositivo Elétricos,GLP,6.0,63.0,A,81.6,0.135,48.0,A
 Mueller,Fogão Fratello G6 Branco 6B,Fogão gás,Piso,Com dispositivo Elétricos,GLP,6.0,63.0,A,81.6,0.135,48.0,A
 ITATIAIA,FOGAO STAR NEW 6Q PTO: 3700000474,Fogão a gás,Piso,Com dispositivo Elétricos,GLP,6.0,65.0,A,82.0,0.13,47.0,A
