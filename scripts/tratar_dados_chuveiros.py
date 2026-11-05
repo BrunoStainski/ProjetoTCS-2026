@@ -12,7 +12,7 @@ df = ler_csv_inmetro("chuveiros-eletricos.csv")
 qtd_inicial = len(df)
 
 # Remove espaços extras só nos textos (sem transformar nulos na string "nan")
-for col in df.select_dtypes(include=["object"]).columns:
+for col in df.select_dtypes(include=["object", "str"]).columns:
     df[col] = df[col].str.strip()
 
 # Correção de typo identificado na fonte
