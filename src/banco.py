@@ -1,5 +1,5 @@
 """
-Acesso ao PostgreSQL do WattWise (container postgres_iamp do docker-compose), via SQLAlchemy.
+Acesso ao PostgreSQL do iamp (container postgres_iamp do docker-compose), via SQLAlchemy.
 Todas as consultas usam parametros e nunca montam SQL com texto do usuario.
 """
 

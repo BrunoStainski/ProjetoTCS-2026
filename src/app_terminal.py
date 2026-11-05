@@ -1,5 +1,5 @@
 """
-WattWise no terminal: o usuario digita o modelo, escolhe a distribuidora
+iamp no terminal: o usuario digita o modelo, escolhe a distribuidora
 e recebe a tarifa (R$/kWh) e quanto o aparelho gasta por mes.
 
 Uso:
@@ -149,7 +149,7 @@ def main():
         print(f"Erro: {erro}")
         sys.exit(1)
 
-    print("WattWise - quanto o seu aparelho pesa na conta de luz")
+    print("iamp - quanto o seu aparelho pesa na conta de luz")
     try:
         while True:
             aparelho = passo_aparelho(con)

@@ -1,0 +1,13 @@
+.git
+.venv
+.env
+__pycache__
+*.pyc
+.vscode
+app_gerenciamento_energetico
+datasets/raw
+models
+docs
+infra
+prompts
+scripts

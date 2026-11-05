@@ -1,5 +1,5 @@
 """
-Funcoes que a interface do WattWise usa. Servem para qualquer tela
+Funcoes que a interface do iamp usa. Servem para qualquer tela
 (terminal, FastAPI, Streamlit...). Tudo le do PostgreSQL (ver banco.py).
 
 Fluxo:

@@ -1,10 +1,10 @@
 """
-Caminhos e conexao do projeto WattWise. Se algo mudar, ajuste so aqui.
+Caminhos e conexao do projeto iamp. Se algo mudar, ajuste so aqui.
 
 Por padrao procura a pasta "datasets" subindo a partir deste arquivo, entao funciona
 com o codigo na raiz do projeto ou dentro de src/.
 As credenciais do PostgreSQL vem do .env da raiz (o mesmo que o docker-compose usa).
-Da para trocar pelas variaveis de ambiente WATTWISE_DADOS e DATABASE_URL.
+Da para trocar pelas variaveis de ambiente IAMP_DADOS e DATABASE_URL.
 """
 
 import os
@@ -39,7 +39,7 @@ def _env(chave, padrao=None):
     return _ENV.get(chave) or padrao
 
 
-DADOS = Path(_env("WATTWISE_DADOS", RAIZ / "datasets" / "processed"))
+DADOS = Path(_env("IAMP_DADOS", RAIZ / "datasets" / "processed"))
 TARIFAS_CSV = DADOS / "tarifas_aneel_limpo.csv"
 
 # PostgreSQL do docker-compose (container postgres_iamp)
