@@ -1,7 +1,8 @@
 """Executa todos os scripts de limpeza (raw -> processed) em sequência.
 
-Uso:  python scripts/executar_pipeline.py            # só limpeza
-      python scripts/executar_pipeline.py --importar # limpeza + carga no PostgreSQL
+Uso:  python scripts/executar_pipeline.py
+
+A carga no PostgreSQL é feita pelo src/criar_banco.py.
 """
 
 import subprocess
@@ -13,8 +14,6 @@ PASTA_SCRIPTS = Path(__file__).resolve().parent
 
 def main() -> int:
     scripts = sorted(PASTA_SCRIPTS.glob("tratar_dados_*.py"))
-    if "--importar" in sys.argv:
-        scripts.append(PASTA_SCRIPTS / "importar_datasets.py")
 
     falhas = []
     for script in scripts:
