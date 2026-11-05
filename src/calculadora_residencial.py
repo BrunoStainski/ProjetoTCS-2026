@@ -1,5 +1,5 @@
 """
-Regras de calculo do WattWise: catalogo de aparelhos, consumo mensal e custo.
+Regras de calculo do iamp: catalogo de aparelhos, consumo mensal e custo.
 
 Usado por criar_banco.py (monta o catalogo a partir dos CSVs limpos) e por
 servico.py (calcula o consumo e monta o resultado para a tela).

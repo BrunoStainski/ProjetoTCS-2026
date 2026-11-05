@@ -12,6 +12,31 @@ services:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    container_name: api_iamp
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres_db
+      POSTGRES_PORT: "5432"
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/saude')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
 
 volumes:
   postgres_data:

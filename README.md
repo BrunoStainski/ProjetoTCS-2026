@@ -44,8 +44,12 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
             v
  Funções para as telas                 src/servico.py
             |
+            +--------------------------------------+
+            v                                      v
+ API FastAPI (Docker)  src/main.py      App de terminal (testes)  src/app_terminal.py
+            |
             v
- App de terminal (para testes)         src/app_terminal.py
+ App Flutter                           app_gerenciamento_energetico/
 ```
 
 ### Tecnologias
@@ -56,6 +60,7 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 | Limpeza e análise | Pandas |
 | Banco de dados | PostgreSQL 15 |
 | Acesso ao banco | SQLAlchemy + psycopg2 |
+| API | FastAPI + Uvicorn |
 | Containers | Docker e Docker Compose |
 
 ### Tabelas do banco
@@ -91,7 +96,8 @@ iamp/
 ├── infra/                # Terraform (em construção)
 ├── models/               # modelos de Machine Learning (em construção)
 ├── prompts/              # registro dos prompts usados com IA
-├── docker-compose.yml    # sobe o PostgreSQL
+├── Dockerfile            # imagem da API
+├── docker-compose.yml    # sobe o PostgreSQL e a API
 ├── requirements.txt      # bibliotecas Python
 └── .env.example          # modelo das credenciais do banco
 ```
@@ -151,19 +157,27 @@ Copie o arquivo de exemplo:
 
 Abra o `.env` e troque a senha em `POSTGRES_PASSWORD`. Esse arquivo não vai para o GitHub.
 
-### Passo 5: subir o banco de dados
+### Passo 5: subir o banco e a API
 
 Abra o Docker Desktop e depois rode:
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Para conferir se o container `postgres_iamp` está rodando:
+Isso sobe dois containers:
+
+- `postgres_iamp`: o banco PostgreSQL (porta 5434)
+- `api_iamp`: a API FastAPI (porta 8000)
+
+Na primeira vez, a API carrega os dados de `datasets/processed/` no banco sozinha (leva cerca de 1 minuto).
+Para conferir se os dois estão `healthy`:
 
 ```bash
 docker ps
 ```
+
+Depois abra **http://localhost:8000/docs** no navegador para ver e testar a API (ver seção 7).
 
 ### Passo 6 (opcional): refazer a limpeza dos dados
 
@@ -173,7 +187,9 @@ Os dados limpos já estão em `datasets/processed/`. Só rode este passo se muda
 python scripts/executar_pipeline.py
 ```
 
-### Passo 7: carregar os dados no banco
+### Passo 7 (opcional): recarregar os dados no banco
+
+A API já carrega os dados na primeira subida. Rode este passo só se refez a limpeza (Passo 6) ou quer recriar as tabelas sem reiniciar a API.
 
 ```bash
 cd src
@@ -207,7 +223,45 @@ Resultado: cerca de 41 kWh por mês, ou **R$ 31,68 por mês**.
 
 ---
 
-## 7. Como o cálculo funciona
+## 7. API
+
+Documentação interativa: **http://localhost:8000/docs** (dá para testar cada endereço em "Try it out").
+
+| Endereço | Para que serve |
+|---|---|
+| `GET /aparelhos?busca=brastemp` | Busca aparelhos por marca e/ou modelo (opcional: `categoria`, `limite`) |
+| `GET /aparelhos/{id}/uso` | Diz o que o app precisa perguntar: `horas`, `ciclos`, `velocidade` ou nada (`null`) |
+| `GET /distribuidoras?uf=PR` | Lista as distribuidoras com tarifa vigente (opcional: `busca=copel`) |
+| `POST /calcular` | Devolve o consumo (kWh/mês) e o custo (R$/mês e R$/ano) |
+| `GET /categorias`, `GET /ufs` | Listas para preencher filtros no app |
+| `GET /saude` | Diz se a API e o banco estão no ar |
+
+Fluxo do app: buscar o aparelho → perguntar o uso → escolher a distribuidora → calcular.
+
+Exemplo de `POST /calcular` (chuveiro Bosch EWI 5.5, 15 min por dia, Copel):
+
+```json
+{
+  "aparelho_id": 9844,
+  "distribuidora_id": 60,
+  "horas_dia": 0.25
+}
+```
+
+Resposta (resumida): `"kwh_mes": 41.25`, `"custo_mes": 31.68`, `"custo_ano": 380.17`, além de `metodo` e `avisos`.
+
+Regras do corpo:
+
+- Envie `distribuidora_id` **ou** `tarifa_manual` (R$/kWh da conta de luz), nunca os dois.
+- `horas_dia` (0 a 24), `ciclos_mes` ou `velocidade` (`baixa`, `media`, `alta`) conforme o `GET /uso`. Se faltar, usa o valor padrão quando existe.
+- `registrar` (padrão `true`) grava o cálculo na tabela `consultas`.
+- Erros: `404` quando o aparelho ou a distribuidora não existe, `422` quando falta ou sobra algum dado.
+
+Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
+
+---
+
+## 8. Como o cálculo funciona
 
 | Caso | Como calcula |
 |---|---|
@@ -222,7 +276,7 @@ Resultado: cerca de 41 kWh por mês, ou **R$ 31,68 por mês**.
 
 ---
 
-## 8. Limitações
+## 9. Limitações
 
 - O valor é uma estimativa: não inclui impostos (ICMS, PIS/COFINS), bandeira tarifária nem iluminação pública.
 - O consumo do Inmetro é medido em laboratório. O uso real pode ser diferente.
@@ -231,7 +285,7 @@ Resultado: cerca de 41 kWh por mês, ou **R$ 31,68 por mês**.
 
 ---
 
-## 9. Fontes dos dados
+## 10. Fontes dos dados
 
 | Dado | Fonte |
 |---|---|
@@ -240,21 +294,20 @@ Resultado: cerca de 41 kWh por mês, ou **R$ 31,68 por mês**.
 
 ---
 
-## 10. O que já foi feito
+## 11. O que já foi feito
 
 - Dados do Inmetro e da ANEEL baixados e limpos com Pandas
 - Banco PostgreSQL no Docker com as tabelas do projeto
 - Cálculo de consumo e custo para 12 tipos de aparelho
 - App de terminal funcionando de ponta a ponta
+- API FastAPI no Docker, subindo junto com o banco (`docker compose up -d`)
 - Diagrama BPMN inicial em `docs/`
 
-## 11. Próximas etapas
+## 12. Próximas etapas
 
 - Análise exploratória com gráficos (Matplotlib/Seaborn)
 - Modelo de Machine Learning para estimar o consumo de aparelhos fora do catálogo
-- API com FastAPI
 - Assistente com IA generativa (RAG com LangChain)
 - App Flutter ligado à API
-- Dockerfile da API e Terraform
+- Terraform
 - Documentação de ética e governança
-- Completar o estado de cada distribuidora (`distribuidoras_uf.csv`)

@@ -124,7 +124,7 @@ def rodar_exemplos(con):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cria as tabelas do WattWise no PostgreSQL")
+    parser = argparse.ArgumentParser(description="Cria as tabelas do iamp no PostgreSQL")
     parser.add_argument("--exemplos", action="store_true", help="roda as consultas de exemplo no final")
     args = parser.parse_args()
 
