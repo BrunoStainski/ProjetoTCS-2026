@@ -133,6 +133,13 @@ colunas_validas = [c for c in colunas_numericas if c in df.columns]
 for col in colunas_validas:
     df[col] = pd.to_numeric(df[col], errors='coerce')
 
+# Marca as linhas em que algum consumo por velocidade vai ser estimado (o app avisa o usuário)
+df['Consumo_Imputado'] = df[[
+    'Consumo_de_Energia_MensalkWh_mês_Baixa',
+    'Consumo_de_Energia_MensalkWh_mês_Média',
+    'Consumo_de_Energia_MensalkWh_mês_Alta',
+]].isna().any(axis=1)
+
 # --- Imputação Proporcional (Consumo e Eficiência) ---
 ratio_cons_baixa = (df['Consumo_de_Energia_MensalkWh_mês_Baixa'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()
 ratio_cons_alta = (df['Consumo_de_Energia_MensalkWh_mês_Alta'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()

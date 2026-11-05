@@ -93,6 +93,7 @@ class PerguntaDeUso(BaseModel):
     )
     opcoes: Optional[list[str]] = Field(None, description="Opcoes de velocidade, quando a pergunta e velocidade.")
     padrao: Union[float, str, None] = Field(None, description="Valor sugerido. null = o usuario precisa informar.")
+    opcional: bool = Field(False, description="true = o usuario pode deixar em branco e fica o valor do Inmetro.")
 
 
 class Distribuidora(BaseModel):

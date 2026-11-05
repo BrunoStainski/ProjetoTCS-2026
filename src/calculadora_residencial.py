@@ -27,6 +27,15 @@ PREMISSAS = {
     "maquina_de_lavar": {"ciclos_mes": 12},
 }
 
+# Aparelhos em que o Inmetro ja informa o kWh/mes, mas o uso real varia muito de casa para casa.
+# O app pergunta as horas (resposta opcional); sem resposta, fica o valor da tabela do Inmetro.
+#  - ar-condicionado: usa a potencia a 35 C em carga total (teto: o inverter costuma gastar menos)
+#  - televisor: o dataset nao traz a potencia ligada, entao o kWh/mes e reescalado pelas horas
+#    que o Inmetro supoe no ensaio. PENDENTE: confirmar esse numero no regulamento do PBE de
+#    televisores; enquanto for None, a TV continua usando so o valor da tabela.
+HORAS_REFERENCIA_INMETRO = {"televisor": None}
+HORAS_OPCIONAIS = {"ar_condicionado"} | {c for c, h in HORAS_REFERENCIA_INMETRO.items() if h}
+
 COLUNAS_NUM = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
     "kwh_ciclo", "potencia_w", "standby_kwh_mes",
@@ -34,6 +43,8 @@ COLUNAS_NUM = [
 
 AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifaria e iluminacao "
                 "publica. O uso real muda o resultado.")
+# Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
+AVISO_TARIFA_USUARIO = ("Calculado com a tarifa que voce informou. O uso real muda o resultado.")
 
 # Cada spec diz quais colunas do CSV limpo viram cada campo do catalogo.
 # "capacidade": (coluna, unidade) aparece na tela, ex.: "490 L".
@@ -171,6 +182,9 @@ def _construir(df, spec):
     out["origem_dado"] = "informado"
     if spec.get("derivado"):
         out.loc[spec["derivado"](df), "origem_dado"] = "derivado ou estimado na limpeza"
+    if "consumo_imputado" in df.columns:  # marcado pelos scripts de limpeza
+        imputado = df["consumo_imputado"].astype(str).str.lower().isin(["true", "1"])
+        out.loc[imputado, "origem_dado"] = "derivado ou estimado na limpeza"
     out["arquivo"] = spec["arquivo"]
 
     # descarta linhas sem nenhum dado de consumo e valores impossiveis
@@ -210,9 +224,27 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
         return {"kwh_mes": float(aparelho[f"kwh_mes_{velocidade}"]),
                 "metodo": f"consumo mensal do Inmetro, velocidade {velocidade}", "premissa": False}
 
+    if horas_dia is not None and aparelho["categoria"] in HORAS_OPCIONAIS:
+        if not 0 <= horas_dia <= 24:
+            raise ValueError("horas por dia precisa estar entre 0 e 24")
+        if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
+            return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
+                    "metodo": (f"{aparelho['potencia_w']:g} W (potencia do Inmetro a 35 C, carga total) x "
+                               f"{horas_dia:g} h/dia x {dias} dias (informado); valor maximo, "
+                               "o compressor nao fica ligado o tempo todo"),
+                    "premissa": False}
+        referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
+        if referencia and pd.notna(aparelho["kwh_mes"]):
+            return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
+                    "metodo": (f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
+                               f"ajustado para {horas_dia:g} h/dia (informado)"),
+                    "premissa": False}
+
     if pd.notna(aparelho["kwh_mes"]):
-        return {"kwh_mes": float(aparelho["kwh_mes"]), "metodo": "consumo mensal do Inmetro",
-                "premissa": False}
+        metodo = "consumo mensal do Inmetro"
+        if aparelho["categoria"] in HORAS_OPCIONAIS:
+            metodo += " (uso padrao do ensaio; informe as horas de uso para ajustar)"
+        return {"kwh_mes": float(aparelho["kwh_mes"]), "metodo": metodo, "premissa": False}
 
     if pd.notna(aparelho["kwh_ciclo"]):
         ciclos = ciclos_mes if ciclos_mes is not None else premissa.get("ciclos_mes")
@@ -243,10 +275,11 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
     raise ValueError("aparelho sem dados de consumo")
 
 
-def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa, uf, horas_dia=None):
+def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa, uf, horas_dia=None,
+                     tarifa_do_usuario=False):
     """Dicionario final que a tela mostra e que vai para a tabela consultas."""
     custo_mes = consumo["kwh_mes"] * tarifa_kwh
-    avisos = [AVISO_PADRAO]
+    avisos = [AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO]
     if consumo.get("premissa"):
         avisos.append("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.")
     if aparelho.get("origem_dado") not in (None, "informado"):
