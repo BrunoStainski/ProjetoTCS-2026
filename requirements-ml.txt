@@ -1,0 +1,7 @@
+# Dependências de Machine Learning (seed, CTGAN, K-Means, EDA).
+# Ficam fora da imagem da API por serem pesadas (sdv instala torch).
+# Instalação: pip install -r requirements.txt -r requirements-ml.txt  (Python 3.12)
+sdv
+scikit-learn
+matplotlib
+jupyter
