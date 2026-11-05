@@ -141,6 +141,9 @@ colunas_opcionais = [
 colunas_obrigatorias = [c for c in colunas_obrigatorias if c in df.columns]
 colunas_opcionais = [c for c in colunas_opcionais if c in df.columns]
 
+# Marca as linhas cujo consumo vai ser preenchido pela média (o app avisa o usuário)
+df['Consumo_Imputado'] = df['Consumo_de_energia_kWh_ciclo_água_fria'].isna()
+
 if 'Marca' in df.columns and 'Tensão_V' in df.columns:
     df[colunas_obrigatorias] = (
         df.groupby(['Marca', 'Tensão_V'])[colunas_obrigatorias]

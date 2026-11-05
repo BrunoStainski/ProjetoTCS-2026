@@ -139,6 +139,10 @@ colunas_imputar = [
 ]
 colunas_validas = [c for c in colunas_imputar if c in df.columns]
 
+# Marca as linhas cuja potência ou stand-by vai ser preenchido pela média (o app avisa o usuário)
+df['Consumo_Imputado'] = df[[c for c in ('Potência_Nominal_W', 'Consumo_Modo_Espera_Stand-by_kWh_dia')
+                             if c in df.columns]].isna().any(axis=1)
+
 # Imputação pela média agrupada em (Marca, Tensão)
 if 'Marca' in df.columns and 'Tensão_V' in df.columns:
     df[colunas_validas] = (

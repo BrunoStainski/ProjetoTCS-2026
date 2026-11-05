@@ -119,6 +119,16 @@ def etapa_5_imputacao(df: pd.DataFrame) -> pd.DataFrame:
     ]
     cols_imputar = [c for c in cols_numericas if c in df_clean.columns]
 
+    # Marca as linhas cujo consumo vai ser preenchido pela média (o app avisa o usuário).
+    # Modelos do padrão 2025 trazem o consumo em outra coluna, que não é imputada.
+    consumo = df_clean["Consumo_de_Energia_Mensal_kWh_mês"].isna()
+    col_2025 = next((c for c in df_clean.columns
+                     if c.lower().startswith("consumo_médio_de_energia_mensal")
+                     or c.lower().startswith("consumo_medio_de_energia_mensal")), None)
+    if col_2025:
+        consumo &= pd.to_numeric(df_clean[col_2025], errors="coerce").isna()
+    df_clean["Consumo_Imputado"] = consumo
+
     # 1. Imputação por Marca + Tipo
     if {"Marca", "Tipo"}.issubset(df_clean.columns) and cols_imputar:
         df_clean[cols_imputar] = df_clean.groupby(["Marca", "Tipo"])[

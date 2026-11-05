@@ -14,7 +14,7 @@ import pandas as pd
 
 import banco
 from calculadora_residencial import (
-    LIMITE_BUSCA, PREMISSAS, consumo_mensal_kwh, montar_resultado, normalizar,
+    HORAS_OPCIONAIS, LIMITE_BUSCA, PREMISSAS, consumo_mensal_kwh, montar_resultado, normalizar,
 )
 
 
@@ -50,12 +50,15 @@ def aparelho_por_id(con, aparelho_id):
 
 def dados_de_uso(con, aparelho_id):
     """Diz o que a tela precisa perguntar antes de calcular.
-    pergunta: None, "velocidade", "ciclos" ou "horas"; padrao: valor sugerido (estimativa do grupo)."""
+    pergunta: None, "velocidade", "ciclos" ou "horas"; padrao: valor sugerido (estimativa do grupo);
+    opcional: True quando o usuario pode deixar em branco e ficar com o valor do Inmetro."""
     a = aparelho_por_id(con, aparelho_id)
     velocidades = [v for v in ("baixa", "media", "alta") if pd.notna(a[f"kwh_mes_{v}"])]
     if velocidades:
         return {"pergunta": "velocidade", "opcoes": velocidades,
                 "padrao": "media" if "media" in velocidades else velocidades[-1]}
+    if a["categoria"] in HORAS_OPCIONAIS and (pd.notna(a["kwh_mes"]) or pd.notna(a["potencia_w"])):
+        return {"pergunta": "horas", "padrao": None, "opcional": True}
     if pd.notna(a["kwh_mes"]):
         return {"pergunta": None}  # o Inmetro ja informa o consumo mensal
     premissa = PREMISSAS.get(a["categoria"], {})
@@ -113,7 +116,8 @@ def calcular(con, aparelho_id, distribuidora_id=None, tarifa_manual=None,
     else:
         raise ValueError("escolha uma distribuidora ou informe a tarifa da conta de luz")
 
-    resultado = montar_resultado(aparelho, consumo, tarifa, nome, origem, uf, horas_dia)
+    resultado = montar_resultado(aparelho, consumo, tarifa, nome, origem, uf, horas_dia,
+                                 tarifa_do_usuario=tarifa_manual is not None)
     resultado["fonte_dados"] = "PostgreSQL"
     if registrar:
         banco.registrar_consulta(con, resultado, horas_dia=horas_dia,

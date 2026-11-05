@@ -80,11 +80,14 @@ def passo_uso(con, aparelho):
     uso = servico.dados_de_uso(con, aparelho["id"])
     horas = ciclos = velocidade = None
     if uso["pergunta"] == "horas":
-        padrao = uso["padrao"]
-        dica = f"Enter = {num(padrao, 1)} h, estimativa" if padrao else "obrigatorio"
+        padrao, opcional = uso["padrao"], uso.get("opcional", False)
+        if opcional:
+            dica = "Enter = usar o consumo do Inmetro"
+        else:
+            dica = f"Enter = {num(padrao, 1)} h, estimativa" if padrao else "obrigatorio"
         while True:
             horas = numero_ou_padrao(f"   Quantas horas por dia voce usa? [{dica}]: ", padrao)
-            if horas is not None or padrao:
+            if horas is not None or padrao or opcional:
                 break
             print("   Para este aparelho preciso das horas de uso.")
     elif uso["pergunta"] == "ciclos":
