@@ -1,6 +1,7 @@
 services:
   postgres_db:
-    image: postgres:15-alpine
+    # PostgreSQL 15 com a extensao pgvector (base vetorial do RAG Eco-Coach)
+    image: pgvector/pgvector:pg15
     container_name: postgres_iamp
     restart: always
     env_file: .env

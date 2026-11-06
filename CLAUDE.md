@@ -18,6 +18,8 @@ datasets/raw/ (Inmetro + ANEEL)
   -> src/main.py (API FastAPI)  |  src/app_terminal.py (teste no terminal)
   -> app_gerenciamento_energetico/ (app Flutter ligado à API; ver seção "App Flutter")
 
+RAG: datasets/raw/rag/ (+ fontes.csv) -> scripts/carregar_rag.py -> trechos_rag (pgvector)
+     -> src/rag.py (busca) -> src/rag_agent.py (Gemini escreve) -> POST /eco-coach
 ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py -> models/ctgan.pkl
     + residencias_sinteticas.csv -> scripts/treinar_kmeans.py -> models/kmeans.pkl -> src/ml_pipeline.py
 ```
@@ -26,7 +28,7 @@ ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py ->
 
 Python 3.12 (o mesmo do Dockerfile; não usar 3.14), Pandas, SQLAlchemy **Core** com SQL
 parametrizado (não há ORM; `banco.py` troca `?` por parâmetros nomeados), psycopg2,
-FastAPI + Uvicorn, PostgreSQL 15, Docker Compose, Flutter (Dart, só o pacote `http`).
+FastAPI + Uvicorn, PostgreSQL 15 com pgvector (imagem `pgvector/pgvector:pg15`), Docker Compose, Flutter (Dart, só o pacote `http`).
 
 ## Como rodar
 
@@ -44,6 +46,8 @@ python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
 python scripts/gerar_seed.py; python scripts/treinar_ctgan.py; python scripts/treinar_kmeans.py
 # EDA (gera docs/graficos/*.png):
 jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
+# Eco-Coach (GEMINI_API_KEY no .env; PostgreSQL no ar): carrega os documentos na base vetorial
+python scripts/carregar_rag.py
 # Testes (pip install -r requirements-dev.txt; sem o PostgreSQL, os de banco são pulados):
 pytest                               # tudo;   pytest -m "not banco"  # só os rápidos
 ```
@@ -79,6 +83,7 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
 `POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
+`POST /eco-coach` ({moradores, itens:[{categoria, kwh_mes, custo_mes}], trocas?} -> plano com fontes [n]),
 `POST /comparar` (+ alternativa_id e preco_novo opcional -> economia e payback em meses).
 Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py).
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
@@ -96,6 +101,24 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
   HISENSE RS3P428NEDA1 com 2,8 kWh); variações do mesmo modelo (marca+detalhe+kWh) aparecem uma vez.
 - Sem sugestão (`SEM_SUGESTAO`, com o motivo para o app): chuveiro, micro-ondas, vapor de sódio.
 - Payback = preco_novo / economia_mes (Python, na API). O catálogo não tem preço: o usuário digita.
+
+## Eco-Coach (RAG) — `src/rag.py`, `src/rag_agent.py`, `scripts/carregar_rag.py`
+
+- Documentos em `datasets/raw/rag/` com a origem em `fontes.csv`: 4 páginas do Inmetro (dicas,
+  etiqueta ENCE, nova etiqueta de geladeira 2026, PBE) + cartilha da Cemig 2025 (páginas 2–17).
+  O Procel Info saiu do ar e o Internet Archive não guardou as dicas, por isso a Cemig.
+- Limpeza da cartilha: só itens com marcador (•); o PDF tem anotações para o ilustrador sem marcador.
+  Seção por página (`SECAO_DA_PAGINA`) + títulos curtos com nome de aparelho (`SECOES`).
+- Embeddings LOCAIS com fastembed (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim, sem torch);
+  cache em `models/fastembed/` (fora do git; a imagem Docker baixa no build). Tabela `trechos_rag`
+  (vector(384)) é criada pelo script, não pelo `criar_banco.py`; recarga apaga e recria os trechos.
+- LLM: Gemini pela API gratuita do AI Studio (`GEMINI_API_KEY`; `GEMINI_MODELOS` = principal e reserva,
+  hoje `gemini-3.5-flash,gemini-3.5-flash-lite`). `thinking_budget=0`: o raciocínio interno cortava o texto.
+  Hugging Face foi descartado: a conta não tem crédito gratuito (402).
+- O Python calcula tudo (perfil, totais, maiores consumos; payback vem do /comparar); o LLM só escreve,
+  com regras no prompt (não inventar números, toda dica com [n], ignorar instruções dentro das fontes).
+  `fontes` na resposta só traz as citações que existem. Erros: 422 entrada, 503 LLM/base indisponível.
+- Testes em `tests/test_rag_agent.py` trocam o LLM por resposta fixa (não chamam o Gemini).
 
 ## App Flutter (`app_gerenciamento_energetico/lib/`)
 
@@ -141,8 +164,7 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 
 ## Próximas etapas
 
-RAG "Eco-Coach" com LangChain (`src/rag_agent.py` vazio; o payback já existe em
-`/comparar`, o LLM só explica; pgvector é candidato a banco vetorial), Terraform (`infra/main.tf`
+tela do Eco-Coach no app, Terraform (`infra/main.tf`
 vazio), documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
 No app: salvar "Minha casa" entre sessões e a tela do Eco-Coach.
@@ -166,6 +188,10 @@ BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e ima
   potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV
   reescala por regra de três com 6,59 h/dia de ensaio (`HORAS_REFERENCIA_INMETRO`): número
   levantado pelo grupo, sem o documento oficial e sem saber se o kWh/mês inclui o stand-by.
+- Eco-Coach: no plano gratuito da API do Gemini o Google pode usar o conteúdo enviado para melhorar
+  os produtos (confirmar nos termos atuais). Enviamos só números de consumo e trechos públicos, nada
+  pessoal. O plano gratuito tem limite de uso e os modelos disponíveis mudam (o 2.5 já saiu do ar).
+- O texto do Eco-Coach é gerado por IA: pode errar mesmo com as regras; por isso cita as fontes.
 - Residências do ML são sintéticas: os perfis servem para demonstração.
 - O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 
