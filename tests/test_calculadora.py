@@ -3,7 +3,8 @@
 import pytest
 
 from calculadora_residencial import (
-    AVISO_PADRAO, AVISO_TARIFA_USUARIO, PREMISSAS, consumo_mensal_kwh, montar_resultado, normalizar,
+    AVISO_PADRAO, AVISO_TARIFA_USUARIO, HORAS_OPCIONAIS, HORAS_REFERENCIA_INMETRO, PREMISSAS,
+    consumo_mensal_kwh, montar_resultado, normalizar,
 )
 from conftest import aparelho
 
@@ -59,6 +60,17 @@ def test_ar_condicionado_sem_horas_usa_inmetro_e_com_horas_usa_potencia():
     ar = aparelho("ar_condicionado", kwh_mes=64.0, potencia_w=1000)
     assert consumo_mensal_kwh(ar)["kwh_mes"] == pytest.approx(64.0)
     assert consumo_mensal_kwh(ar, horas_dia=8)["kwh_mes"] == pytest.approx(1000 * 8 * 30 / 1000)
+
+
+def test_tv_sem_horas_usa_inmetro_e_com_horas_reescala_pelo_ensaio():
+    """Ensaio da TV: 6,59 h/dia ligada. 12 kWh/mes a 3 h/dia -> 12 x 3 / 6,59."""
+    tv = aparelho("televisor", kwh_mes=12.0)
+    assert HORAS_REFERENCIA_INMETRO["televisor"] == 6.59
+    assert "televisor" in HORAS_OPCIONAIS
+    assert consumo_mensal_kwh(tv)["kwh_mes"] == pytest.approx(12.0)
+    r = consumo_mensal_kwh(tv, horas_dia=3)
+    assert r["kwh_mes"] == pytest.approx(12 * 3 / 6.59)
+    assert "6.59" in r["metodo"]
 
 
 # Regra 2: kWh/ciclo x ciclos ------------------------------------------------------------

@@ -31,9 +31,11 @@ PREMISSAS = {
 # O app pergunta as horas (resposta opcional); sem resposta, fica o valor da tabela do Inmetro.
 #  - ar-condicionado: usa a potencia a 35 C em carga total (teto: o inverter costuma gastar menos)
 #  - televisor: o dataset nao traz a potencia ligada, entao o kWh/mes e reescalado pelas horas
-#    que o Inmetro supoe no ensaio. PENDENTE: confirmar esse numero no regulamento do PBE de
-#    televisores; enquanto for None, a TV continua usando so o valor da tabela.
-HORAS_REFERENCIA_INMETRO = {"televisor": None}
+#    do ensaio (regra de tres: kWh/mes x horas do usuario / 6,59).
+#    6,59 h ligada + 17,41 h em stand-by por dia = padrao de ensaio levantado pelo grupo.
+#    LIMITACAO: ainda sem o documento oficial (regulamento do PBE de televisores) e sem saber se
+#    o kWh/mes do Inmetro inclui o stand-by; por isso o consumo inteiro e reescalado.
+HORAS_REFERENCIA_INMETRO = {"televisor": 6.59}
 HORAS_OPCIONAIS = {"ar_condicionado"} | {c for c, h in HORAS_REFERENCIA_INMETRO.items() if h}
 
 COLUNAS_NUM = [

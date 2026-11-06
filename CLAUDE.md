@@ -112,7 +112,13 @@ BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e ima
 - Consumo do Inmetro é de laboratório, não de uso real.
 - Alguns consumos foram imputados pela média na limpeza (geladeira, máquina, micro-ondas,
   ventilador de mesa) e ainda aparecem como "informado" — só o ar-condicionado é marcado.
-- Ar-condicionado e TV usam o kWh/mês fixo do Inmetro, sem perguntar as horas de uso.
+- Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
+  potência a 35 °C em carga total (teto). A TV reescala pela regra de três com 6,59 h/dia de ensaio
+  (`HORAS_REFERENCIA_INMETRO`): número levantado pelo grupo, sem o documento oficial e sem saber
+  se o kWh/mês do Inmetro inclui o stand-by.
+- TVs: 77 consumos com a vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela)
+  foram corrigidos na limpeza e marcados em `consumo_imputado`; stand-by > 10 W foi apagado
+  (`standby_suspeito`).
 - Residências do ML são sintéticas: os perfis servem para demonstração.
 - O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 
