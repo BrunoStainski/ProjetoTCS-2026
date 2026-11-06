@@ -69,8 +69,10 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 ## API (`src/main.py`)
 
 `GET /aparelhos?busca=`, `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
-`POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`.
-Erros: 404 (não existe), 422 (dado faltando). Ids mudam ao recriar o banco.
+`POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
+`POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco).
+Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
+A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de `models/`).
 
 ## Machine Learning (Dupla 2)
 
@@ -94,7 +96,7 @@ Erros: 404 (não existe), 422 (dado faltando). Ids mudam ao recriar o banco.
 
 ## Próximas etapas
 
-Endpoint `POST /classificar` na API, EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
+EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
 só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API, Terraform
 (`infra/main.tf` vazio), documento de processo/ética, BPMN (`docs/bpmn_processo.png`), deck e vídeo.
 
