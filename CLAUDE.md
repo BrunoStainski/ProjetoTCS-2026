@@ -128,10 +128,10 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 
 ## Próximas etapas
 
-EDA com gráficos, RAG "Eco-Coach" com LangChain (`src/rag_agent.py` vazio; o payback já existe em
+RAG "Eco-Coach" com LangChain (`src/rag_agent.py` vazio; o payback já existe em
 `/comparar`, o LLM só explica; pgvector é candidato a banco vetorial), Terraform (`infra/main.tf`
 vazio), documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
-(`prompts/registros_vibecoding.md` vazio), testes em Python, deck e vídeo.
+(`prompts/registros_vibecoding.md` vazio), deck e vídeo.
 No app: salvar "Minha casa" entre sessões e a tela do Eco-Coach.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
@@ -141,14 +141,18 @@ BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e ima
 
 - Consumo do Inmetro é de laboratório, não de uso real.
 - Alguns consumos foram imputados na limpeza (ar-condicionado, geladeira, micro-ondas, ventilador
-  de mesa): ficam com `origem_dado = 'derivado ou estimado na limpeza'`, o app avisa e eles não
+  de mesa, TV): ficam com `origem_dado = 'derivado ou estimado na limpeza'`, o app avisa e eles não
   entram nas sugestões de troca.
-- O Inmetro tem erros de digitação no consumo (ex.: 28,0 vs 2,8 kWh); as sugestões filtram os casos
-  extremos, mas o cálculo do aparelho escolhido usa o valor como veio.
+- O Inmetro tem erros de digitação no consumo (ex.: 28,0 vs 2,8 kWh). Nas TVs, 77 consumos com a
+  vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela) são corrigidos na limpeza
+  (`consumo_imputado`, motivo em `correcao_consumo`) e o stand-by > 10 W é apagado
+  (`standby_suspeito`). Nas outras categorias, as sugestões filtram os casos extremos, mas o
+  cálculo do aparelho escolhido usa o valor como veio.
 - Payback simples (sem juros, sem revenda do antigo, sem reajuste de tarifa) e com preço digitado.
-- TV usa o kWh/mês fixo do Inmetro, sem perguntar as horas (falta confirmar as horas do ensaio,
-  `HORAS_REFERENCIA_INMETRO`). Ar-condicionado pergunta as horas (opcional) e usa a potência a
-  35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo).
+- Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
+  potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV
+  reescala por regra de três com 6,59 h/dia de ensaio (`HORAS_REFERENCIA_INMETRO`): número
+  levantado pelo grupo, sem o documento oficial e sem saber se o kWh/mês inclui o stand-by.
 - Residências do ML são sintéticas: os perfis servem para demonstração.
 - O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 

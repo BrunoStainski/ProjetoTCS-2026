@@ -103,6 +103,12 @@ def test_ar_condicionado_pede_horas_opcionais(api, id_da_categoria):
 
 
 @pytest.mark.banco
+def test_tv_pede_horas_opcionais(api, id_da_categoria):
+    uso = api.get(f"/aparelhos/{id_da_categoria('televisor')}/uso").json()
+    assert uso["pergunta"] == "horas" and uso["opcional"] is True
+
+
+@pytest.mark.banco
 def test_aparelho_inexistente_da_404(api):
     assert api.get("/aparelhos/999999999/uso").status_code == 404
 
