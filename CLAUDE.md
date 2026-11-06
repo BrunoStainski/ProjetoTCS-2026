@@ -17,6 +17,9 @@ datasets/raw/ (Inmetro + ANEEL)
   -> src/servico.py (funções usadas por qualquer interface)
   -> src/main.py (API FastAPI)  |  src/app_terminal.py (teste no terminal)
   -> app_gerenciamento_energetico/ (Flutter — ainda é o template inicial)
+
+ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py -> models/ctgan.pkl
+    + residencias_sinteticas.csv -> scripts/treinar_kmeans.py -> models/kmeans.pkl -> src/ml_pipeline.py
 ```
 
 ## Stack
@@ -34,6 +37,8 @@ docker compose up -d --build         # postgres_iamp (porta 5434) + api_iamp (po
 # http://localhost:8000/docs
 cd src && python criar_banco.py      # recarga manual;   python app_terminal.py  # teste
 python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
+# ML (pip install -r requirements-ml.txt; nesta ordem, ~5 min no CPU):
+python scripts/gerar_seed.py; python scripts/treinar_ctgan.py; python scripts/treinar_kmeans.py
 ```
 
 ## Banco (definido em `src/banco.py`, constante ESQUEMA)
@@ -67,19 +72,29 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`.
 Erros: 404 (não existe), 422 (dado faltando). Ids mudam ao recriar o banco.
 
-## Machine Learning (planejado — Dupla 2)
+## Machine Learning (Dupla 2)
 
-- Seed de residências geradas por regras com aparelhos e tarifas reais (`scripts/gerar_seed.py`).
-- **CTGAN** (SDV) aprende a seed e gera milhares de residências sintéticas -> `models/ctgan.pkl`.
-- **K-Means** agrupa residências em Consciente / Moderado / Ineficiente usando variáveis por
-  morador (kWh/morador, fração de chuveiro/ar/geladeira) -> `models/kmeans.pkl`.
-- `src/ml_pipeline.py` expõe `classificar_residencia(inventario) -> {perfil, kwh_por_morador, comparacao_media}`
-  para a API. Dependências pesadas (sdv/torch) ficam em `requirements-ml.txt`, fora da imagem da API.
+- **Seed** (`scripts/gerar_seed.py`): 3.000 residências por regras, com aparelhos reais do
+  catálogo e tarifas vigentes da ANEEL; consumo via `consumo_mensal_kwh` (mesmas regras do app).
+  Perfis econômico/moderado/ineficiente e probabilidades em `PERFIS` são premissas do grupo.
+  Ar-condicionado limitado a 3.500 W e fator de compressor 0,6. `perfil_regra` é o rótulo da
+  geração: **nunca** entra no treino (vazamento), só na conferência do K-Means.
+- **CTGAN** (SDV 2.1, `scripts/treinar_ctgan.py`): aprende UF, moradores (categórico), cômodos,
+  `tem_*` e kWh por aparelho (chuveiro por morador). Total, custo e frações são recalculados;
+  distribuidora/tarifa sorteadas entre as reais da UF. Gera 5.000 casas; `validar()` imprime a
+  comparação seed × sintética. SDV 2.x: `fit`/`sample` usam `{"residencias": df}`.
+- **K-Means** (`scripts/treinar_kmeans.py`, k=3): variáveis `kwh_por_morador` (log, peso 2) e
+  `frac_chuveiro/ar/refrigerador` (peso 0,5); nome do grupo pela média de kWh/morador.
+  O `kmeans.pkl` guarda só números, então a API não precisa de scikit-learn.
+- **`src/ml_pipeline.py`**: `classificar_residencia({"moradores", "itens": [{categoria, kwh_mes}]})`
+  -> perfil, kWh/morador e comparação com a mediana das sintéticas (+ aviso de dado sintético).
+- Resultados atuais: qualidade SDV ~85%; K-Means bate com o perfil da geração em ~73% da seed.
+- Dependências pesadas (sdv/torch) ficam em `requirements-ml.txt`, fora da imagem da API.
 - Extra opcional: regressão do consumo de geladeiras (sem a classe de eficiência como variável: vazamento).
 
 ## Próximas etapas
 
-EDA com gráficos, ML acima, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
+Endpoint `POST /classificar` na API, EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
 só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API, Terraform
 (`infra/main.tf` vazio), documento de processo/ética, BPMN (`docs/bpmn_processo.png`), deck e vídeo.
 
@@ -90,6 +105,7 @@ só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API,
   ventilador de mesa) e ainda aparecem como "informado" — só o ar-condicionado é marcado.
 - Ar-condicionado e TV usam o kWh/mês fixo do Inmetro, sem perguntar as horas de uso.
 - Residências do ML são sintéticas: os perfis servem para demonstração.
+- O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 
 ## Convenções
 
