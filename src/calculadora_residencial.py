@@ -38,8 +38,49 @@ HORAS_OPCIONAIS = {"ar_condicionado"} | {c for c, h in HORAS_REFERENCIA_INMETRO.
 
 COLUNAS_NUM = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
-    "kwh_ciclo", "potencia_w", "standby_kwh_mes",
+    "kwh_ciclo", "potencia_w", "standby_kwh_mes", "fluxo_lm",
 ]
+
+# Sugestao de aparelho mais economico: so comparamos modelos que fazem o mesmo servico.
+#  - categorias: onde procurar (fluorescente -> LED e permitido, as duas tem lumens)
+#  - medida: coluna que precisa ser parecida (capacidade = litros, polegadas, BTU/h, kg, cm ou cv)
+#  - tolerancia: diferenca maxima da medida (0.15 = 15% para mais ou para menos)
+#  - mesmo_tipo: exige o mesmo tipo (so onde o tipo vem padronizado no Inmetro)
+EQUIVALENCIA = {
+    "refrigerador": {"categorias": ["refrigerador"], "medida": "capacidade", "tolerancia": 0.15,
+                     "mesmo_tipo": True, "texto": "mesmo tipo e volume parecido (15% para mais ou para menos)"},
+    "televisor": {"categorias": ["televisor"], "medida": "capacidade", "tolerancia": 0.05,
+                  "mesmo_tipo": False, "texto": "tela do mesmo tamanho (5% para mais ou para menos)"},
+    "ar_condicionado": {"categorias": ["ar_condicionado"], "medida": "capacidade", "tolerancia": 0.05,
+                        "mesmo_tipo": True, "texto": "mesmo tipo e mesma capacidade em BTU/h (5%)"},
+    "ventilador_de_mesa": {"categorias": ["ventilador_de_mesa"], "medida": "capacidade", "tolerancia": 0.10,
+                           "mesmo_tipo": False, "texto": "helice de diametro parecido (10%)"},
+    "ventilador_de_teto": {"categorias": ["ventilador_de_teto"], "medida": "capacidade", "tolerancia": 0.10,
+                           "mesmo_tipo": False, "texto": "diametro parecido (10%)"},
+    "maquina_de_lavar": {"categorias": ["maquina_de_lavar"], "medida": "capacidade", "tolerancia": 0.15,
+                         "mesmo_tipo": True, "texto": "mesmo tipo e capacidade parecida em kg (15%)"},
+    "lampada_led": {"categorias": ["lampada_led"], "medida": "fluxo_lm", "tolerancia": 0.10,
+                    "mesmo_tipo": False, "texto": "mesma luminosidade em lumens (10%)"},
+    "lampada_fluorescente": {"categorias": ["lampada_led", "lampada_fluorescente"], "medida": "fluxo_lm",
+                             "tolerancia": 0.10, "mesmo_tipo": False,
+                             "texto": "mesma luminosidade em lumens (10%), incluindo lampadas LED"},
+    "bomba": {"categorias": ["bomba"], "medida": "capacidade", "tolerancia": 0.0, "mesmo_tipo": False,
+              "texto": "motor de mesma potencia (cv); confira vazao e altura com o fabricante"},
+}
+# Onde nao sugerimos troca, e o motivo (aparece no app).
+SEM_SUGESTAO = {
+    "chuveiro": ("Chuveiros eletricos tem eficiencia parecida: um modelo de menor potencia so esquenta "
+                 "menos a agua. Para economizar, reduza o tempo de banho ou use a posicao verao."),
+    "microondas": ("O Inmetro informa so a potencia do micro-ondas. Um modelo de menor potencia demora mais "
+                   "para aquecer, entao a economia nao pode ser estimada so com esses dados."),
+    "lampada_vapor_sodio": ("O dataset de vapor de sodio nao traz a luminosidade (lumens), entao nao da "
+                            "para achar uma lampada equivalente."),
+}
+# Uma sugestao precisa gastar pelo menos 5% menos que o aparelho atual.
+ECONOMIA_MINIMA = 0.05
+# Consumo abaixo de 40% da mediana dos modelos equivalentes e tratado como erro de digitacao no
+# Inmetro e nao e sugerido (ex.: HISENSE RS3P428NEDA = 28,0 kWh e a versao 127 V = 2,8 kWh).
+FRACAO_SUSPEITA = 0.4
 
 AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifaria e iluminacao "
                 "publica. O uso real muda o resultado.")
@@ -95,12 +136,12 @@ SPECS = [
     {
         "arquivo": "lampadas_led_limpo.csv", "categoria": "lampada_led",
         "tipo": "tipo_de_lampada", "capacidade": ("potencia_w", "W"),
-        "potencia_w": ["potencia_w"],
+        "potencia_w": ["potencia_w"], "fluxo_lm": "fluxo_luminoso_lm",
     },
     {
         "arquivo": "lampadas_fluorescentes_limpo.csv", "categoria": "lampada_fluorescente",
         "tipo": "tipo_de_bulbo", "capacidade": ("potencia_w", "W"),
-        "potencia_w": ["potencia_w"],
+        "potencia_w": ["potencia_w"], "fluxo_lm": "fluxo_luminoso_lm",
     },
     {
         "arquivo": "lampadas_vapor_sodio_limpo.csv", "categoria": "lampada_vapor_sodio",
@@ -178,6 +219,11 @@ def _construir(df, spec):
         out["potencia_w"] = _num(df, spec["potencia_w"])
     if "standby_dia" in spec:
         out["standby_kwh_mes"] = _num(df, [spec["standby_dia"]]) * DIAS_MES
+    if "fluxo_lm" in spec:  # lumens: usado para achar lampada equivalente
+        out["fluxo_lm"] = _num(df, [spec["fluxo_lm"]])
+        out.loc[out["fluxo_lm"] <= 0, "fluxo_lm"] = float("nan")
+        com_lm = out["fluxo_lm"].notna()
+        out.loc[com_lm, "detalhe"] = out.loc[com_lm, "detalhe"] + ", " + out.loc[com_lm, "fluxo_lm"].map("{:g} lm".format)
 
     out["origem_dado"] = "informado"
     if spec.get("derivado"):

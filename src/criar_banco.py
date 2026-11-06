@@ -26,7 +26,7 @@ CONSULTAS_SQL = Path(__file__).resolve().parent / "consultas_exemplo.sql"
 COLUNAS_APARELHOS = [
     "categoria", "marca", "modelo", "tipo", "capacidade", "unidade", "detalhe",
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta", "kwh_ciclo",
-    "potencia_w", "standby_kwh_mes", "origem_dado", "arquivo_origem", "busca",
+    "potencia_w", "standby_kwh_mes", "fluxo_lm", "origem_dado", "arquivo_origem", "busca",
 ]
 
 
