@@ -23,31 +23,32 @@ IconData iconeDaCategoria(String categoria) {
 
 /// Marca do app: raio amarelo + "iamp".
 class LogoIamp extends StatelessWidget {
-  final double tamanho;
-
-  const LogoIamp({super.key, this.tamanho = 22});
+  const LogoIamp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return const Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.bolt, color: Cores.amarelo, size: tamanho + 4),
-        Text('iamp',
-            style: TextStyle(fontSize: tamanho, fontWeight: FontWeight.w800, letterSpacing: 1, color: Cores.branco)),
+        Icon(Icons.bolt, color: Cores.amarelo, size: 28),
+        Text(
+          'iamp',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1, color: Cores.branco),
+        ),
       ],
     );
   }
 }
 
-/// Estrutura de toda tela: barra com o titulo, botao "Minha casa" e largura maxima
-/// (para o app ficar bom no navegador e no Windows).
+/// Estrutura de toda tela: barra com o titulo, botao "Minha casa", largura maxima
+/// e, opcionalmente, o botao principal fixo embaixo (zona do polegar no celular).
 class Pagina extends StatelessWidget {
   final String titulo;
   final Widget filho;
   final int? passo; // 1 a 4 no fluxo de calculo; null nas outras telas
   final bool mostrarCasa;
   final Widget? tituloWidget; // substitui o texto do titulo (ex.: logo na tela inicial)
+  final Widget? rodape; // acao principal, fixa embaixo
 
   const Pagina({
     super.key,
@@ -56,6 +57,7 @@ class Pagina extends StatelessWidget {
     this.passo,
     this.mostrarCasa = true,
     this.tituloWidget,
+    this.rodape,
   });
 
   @override
@@ -63,7 +65,10 @@ class Pagina extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: tituloWidget ?? Text(titulo),
-        actions: [if (mostrarCasa) const BotaoCasa(), const SizedBox(width: 8)],
+        actions: [
+          if (mostrarCasa) const BotaoCasa(),
+          const SizedBox(width: Espaco.p),
+        ],
         bottom: passo == null
             ? null
             : PreferredSize(
@@ -72,18 +77,47 @@ class Pagina extends StatelessWidget {
               ),
       ),
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Padding(padding: const EdgeInsets.all(16), child: filho),
-          ),
+        bottom: rodape == null,
+        child: _Largura(
+          child: Padding(padding: const EdgeInsets.all(Espaco.m), child: filho),
         ),
       ),
+      bottomNavigationBar: rodape == null
+          ? null
+          : DecoratedBox(
+              decoration: const BoxDecoration(
+                color: Cores.preto,
+                border: Border(top: BorderSide(color: Cores.borda)),
+              ),
+              child: SafeArea(
+                top: false,
+                child: _Largura(
+                  encolher: true,
+                  child: Padding(padding: const EdgeInsets.fromLTRB(Espaco.m, 12, Espaco.m, Espaco.m), child: rodape),
+                ),
+              ),
+            ),
     );
   }
 }
 
-/// Abre "Minha casa"; o numero mostra quantos aparelhos ja foram adicionados.
+/// Em tela larga (navegador, tablet) o conteudo fica centralizado com no maximo 640.
+/// encolher: ocupa so a altura do conteudo (no rodape; sem isso o Align toma a tela inteira).
+class _Largura extends StatelessWidget {
+  final Widget child;
+  final bool encolher;
+
+  const _Largura({required this.child, this.encolher = false});
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.topCenter,
+    heightFactor: encolher ? 1 : null,
+    child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 640), child: child),
+  );
+}
+
+/// Abre "Minha casa"; o numero mostra quantos aparelhos ja foram adicionados e pula quando muda.
 class BotaoCasa extends StatelessWidget {
   const BotaoCasa({super.key});
 
@@ -95,7 +129,14 @@ class BotaoCasa extends StatelessWidget {
         tooltip: 'Minha casa',
         icon: Badge(
           isLabelVisible: !casa.vazia,
-          label: Text('${casa.totalAparelhos}'),
+          label: TweenAnimationBuilder<double>(
+            key: ValueKey(casa.totalAparelhos),
+            tween: Tween(begin: 1.6, end: 1),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.elasticOut,
+            builder: (_, escala, filho) => Transform.scale(scale: escala, child: filho),
+            child: Text('${casa.totalAparelhos}'),
+          ),
           child: const Icon(Icons.home_outlined),
         ),
         onPressed: () => abrirMinhaCasa(context),
@@ -106,48 +147,91 @@ class BotaoCasa extends StatelessWidget {
 
 const rotaMinhaCasa = '/minha-casa';
 
-void abrirMinhaCasa(BuildContext context) {
+void abrirMinhaCasa(BuildContext context) => abrirMinhaCasaNo(Navigator.of(context));
+
+void abrirMinhaCasaNo(NavigatorState navegador) {
   // se "Minha casa" ja esta aberta mais atras, volta para ela em vez de abrir outra
   if (TelaMinhaCasa.abertas > 0) {
-    Navigator.popUntil(context, ModalRoute.withName(rotaMinhaCasa));
+    navegador.popUntil(ModalRoute.withName(rotaMinhaCasa));
     return;
   }
-  Navigator.push(
-    context,
-    MaterialPageRoute(settings: const RouteSettings(name: rotaMinhaCasa), builder: (_) => const TelaMinhaCasa()),
+  navegador.push(
+    MaterialPageRoute(
+      settings: const RouteSettings(name: rotaMinhaCasa),
+      builder: (_) => const TelaMinhaCasa(),
+    ),
   );
 }
 
-/// Cartao amarelo com o numero principal da tela (ex.: gasto por mes).
-class CartaoDestaque extends StatelessWidget {
-  final String titulo;
-  final String valor;
-  final String? rodape;
+/// Numero que "conta" ate o valor quando aparece e quando muda (ex.: total da casa).
+class ValorAnimado extends StatelessWidget {
+  final double valor;
+  final String Function(double) formatar;
+  final TextStyle estilo;
 
-  const CartaoDestaque({super.key, required this.titulo, required this.valor, this.rodape});
+  const ValorAnimado(this.valor, {super.key, required this.formatar, required this.estilo});
 
   @override
   Widget build(BuildContext context) {
-    final texto = Theme.of(context).textTheme;
-    return Card(
-      color: Cores.amarelo,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(14))),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Text(titulo, style: texto.titleMedium?.copyWith(color: Cores.preto)),
-            Text(valor,
-                style: texto.displaySmall?.copyWith(color: Cores.preto, fontWeight: FontWeight.w900)),
-            if (rodape != null) Text(rodape!, style: const TextStyle(color: Cores.preto)),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: valor),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, _) => Text(formatar(v), style: estilo, textAlign: TextAlign.center),
+    );
+  }
+}
+
+/// Valor principal da tela: fundo escuro, borda e brilho suave na cor do destaque.
+/// Amarelo para gasto, verde para economia.
+class CartaoDestaque extends StatelessWidget {
+  final String titulo;
+  final double valor;
+  final String Function(double) formatar;
+  final String? rodape;
+  final Color cor;
+
+  const CartaoDestaque({
+    super.key,
+    required this.titulo,
+    required this.valor,
+    required this.formatar,
+    this.rodape,
+    this.cor = Cores.amarelo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: Espaco.g, vertical: Espaco.g),
+      decoration: BoxDecoration(
+        color: Cores.superficie,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cor.withValues(alpha: 0.7), width: 1.5),
+        boxShadow: [BoxShadow(color: cor.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: -4)],
+      ),
+      child: Column(
+        children: [
+          Text(titulo, style: Estilos.rotulo),
+          const SizedBox(height: 4),
+          ValorAnimado(
+            valor,
+            formatar: formatar,
+            estilo: Estilos.valor.copyWith(color: cor),
+          ),
+          if (rodape != null) ...[
+            const SizedBox(height: 4),
+            Text(rodape!, style: Estilos.secundario, textAlign: TextAlign.center),
           ],
-        ),
+        ],
       ),
     );
   }
 }
 
-/// Cartao pequeno com titulo e valor (ex.: Consumo / 41,25 kWh/mes).
+/// Cartao pequeno: rotulo discreto em cima, valor em destaque embaixo.
 class CartaoInfo extends StatelessWidget {
   final String titulo;
   final String valor;
@@ -156,14 +240,18 @@ class CartaoInfo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final texto = Theme.of(context).textTheme;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: Espaco.m),
         child: Column(
           children: [
-            Text(titulo, style: texto.labelMedium?.copyWith(color: Cores.cinza)),
-            Text(valor, style: texto.titleMedium, textAlign: TextAlign.center),
+            Text(titulo, style: Estilos.secundario),
+            const SizedBox(height: 4),
+            Text(
+              valor,
+              style: Estilos.numero.copyWith(color: Cores.branco),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -183,13 +271,13 @@ class ListaAvisos extends StatelessWidget {
       children: [
         for (final aviso in avisos)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: Espaco.p),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline, size: 18, color: Cores.amarelo),
-                const SizedBox(width: 8),
-                Expanded(child: Text(aviso, style: const TextStyle(color: Cores.cinza, fontSize: 13))),
+                const Icon(Icons.info_outline, size: 16, color: Cores.amarelo),
+                const SizedBox(width: Espaco.p),
+                Expanded(child: Text(aviso, style: Estilos.secundario)),
               ],
             ),
           ),
@@ -205,9 +293,9 @@ class Titulo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 16, bottom: 4),
-        child: Text(texto, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Cores.amarelo)),
-      );
+    padding: const EdgeInsets.only(top: Espaco.g, bottom: Espaco.p),
+    child: Text(texto.toUpperCase(), style: Estilos.rotulo.copyWith(color: Cores.amarelo, letterSpacing: 0.8)),
+  );
 }
 
 class MensagemErro extends StatelessWidget {
@@ -218,19 +306,78 @@ class MensagemErro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
     return Card(
-      color: cores.errorContainer,
+      color: const Color(0xFF1F0E0E),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Cores.vermelho.withValues(alpha: 0.6)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(Espaco.m),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(mensagem, style: TextStyle(color: cores.onErrorContainer)),
-            if (tentarDeNovo != null) TextButton(onPressed: tentarDeNovo, child: const Text('Tentar de novo')),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.error_outline, color: Cores.vermelho),
+                const SizedBox(width: 12),
+                Expanded(child: Text(mensagem, style: Estilos.corpo)),
+              ],
+            ),
+            if (tentarDeNovo != null)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(onPressed: tentarDeNovo, child: const Text('Tentar de novo')),
+              ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Botao principal que vira "feito" com animacao (ex.: Adicionar -> Na sua casa).
+class BotaoComConfirmacao extends StatelessWidget {
+  final bool feito;
+  final String textoAcao;
+  final IconData iconeAcao;
+  final VoidCallback onAcao;
+  final String textoFeito;
+  final VoidCallback onFeito;
+
+  const BotaoComConfirmacao({
+    super.key,
+    required this.feito,
+    required this.textoAcao,
+    required this.iconeAcao,
+    required this.onAcao,
+    required this.textoFeito,
+    required this.onFeito,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 350),
+      transitionBuilder: (filho, animacao) => ScaleTransition(
+        scale: Tween(begin: 0.9, end: 1.0).animate(CurvedAnimation(parent: animacao, curve: Curves.easeOutBack)),
+        child: FadeTransition(opacity: animacao, child: filho),
+      ),
+      child: feito
+          ? OutlinedButton.icon(
+              key: const ValueKey('feito'),
+              style: OutlinedButton.styleFrom(side: const BorderSide(color: Cores.verde)),
+              onPressed: onFeito,
+              icon: const Icon(Icons.check_circle, color: Cores.verde),
+              label: Text(textoFeito),
+            )
+          : FilledButton.icon(
+              key: const ValueKey('acao'),
+              onPressed: onAcao,
+              icon: Icon(iconeAcao),
+              label: Text(textoAcao),
+            ),
     );
   }
 }

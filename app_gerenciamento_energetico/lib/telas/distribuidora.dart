@@ -95,6 +95,7 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
     return Pagina(
       titulo: 'Qual é a sua distribuidora?',
       passo: 3,
+      rodape: _usarConta ? FilledButton(onPressed: _calcularComConta, child: const Text('Calcular')) : null,
       filho: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -104,15 +105,15 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
               child: ListTile(
                 leading: const Icon(Icons.bolt),
                 title: Text('Usar a mesma: ${ultima.descricao}'),
-                subtitle: Text('${reais(ultima.tarifaKwh, casas: 4)} por kWh', style: const TextStyle(color: Cores.cinza)),
+                subtitle: Text('${reais(ultima.tarifaKwh, casas: 4)} por kWh', style: Estilos.secundario),
                 trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
                 onTap: () => _calcular(ultima),
               ),
             ),
             const SizedBox(height: 8),
-            const Text('Ou escolha outra:', style: TextStyle(color: Cores.cinza)),
+            const Text('Ou escolha outra:', style: Estilos.secundario),
           ] else
-            const Text('A distribuidora aparece na sua conta de luz.', style: TextStyle(color: Cores.cinza)),
+            const Text('A distribuidora aparece na sua conta de luz.', style: Estilos.secundario),
           const SizedBox(height: 12),
           SegmentedButton<bool>(
             segments: const [
@@ -138,12 +139,11 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
                 helperText: 'Valor total da conta dividido pelos kWh consumidos no mês.',
               ),
             ),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: _calcularComConta, child: const Text('Calcular')),
           ] else ...[
             DropdownButtonFormField<String>(
               initialValue: _uf,
               dropdownColor: Cores.superficieAlta,
+              iconEnabledColor: Cores.amarelo,
               decoration: const InputDecoration(labelText: 'Estado'),
               items: [for (final uf in _ufs) DropdownMenuItem(value: uf, child: Text(uf))],
               onChanged: _escolherUf,
@@ -167,8 +167,8 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
                     final d = _filtradas[i];
                     return ListTile(
                       title: Text(d.nome),
-                      subtitle: Text('${reais(d.tarifaKwh, casas: 4)} por kWh', style: const TextStyle(color: Cores.cinza)),
-                      trailing: const Icon(Icons.chevron_right, color: Cores.cinza),
+                      subtitle: Text('${reais(d.tarifaKwh, casas: 4)} por kWh', style: Estilos.secundario),
+                      trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
                       onTap: () => _calcular(EscolhaTarifa.daDistribuidora(d)),
                     );
                   },
