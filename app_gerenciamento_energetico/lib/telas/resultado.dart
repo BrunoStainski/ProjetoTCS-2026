@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../casa.dart';
+import '../tema.dart';
 import 'comum.dart';
+import 'sugestoes.dart';
 
 /// Passo 4: chama POST /calcular e mostra quanto o aparelho custa.
+/// Daqui o usuario adiciona o aparelho na casa ou procura um modelo mais economico.
 class TelaResultado extends StatefulWidget {
   final Consulta consulta;
-  final int? distribuidoraId;
-  final double? tarifaManual;
 
-  const TelaResultado({super.key, required this.consulta, this.distribuidoraId, this.tarifaManual});
+  const TelaResultado({super.key, required this.consulta});
 
   @override
   State<TelaResultado> createState() => _TelaResultadoState();
@@ -17,6 +19,7 @@ class TelaResultado extends StatefulWidget {
 
 class _TelaResultadoState extends State<TelaResultado> {
   late Future<Resultado> _resultado;
+  bool _adicionado = false;
 
   @override
   void initState() {
@@ -24,16 +27,15 @@ class _TelaResultadoState extends State<TelaResultado> {
     _resultado = _calcular();
   }
 
-  Future<Resultado> _calcular() {
-    final c = widget.consulta;
-    return Api.calcular(
-      aparelhoId: c.aparelho.id,
-      distribuidoraId: widget.distribuidoraId,
-      tarifaManual: widget.tarifaManual,
-      horasDia: c.horasDia,
-      ciclosMes: c.ciclosMes,
-      velocidade: c.velocidade,
-    );
+  Future<Resultado> _calcular() => Api.calcular(widget.consulta.aparelho.id, widget.consulta.paraApi());
+
+  void _adicionar(Resultado r) {
+    casa.adicionar(widget.consulta, r);
+    setState(() => _adicionado = true);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('${r.nome} foi para a sua casa.'),
+      action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasa(context)),
+    ));
   }
 
   @override
@@ -51,96 +53,77 @@ class _TelaResultadoState extends State<TelaResultado> {
             return MensagemErro(snap.error.toString(),
                 tentarDeNovo: () => setState(() => _resultado = _calcular()));
           }
-          return _Conteudo(snap.data!);
+          final r = snap.data!;
+          return ListView(
+            children: [
+              _DetalhesDoResultado(r),
+              const SizedBox(height: 16),
+              if (_adicionado)
+                OutlinedButton.icon(
+                  onPressed: () => abrirMinhaCasa(context),
+                  icon: const Icon(Icons.check, color: Cores.amarelo),
+                  label: const Text('Na sua casa - ver total'),
+                )
+              else
+                FilledButton.icon(
+                  onPressed: () => _adicionar(r),
+                  icon: const Icon(Icons.add_home_outlined),
+                  label: const Text('Adicionar à minha casa'),
+                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta)),
+                ),
+                icon: const Icon(Icons.trending_down, color: Cores.amarelo),
+                label: const Text('Ver modelos mais econômicos'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
+                icon: const Icon(Icons.search),
+                label: const Text('Calcular outro aparelho'),
+              ),
+            ],
+          );
         },
       ),
     );
   }
 }
 
-class _Conteudo extends StatelessWidget {
+class _DetalhesDoResultado extends StatelessWidget {
   final Resultado r;
 
-  const _Conteudo(this.r);
+  const _DetalhesDoResultado(this.r);
 
   @override
   Widget build(BuildContext context) {
     final texto = Theme.of(context).textTheme;
-    final cores = Theme.of(context).colorScheme;
-    return ListView(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('${r.marca} ${r.modelo}', style: texto.titleLarge),
-        if (r.detalhe.isNotEmpty) Text(r.detalhe),
-        if (r.distribuidora != '-') Text('${r.distribuidora} - ${r.uf}'),
+        Text(r.nome, style: texto.titleLarge),
+        if (r.detalhe.isNotEmpty) Text(r.detalhe, style: const TextStyle(color: Cores.cinza)),
+        if (r.distribuidora != '-')
+          Text('${r.distribuidora} - ${r.uf}', style: const TextStyle(color: Cores.cinza)),
         const SizedBox(height: 16),
-        Card(
-          color: cores.primaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                Text('Gasto por mês', style: texto.titleMedium),
-                Text(reais(r.custoMes), style: texto.displaySmall?.copyWith(fontWeight: FontWeight.bold)),
-                Text('${reais(r.custoAno)} por ano'),
-              ],
-            ),
-          ),
-        ),
+        CartaoDestaque(titulo: 'Gasto por mês', valor: reais(r.custoMes), rodape: '${reais(r.custoAno)} por ano'),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _Info('Consumo', '${numero(r.kwhMes)} kWh/mês')),
-            Expanded(child: _Info('Tarifa', '${reais(r.tarifaKwh, casas: 4)}/kWh')),
+            Expanded(child: CartaoInfo('Consumo', '${numero(r.kwhMes)} kWh/mês')),
+            Expanded(child: CartaoInfo('Tarifa', '${reais(r.tarifaKwh, casas: 4)}/kWh')),
           ],
         ),
-        const SizedBox(height: 16),
-        Text('Como calculamos', style: texto.titleSmall),
+        const Titulo('Como calculamos'),
         Text(r.metodo),
-        const SizedBox(height: 8),
-        Text('Fonte da tarifa', style: texto.titleSmall),
+        const Titulo('Fonte da tarifa'),
         Text(r.origemTarifa),
         const SizedBox(height: 16),
-        for (final aviso in r.avisos)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, size: 18, color: cores.outline),
-                const SizedBox(width: 8),
-                Expanded(child: Text(aviso, style: texto.bodySmall)),
-              ],
-            ),
-          ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
-          icon: const Icon(Icons.search),
-          label: const Text('Calcular outro aparelho'),
-        ),
+        ListaAvisos(r.avisos),
       ],
-    );
-  }
-}
-
-class _Info extends StatelessWidget {
-  final String titulo;
-  final String valor;
-
-  const _Info(this.titulo, this.valor);
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            Text(titulo, style: Theme.of(context).textTheme.labelMedium),
-            Text(valor, style: Theme.of(context).textTheme.titleMedium),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -1,11 +1,11 @@
 {
-    "name": "app_gerenciamento_energetico",
-    "short_name": "app_gerenciamento_energetico",
+    "name": "iamp",
+    "short_name": "iamp",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "Aplicativo do projeto desenvolvido no bootcamp da TCS 2026",
+    "background_color": "#000000",
+    "theme_color": "#FFD000",
+    "description": "iamp: quanto cada aparelho pesa na sua conta de luz (Inmetro + ANEEL)",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

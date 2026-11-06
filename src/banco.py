@@ -33,6 +33,7 @@ CREATE TABLE aparelhos (
     kwh_ciclo       DOUBLE PRECISION,
     potencia_w      DOUBLE PRECISION,
     standby_kwh_mes DOUBLE PRECISION,
+    fluxo_lm        DOUBLE PRECISION,  -- lumens (lampadas), para achar uma equivalente
     origem_dado     TEXT NOT NULL,     -- "informado" ou "derivado ou estimado na limpeza"
     arquivo_origem  TEXT NOT NULL,
     busca           TEXT NOT NULL,     -- marca + modelo sem acento, minusculo

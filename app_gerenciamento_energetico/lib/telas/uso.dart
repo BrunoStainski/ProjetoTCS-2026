@@ -103,7 +103,7 @@ class _TelaUsoState extends State<TelaUso> {
             const SizedBox(height: 8),
             SegmentedButton<String>(
               segments: [for (final o in p!.opcoes) ButtonSegment(value: o, label: Text(o))],
-              selected: {if (_velocidade != null) _velocidade!},
+              selected: {?_velocidade},
               onSelectionChanged: (s) => setState(() => _velocidade = s.first),
             ),
           ],

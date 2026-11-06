@@ -13,10 +13,10 @@ datasets/raw/ (Inmetro + ANEEL)
   -> scripts/tratar_dados_*.py (Pandas, um por dataset; scripts/executar_pipeline.py roda todos)
   -> datasets/processed/*_limpo.csv  (+ distribuidoras_uf.csv: UF de cada distribuidora via CNPJ)
   -> src/criar_banco.py (recria as tabelas e carrega)       -> PostgreSQL 15 (Docker)
-  -> src/calculadora_residencial.py (catálogo + regras de cálculo)
+  -> src/calculadora_residencial.py (catálogo + regras de cálculo + EQUIVALENCIA para sugestões)
   -> src/servico.py (funções usadas por qualquer interface)
   -> src/main.py (API FastAPI)  |  src/app_terminal.py (teste no terminal)
-  -> app_gerenciamento_energetico/ (Flutter — ainda é o template inicial)
+  -> app_gerenciamento_energetico/ (app Flutter ligado à API; ver seção "App Flutter")
 
 ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py -> models/ctgan.pkl
     + residencias_sinteticas.csv -> scripts/treinar_kmeans.py -> models/kmeans.pkl -> src/ml_pipeline.py
@@ -26,15 +26,18 @@ ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py ->
 
 Python 3.12 (o mesmo do Dockerfile; não usar 3.14), Pandas, SQLAlchemy **Core** com SQL
 parametrizado (não há ORM; `banco.py` troca `?` por parâmetros nomeados), psycopg2,
-FastAPI + Uvicorn, PostgreSQL 15, Docker Compose, Flutter.
+FastAPI + Uvicorn, PostgreSQL 15, Docker Compose, Flutter (Dart, só o pacote `http`).
 
 ## Como rodar
 
 ```bash
 cp .env.example .env                 # credenciais do banco (o .env não vai para o git)
 docker compose up -d --build         # postgres_iamp (porta 5434) + api_iamp (porta 8000)
-# a API carrega os CSVs no banco sozinha na 1ª subida (RECARREGAR_BANCO=1 força recarga)
+# a API carrega os CSVs no banco sozinha na 1ª subida e quando falta coluna nova no banco
+# (RECARREGAR_BANCO=1 força recarga). Mudou código em src/? rode o --build de novo.
 # http://localhost:8000/docs
+cd app_gerenciamento_energetico && flutter run -d chrome   # app (Windows desktop exige VS C++)
+flutter analyze; flutter test                               # checagens do app
 cd src && python criar_banco.py      # recarga manual;   python app_terminal.py  # teste
 python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
 # ML (pip install -r requirements-ml.txt; nesta ordem, ~5 min no CPU):
@@ -49,7 +52,7 @@ pytest                               # tudo;   pytest -m "not banco"  # só os r
 
 | Tabela | Conteúdo |
 |---|---|
-| `aparelhos` | Catálogo: categoria, marca, modelo, tipo, capacidade, kwh_mes (e por velocidade), kwh_ciclo, potencia_w, standby, `origem_dado` |
+| `aparelhos` | Catálogo: categoria, marca, modelo, tipo, capacidade, kwh_mes (e por velocidade), kwh_ciclo, potencia_w, standby, `fluxo_lm` (lâmpadas), `origem_dado` |
 | `distribuidoras` | 99 distribuidoras com UF (`fonte_uf` = de onde veio) |
 | `tarifas` | Tarifa B1 residencial convencional (TUSD+TE, R$/kWh) com vigência |
 | `vw_tarifa_vigente` | Tarifa válida hoje por distribuidora |
@@ -74,9 +77,34 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 
 `GET /aparelhos?busca=`, `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
-`POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco).
+`POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
+`POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
+`POST /comparar` (+ alternativa_id e preco_novo opcional -> economia e payback em meses).
+Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py).
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
 A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de `models/`).
+`banco_carregado()` compara as colunas de `aparelhos` com `COLUNAS_APARELHOS` (criar_banco.py): ao
+adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
+
+## Sugestão de troca (`servico.sugerir_alternativas` e `servico.comparar`)
+
+- Equivalência em `EQUIVALENCIA` (calculadora_residencial.py): mesma categoria (fluorescente pode
+  virar LED), medida parecida (`capacidade` ou `fluxo_lm`) dentro da tolerância e mesmo tipo só onde
+  o tipo do Inmetro é padronizado (geladeira, ar, máquina de lavar). Mesmo uso e mesma tarifa do atual.
+- Filtros: só `origem_dado = 'informado'`; economia mínima 5% (`ECONOMIA_MINIMA`); consumo abaixo de
+  40% da mediana dos equivalentes é descartado como erro de dado (`FRACAO_SUSPEITA`; caso real:
+  HISENSE RS3P428NEDA1 com 2,8 kWh); variações do mesmo modelo (marca+detalhe+kWh) aparecem uma vez.
+- Sem sugestão (`SEM_SUGESTAO`, com o motivo para o app): chuveiro, micro-ondas, vapor de sódio.
+- Payback = preco_novo / economia_mes (Python, na API). O catálogo não tem preço: o usuário digita.
+
+## App Flutter (`app_gerenciamento_energetico/lib/`)
+
+- `tema.dart`: identidade visual (fundo preto, amarelo `#FFD000` nos destaques, texto branco).
+- `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
+  ChangeNotifier global `casa`; só em memória, sem persistência).
+- Telas (`telas/`): busca -> uso -> distribuidora (oferece a última tarifa) -> resultado ->
+  minha_casa (total, quantidade por item, perfil K-Means) | sugestoes -> comparar (payback, trocar na casa).
+- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação).
 
 ## Machine Learning (Dupla 2)
 
@@ -100,25 +128,31 @@ A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de 
 
 ## Próximas etapas
 
-EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
-só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API, Terraform
-(`infra/main.tf` vazio), documento de processo/ética, deck e vídeo.
+RAG "Eco-Coach" com LangChain (`src/rag_agent.py` vazio; o payback já existe em
+`/comparar`, o LLM só explica; pgvector é candidato a banco vetorial), Terraform (`infra/main.tf`
+vazio), documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
+(`prompts/registros_vibecoding.md` vazio), deck e vídeo.
+No app: salvar "Minha casa" entre sessões e a tela do Eco-Coach.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
-(ex.: um futuro `POST /simulacao`), atualizar os dois.
+(ex.: um futuro `POST /simulacao`), atualizar os dois. PENDENTE: incluir `/sugestoes` e `/comparar`.
 
 ## Limitações conhecidas (usar na parte de ética)
 
 - Consumo do Inmetro é de laboratório, não de uso real.
-- Alguns consumos foram imputados pela média na limpeza (geladeira, máquina, micro-ondas,
-  ventilador de mesa) e ainda aparecem como "informado" — só o ar-condicionado é marcado.
+- Alguns consumos foram imputados na limpeza (ar-condicionado, geladeira, micro-ondas, ventilador
+  de mesa, TV): ficam com `origem_dado = 'derivado ou estimado na limpeza'`, o app avisa e eles não
+  entram nas sugestões de troca.
+- O Inmetro tem erros de digitação no consumo (ex.: 28,0 vs 2,8 kWh). Nas TVs, 77 consumos com a
+  vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela) são corrigidos na limpeza
+  (`consumo_imputado`, motivo em `correcao_consumo`) e o stand-by > 10 W é apagado
+  (`standby_suspeito`). Nas outras categorias, as sugestões filtram os casos extremos, mas o
+  cálculo do aparelho escolhido usa o valor como veio.
+- Payback simples (sem juros, sem revenda do antigo, sem reajuste de tarifa) e com preço digitado.
 - Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
-  potência a 35 °C em carga total (teto). A TV reescala pela regra de três com 6,59 h/dia de ensaio
-  (`HORAS_REFERENCIA_INMETRO`): número levantado pelo grupo, sem o documento oficial e sem saber
-  se o kWh/mês do Inmetro inclui o stand-by.
-- TVs: 77 consumos com a vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela)
-  foram corrigidos na limpeza e marcados em `consumo_imputado`; stand-by > 10 W foi apagado
-  (`standby_suspeito`).
+  potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV
+  reescala por regra de três com 6,59 h/dia de ensaio (`HORAS_REFERENCIA_INMETRO`): número
+  levantado pelo grupo, sem o documento oficial e sem saber se o kWh/mês inclui o stand-by.
 - Residências do ML são sintéticas: os perfis servem para demonstração.
 - O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 
@@ -128,3 +162,4 @@ BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e ima
 - Nunca montar SQL com texto do usuário; usar `banco.consulta`/`banco.executar` com `?`.
 - Toda fonte de dado precisa ser registrada (coluna de fonte ou tabela `cargas`).
 - Branches por pessoa/tarefa, merge na `main` por Pull Request.
+- Commits e PRs sem linha "Co-Authored-By" nem rodapé de atribuição ao Claude.
