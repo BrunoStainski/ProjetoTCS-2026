@@ -98,7 +98,10 @@ A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de 
 
 EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
 só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API, Terraform
-(`infra/main.tf` vazio), documento de processo/ética, BPMN (`docs/bpmn_processo.png`), deck e vídeo.
+(`infra/main.tf` vazio), documento de processo/ética, deck e vídeo.
+BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
+`docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
+(ex.: um futuro `POST /simulacao`), atualizar os dois.
 
 ## Limitações conhecidas (usar na parte de ética)
 
