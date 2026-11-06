@@ -16,7 +16,8 @@ datasets/raw/ (Inmetro + ANEEL)
   -> src/calculadora_residencial.py (catálogo + regras de cálculo)
   -> src/servico.py (funções usadas por qualquer interface)
   -> src/main.py (API FastAPI)  |  src/app_terminal.py (teste no terminal)
-  -> app_gerenciamento_energetico/ (Flutter — ainda é o template inicial)
+  -> app_gerenciamento_energetico/ (Flutter — protótipo: busca -> uso -> distribuidora -> resultado;
+     lib/api.dart fala com a API, API_URL via --dart-define, Android usa 10.0.2.2)
 
 ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py -> models/ctgan.pkl
     + residencias_sinteticas.csv -> scripts/treinar_kmeans.py -> models/kmeans.pkl -> src/ml_pipeline.py
@@ -39,6 +40,8 @@ cd src && python criar_banco.py      # recarga manual;   python app_terminal.py 
 python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
 # ML (pip install -r requirements-ml.txt; nesta ordem, ~5 min no CPU):
 python scripts/gerar_seed.py; python scripts/treinar_ctgan.py; python scripts/treinar_kmeans.py
+# EDA (gera docs/graficos/*.png):
+jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
 ```
 
 ## Banco (definido em `src/banco.py`, constante ESQUEMA)
@@ -96,8 +99,9 @@ A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de 
 
 ## Próximas etapas
 
-EDA com gráficos, RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
-só explica; pgvector é candidato a banco vetorial), app Flutter ligado à API, Terraform
+RAG "Eco-Coach" com LangChain (payback calculado em Python, o LLM
+só explica; pgvector é candidato a banco vetorial), app Flutter: inventário com vários aparelhos +
+`POST /classificar` (o protótipo calcula um aparelho por vez), Terraform
 (`infra/main.tf` vazio), documento de processo/ética, deck e vídeo.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
