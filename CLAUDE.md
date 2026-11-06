@@ -41,6 +41,8 @@ python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
 python scripts/gerar_seed.py; python scripts/treinar_ctgan.py; python scripts/treinar_kmeans.py
 # EDA (gera docs/graficos/*.png):
 jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
+# Testes (pip install -r requirements-dev.txt; sem o PostgreSQL, os de banco são pulados):
+pytest                               # tudo;   pytest -m "not banco"  # só os rápidos
 ```
 
 ## Banco (definido em `src/banco.py`, constante ESQUEMA)
