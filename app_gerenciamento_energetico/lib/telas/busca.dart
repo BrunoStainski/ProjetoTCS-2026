@@ -25,9 +25,11 @@ class _TelaBuscaState extends State<TelaBusca> {
   @override
   void initState() {
     super.initState();
-    Api.categorias().then((c) {
-      if (mounted) setState(() => _categorias = c);
-    }).catchError((_) {});
+    Api.categorias()
+        .then((c) {
+          if (mounted) setState(() => _categorias = c);
+        })
+        .catchError((_) {});
   }
 
   @override
@@ -69,10 +71,12 @@ class _TelaBuscaState extends State<TelaBusca> {
       filho: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Quanto cada aparelho pesa na sua conta de luz?',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+          Text(
+            'Quanto cada aparelho pesa na sua conta de luz?',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 4),
-          const Text('Dados oficiais do Inmetro e tarifas da ANEEL.', style: TextStyle(color: Cores.cinza)),
+          const Text('Dados oficiais do Inmetro e tarifas da ANEEL.', style: Estilos.secundario),
           const SizedBox(height: 16),
           const _AtalhoCasa(),
           TextField(
@@ -82,13 +86,17 @@ class _TelaBuscaState extends State<TelaBusca> {
             decoration: InputDecoration(
               labelText: 'Marca e/ou modelo',
               hintText: 'Ex.: brastemp, bosch ewi, samsung',
-              suffixIcon: IconButton(icon: const Icon(Icons.search, color: Cores.amarelo), onPressed: _buscar),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.search, color: Cores.amarelo),
+                onPressed: _buscar,
+              ),
             ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
             initialValue: _categoria,
             dropdownColor: Cores.superficieAlta,
+            iconEnabledColor: Cores.amarelo,
             decoration: const InputDecoration(labelText: 'Tipo de aparelho (opcional)'),
             items: [
               const DropdownMenuItem(value: null, child: Text('Todos')),
@@ -111,9 +119,11 @@ class _TelaBuscaState extends State<TelaBusca> {
                   return ListTile(
                     leading: Icon(iconeDaCategoria(a.categoria)),
                     title: Text(a.nome),
-                    subtitle: Text([a.categoriaLegivel, if (a.detalhe.isNotEmpty) a.detalhe].join(' - '),
-                        style: const TextStyle(color: Cores.cinza)),
-                    trailing: const Icon(Icons.chevron_right, color: Cores.cinza),
+                    subtitle: Text(
+                      [a.categoriaLegivel, if (a.detalhe.isNotEmpty) a.detalhe].join(' - '),
+                      style: Estilos.secundario,
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
                     onTap: () => _escolher(a),
                   );
                 },
@@ -141,8 +151,10 @@ class _AtalhoCasa extends StatelessWidget {
             child: ListTile(
               leading: const Icon(Icons.home_outlined),
               title: Text('Minha casa: ${reais(casa.custoMes)} por mês'),
-              subtitle: Text('${casa.totalAparelhos} aparelho(s) - ${numero(casa.kwhMes)} kWh/mês',
-                  style: const TextStyle(color: Cores.cinza)),
+              subtitle: Text(
+                '${casa.totalAparelhos} aparelho(s) - ${numero(casa.kwhMes)} kWh/mês',
+                style: Estilos.secundario,
+              ),
               trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
               onTap: () => abrirMinhaCasa(context),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../tema.dart';
 import 'comum.dart';
 import 'distribuidora.dart';
 
@@ -67,6 +68,7 @@ class _TelaUsoState extends State<TelaUso> {
       case 'velocidade':
         c.velocidade = _velocidade;
       case 'horas':
+        if (_pergunta!.opcional && _valor.text.trim().isEmpty) break; // fica o valor do Inmetro
         final horas = lerNumero(_valor.text);
         if (horas == null || horas < 0 || horas > 24) {
           setState(() => _erro = 'Informe as horas por dia, entre 0 e 24 (ex.: 0,25 = 15 minutos).');
@@ -92,15 +94,32 @@ class _TelaUsoState extends State<TelaUso> {
     return Pagina(
       titulo: 'Como você usa?',
       passo: 2,
+      rodape: p == null ? null : FilledButton(onPressed: _confirmar, child: const Text('Continuar')),
       filho: ListView(
         children: [
-          Text(aparelho.nome, style: Theme.of(context).textTheme.titleLarge),
-          Text([aparelho.categoriaLegivel, if (aparelho.detalhe.isNotEmpty) aparelho.detalhe].join(' - ')),
-          const SizedBox(height: 24),
+          Row(
+            children: [
+              Icon(iconeDaCategoria(aparelho.categoria), color: Cores.amarelo, size: 32),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(aparelho.nome, style: Estilos.titulo),
+                    Text(
+                      [aparelho.categoriaLegivel, if (aparelho.detalhe.isNotEmpty) aparelho.detalhe].join(' - '),
+                      style: Estilos.secundario,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Espaco.gg),
           if (p == null && _erro == null) const Center(child: CircularProgressIndicator()),
           if (p?.pergunta == 'velocidade') ...[
-            const Text('Em qual velocidade você costuma usar?'),
-            const SizedBox(height: 8),
+            const Text('Em qual velocidade você costuma usar?', style: Estilos.forte),
+            const SizedBox(height: 12),
             SegmentedButton<String>(
               segments: [for (final o in p!.opcoes) ButtonSegment(value: o, label: Text(o))],
               selected: {?_velocidade},
@@ -113,15 +132,21 @@ class _TelaUsoState extends State<TelaUso> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               onSubmitted: (_) => _confirmar(),
               decoration: InputDecoration(
-                labelText: p!.pergunta == 'horas' ? 'Horas por dia' : 'Lavagens por mês',
-                helperText: p.padrao != null
+                labelText: p!.pergunta == 'horas'
+                    ? (p.opcional ? 'Horas por dia (opcional)' : 'Horas por dia')
+                    : 'Lavagens por mês',
+                hintText: p.pergunta == 'horas' && aparelho.categoria != 'chuveiro' ? 'Ex.: 4' : null,
+                helperMaxLines: 3,
+                helperText: p.opcional
+                    ? 'Em branco, usamos o consumo medido pelo Inmetro no ensaio. '
+                          'Informe suas horas para um valor mais próximo do seu uso.'
+                    : p.padrao != null
                     ? 'Valor sugerido é uma estimativa. Troque pelo seu uso real.'
                     : 'Obrigatório para este aparelho. Ex.: 0,25 = 15 minutos.',
               ),
             ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Espaco.m),
           if (_erro != null) MensagemErro(_erro!, tentarDeNovo: p == null ? _carregar : null),
-          if (p != null) FilledButton(onPressed: _confirmar, child: const Text('Continuar')),
         ],
       ),
     );

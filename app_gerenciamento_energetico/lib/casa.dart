@@ -13,16 +13,16 @@ class EscolhaTarifa {
   final double tarifaKwh;
 
   EscolhaTarifa.daDistribuidora(Distribuidora d)
-      : distribuidoraId = d.id,
-        tarifaManual = null,
-        descricao = d.uf == null ? d.nome : '${d.nome} - ${d.uf}',
-        tarifaKwh = d.tarifaKwh;
+    : distribuidoraId = d.id,
+      tarifaManual = null,
+      descricao = d.uf == null ? d.nome : '${d.nome} - ${d.uf}',
+      tarifaKwh = d.tarifaKwh;
 
   EscolhaTarifa.manual(double tarifa)
-      : distribuidoraId = null,
-        tarifaManual = tarifa,
-        descricao = 'Tarifa da conta de luz',
-        tarifaKwh = tarifa;
+    : distribuidoraId = null,
+      tarifaManual = tarifa,
+      descricao = 'Tarifa da conta de luz',
+      tarifaKwh = tarifa;
 
   Map<String, dynamic> paraApi() => {'distribuidora_id': distribuidoraId, 'tarifa_manual': tarifaManual};
 }
@@ -38,16 +38,21 @@ class Consulta {
   Consulta(this.aparelho, {this.horasDia, this.ciclosMes, this.velocidade, this.tarifa});
 
   /// Mesmo uso e mesma tarifa, opcionalmente com outro aparelho (troca por um mais economico).
-  Consulta copiar({Aparelho? aparelho}) => Consulta(aparelho ?? this.aparelho,
-      horasDia: horasDia, ciclosMes: ciclosMes, velocidade: velocidade, tarifa: tarifa);
+  Consulta copiar({Aparelho? aparelho}) => Consulta(
+    aparelho ?? this.aparelho,
+    horasDia: horasDia,
+    ciclosMes: ciclosMes,
+    velocidade: velocidade,
+    tarifa: tarifa,
+  );
 
   /// Corpo comum de /calcular, /sugestoes e /comparar.
   Map<String, dynamic> paraApi() => {
-        ...?tarifa?.paraApi(),
-        'horas_dia': horasDia,
-        'ciclos_mes': ciclosMes,
-        'velocidade': velocidade,
-      };
+    ...?tarifa?.paraApi(),
+    'horas_dia': horasDia,
+    'ciclos_mes': ciclosMes,
+    'velocidade': velocidade,
+  };
 }
 
 class ItemCasa {
@@ -132,8 +137,9 @@ class Casa extends ChangeNotifier {
   }
 
   /// Formato de POST /classificar.
-  List<Map<String, dynamic>> itensParaPerfil() =>
-      [for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes}];
+  List<Map<String, dynamic>> itensParaPerfil() => [
+    for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes},
+  ];
 
   @visibleForTesting
   void limpar() {

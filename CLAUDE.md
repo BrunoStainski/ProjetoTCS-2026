@@ -99,12 +99,25 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 
 ## App Flutter (`app_gerenciamento_energetico/lib/`)
 
-- `tema.dart`: identidade visual (fundo preto, amarelo `#FFD000` nos destaques, texto branco).
+- `tema.dart`: identidade visual. `Cores` (preto de fundo, amarelo `#FFD000` só em ação e valor
+  principal = regra 60/30/10, verde `#3DDC84` = economia/bom, vermelho `#FF5C5C` = alerta; texto
+  branco 100/80/60% de opacidade; detalhes nunca em branco: ícones, bordas (`borda` = amarelo 55%),
+  divisórias (amarelo 25%) e contornos são amarelos), `Estilos` (4 tamanhos: 32/20/16/13, 2 pesos, dígitos tabulares
+  em valores) e `Espaco` (grade de 8). Não usar cor/tamanho solto nas telas.
+- Padrões de tela (`telas/comum.dart`): ação principal no `rodape` da `Pagina` (zona do polegar);
+  valor principal em `CartaoDestaque` (contorno + brilho, conta até o valor); toque mínimo 48dp
+  (tema); payback verde até 60 meses, amarelo acima, vermelho se não se paga (corte do grupo).
+- Ícone: `assets/icone/*.png` -> `dart run flutter_launcher_icons` (config no pubspec.yaml).
+- Skills de design usadas (instaladas só no PC, globais): mobile-app-ui-design, mobile-android-design,
+  flutter-build-responsive-layout, flutter-fix-layout-issues.
 - `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
   ChangeNotifier global `casa`; só em memória, sem persistência).
 - Telas (`telas/`): busca -> uso -> distribuidora (oferece a última tarifa) -> resultado ->
   minha_casa (total, quantidade por item, perfil K-Means) | sugestoes -> comparar (payback, trocar na casa).
-- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação).
+- `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, em branco = valor do Inmetro.
+- Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra);
+  avisos (SnackBar) que navegam usam o `NavigatorState` guardado antes, não o `context` da tela.
+- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional).
 
 ## Machine Learning (Dupla 2)
 

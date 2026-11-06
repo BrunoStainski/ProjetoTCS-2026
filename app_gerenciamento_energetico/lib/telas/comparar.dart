@@ -38,11 +38,11 @@ class _TelaCompararState extends State<TelaComparar> {
   }
 
   Future<Comparacao> _comparar({double? preco}) => Api.comparar(
-        widget.consulta.aparelho.id,
-        widget.sugerido.aparelho.id,
-        widget.consulta.paraApi(),
-        precoNovo: preco,
-      );
+    widget.consulta.aparelho.id,
+    widget.sugerido.aparelho.id,
+    widget.consulta.paraApi(),
+    precoNovo: preco,
+  );
 
   Future<void> _calcularPayback() async {
     final preco = lerNumero(_preco.text);
@@ -54,37 +54,56 @@ class _TelaCompararState extends State<TelaComparar> {
       _erroPreco = null;
       _calculandoPayback = true;
     });
-    final novo = _comparar(preco: preco);
     try {
-      await novo;
-      setState(() => _comparacao = novo);
+      // o setState nao pode receber um Future: espera a resposta e so depois troca o estado
+      final comparacao = await _comparar(preco: preco);
+      if (!mounted) return;
+      setState(() {
+        _comparacao = Future.value(comparacao);
+      });
     } on ApiErro catch (e) {
-      setState(() => _erroPreco = e.mensagem);
+      if (mounted) setState(() => _erroPreco = e.mensagem);
     } finally {
-      setState(() => _calculandoPayback = false);
+      if (mounted) setState(() => _calculandoPayback = false);
     }
   }
 
   void _levarParaCasa(Comparacao c) {
     final nova = widget.consulta.copiar(aparelho: widget.sugerido.aparelho);
+    final navegador = Navigator.of(context);
+    final avisos = ScaffoldMessenger.of(context);
     if (widget.item != null) {
       casa.trocar(widget.item!, nova, c.novo);
-      Navigator.popUntil(context, ModalRoute.withName(rotaMinhaCasa));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Trocado por ${c.novo.nome}.')));
+      navegador.popUntil(ModalRoute.withName(rotaMinhaCasa));
+      avisos.showSnackBar(SnackBar(content: Text('Trocado por ${c.novo.nome}.')));
       return;
     }
     casa.adicionar(nova, c.novo);
     setState(() => _feito = true);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${c.novo.nome} foi para a sua casa.'),
-      action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasa(context)),
-    ));
+    avisos.showSnackBar(
+      SnackBar(
+        content: Text('${c.novo.nome} foi para a sua casa.'),
+        // o aviso pode continuar na tela depois de sair daqui: usa o navegador, nao o context
+        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Pagina(
       titulo: 'Vale a pena trocar?',
+      rodape: FilledButton.icon(
+        onPressed: _calculandoPayback ? null : _calcularPayback,
+        icon: _calculandoPayback
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Cores.preto),
+              )
+            : const Icon(Icons.timer_outlined),
+        label: const Text('Calcular payback'),
+      ),
       filho: FutureBuilder<Comparacao>(
         future: _comparacao,
         builder: (context, snap) {
@@ -92,7 +111,12 @@ class _TelaCompararState extends State<TelaComparar> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError && !snap.hasData) {
-            return MensagemErro(snap.error.toString(), tentarDeNovo: () => setState(() => _comparacao = _comparar()));
+            return MensagemErro(
+              snap.error.toString(),
+              tentarDeNovo: () => setState(() {
+                _comparacao = _comparar();
+              }),
+            );
           }
           final c = snap.data!;
           return ListView(
@@ -102,22 +126,26 @@ class _TelaCompararState extends State<TelaComparar> {
                 children: [
                   Expanded(child: _Coluna('Seu modelo', c.atual, destaque: false)),
                   const Padding(
-                    padding: EdgeInsets.only(top: 48),
+                    padding: EdgeInsets.only(top: 56, left: 4, right: 4),
                     child: Icon(Icons.arrow_forward, color: Cores.amarelo),
                   ),
                   Expanded(child: _Coluna('Modelo novo', c.novo, destaque: true)),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: Espaco.p),
               CartaoDestaque(
                 titulo: 'Economia por mês',
-                valor: reais(c.economiaMes),
-                rodape: '${reais(c.economiaAno)} por ano - ${numero(c.economiaKwhMes)} kWh/mês a menos',
+                valor: c.economiaMes,
+                formatar: reais,
+                cor: c.economiaMes > 0 ? Cores.verde : Cores.vermelho,
+                rodape: '${reais(c.economiaAno)} por ano · ${numero(c.economiaKwhMes)} kWh/mês a menos',
               ),
               const Titulo('Em quanto tempo a troca se paga?'),
-              const Text('O catálogo do Inmetro não tem preços. Digite o preço que você encontrou na loja.',
-                  style: TextStyle(color: Cores.cinza)),
-              const SizedBox(height: 8),
+              const Text(
+                'O catálogo do Inmetro não tem preços. Digite o preço que você encontrou na loja.',
+                style: Estilos.secundario,
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _preco,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -128,26 +156,29 @@ class _TelaCompararState extends State<TelaComparar> {
                   errorText: _erroPreco,
                 ),
               ),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: _calculandoPayback ? null : _calcularPayback,
-                child: _calculandoPayback
-                    ? const SizedBox(
-                        height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Cores.preto))
-                    : const Text('Calcular payback'),
+              // momento de pico: o payback aparece com animacao e os meses "contam" ate o valor
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                transitionBuilder: (filho, animacao) => SizeTransition(
+                  sizeFactor: animacao,
+                  child: FadeTransition(opacity: animacao, child: filho),
+                ),
+                child: c.payback == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        key: ValueKey(c.payback!.precoNovo),
+                        padding: const EdgeInsets.only(top: Espaco.m),
+                        child: _CartaoPayback(c.payback!),
+                      ),
               ),
-              if (c.payback != null) ...[
-                const SizedBox(height: 12),
-                _CartaoPayback(c.payback!),
-              ],
-              const SizedBox(height: 16),
+              const SizedBox(height: Espaco.g),
               if (!_feito)
                 OutlinedButton.icon(
                   onPressed: () => _levarParaCasa(c),
                   icon: Icon(widget.item != null ? Icons.swap_horiz : Icons.add_home_outlined, color: Cores.amarelo),
                   label: Text(widget.item != null ? 'Trocar na minha casa' : 'Adicionar este modelo à minha casa'),
                 ),
-              const SizedBox(height: 16),
+              const SizedBox(height: Espaco.m),
               ListaAvisos(c.avisos),
             ],
           );
@@ -168,22 +199,21 @@ class _Coluna extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: destaque ? Cores.amarelo : Cores.borda),
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: destaque ? Cores.verde : Cores.borda),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(titulo, style: TextStyle(color: destaque ? Cores.amarelo : Cores.cinza, fontSize: 12)),
+            Text(titulo, style: Estilos.rotulo.copyWith(color: destaque ? Cores.verde : Cores.cinza)),
             const SizedBox(height: 4),
-            Text(r.nome, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 3, overflow: TextOverflow.ellipsis),
-            if (r.detalhe.isNotEmpty) Text(r.detalhe, style: const TextStyle(color: Cores.cinza, fontSize: 12)),
-            const SizedBox(height: 8),
-            Text('${numero(r.kwhMes)} kWh/mês'),
-            Text(reais(r.custoMes), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            const Text('por mês', style: TextStyle(color: Cores.cinza, fontSize: 12)),
+            Text(r.nome, style: Estilos.forte, maxLines: 3, overflow: TextOverflow.ellipsis),
+            if (r.detalhe.isNotEmpty) Text(r.detalhe, style: Estilos.secundario),
+            const SizedBox(height: Espaco.p),
+            Text(reais(r.custoMes), style: Estilos.valorMedio.copyWith(color: Cores.branco)),
+            Text('por mês · ${numero(r.kwhMes)} kWh', style: Estilos.secundario),
           ],
         ),
       ),
@@ -191,6 +221,8 @@ class _Coluna extends StatelessWidget {
   }
 }
 
+/// Payback: verde quando se paga em ate 5 anos, amarelo quando demora mais, vermelho quando nao se paga.
+/// (5 anos e um corte do grupo para a cor, nao uma regra oficial.)
 class _CartaoPayback extends StatelessWidget {
   final Payback p;
 
@@ -199,27 +231,39 @@ class _CartaoPayback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meses = p.meses;
-    return Card(
-      color: Cores.amareloEscuro,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(14)),
-        side: BorderSide(color: Cores.amarelo),
+    final cor = meses == null
+        ? Cores.vermelho
+        : meses <= 60
+        ? Cores.verde
+        : Cores.amarelo;
+    return Container(
+      padding: const EdgeInsets.all(Espaco.g),
+      decoration: BoxDecoration(
+        color: Cores.superficie,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cor.withValues(alpha: 0.7), width: 1.5),
+        boxShadow: [BoxShadow(color: cor.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: -4)],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (meses != null) ...[
-              Text(meses < 1 ? 'menos de 1 mês' : '${numero(meses, casas: 0)} meses',
-                  style: const TextStyle(color: Cores.amarelo, fontSize: 32, fontWeight: FontWeight.w900)),
-              if (p.anos != null && meses >= 12)
-                Text('cerca de ${numero(p.anos!, casas: 1)} anos', style: const TextStyle(color: Cores.branco)),
-              const SizedBox(height: 8),
-            ],
-            Text(p.texto, textAlign: TextAlign.center),
-            Text('Preço considerado: ${reais(p.precoNovo)}', style: const TextStyle(color: Cores.cinza, fontSize: 12)),
+      child: Column(
+        children: [
+          Icon(meses == null ? Icons.money_off : Icons.savings_outlined, color: cor, size: 32),
+          const SizedBox(height: Espaco.p),
+          if (meses != null) ...[
+            if (meses < 1)
+              Text('menos de 1 mês', style: Estilos.valor.copyWith(color: cor))
+            else
+              ValorAnimado(
+                meses,
+                formatar: (v) => '${numero(v, casas: 0)} meses',
+                estilo: Estilos.valor.copyWith(color: cor),
+              ),
+            if (p.anos != null && meses >= 12) Text('cerca de ${numero(p.anos!, casas: 1)} anos', style: Estilos.forte),
+            const SizedBox(height: Espaco.p),
           ],
-        ),
+          Text(p.texto, textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text('Preço considerado: ${reais(p.precoNovo)}', style: Estilos.secundario),
+        ],
       ),
     );
   }

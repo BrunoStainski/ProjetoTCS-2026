@@ -12,11 +12,6 @@ class IampApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'iamp',
-      debugShowCheckedModeBanner: false,
-      theme: temaIamp(),
-      home: const TelaBusca(),
-    );
+    return MaterialApp(title: 'iamp', debugShowCheckedModeBanner: false, theme: temaIamp(), home: const TelaBusca());
   }
 }

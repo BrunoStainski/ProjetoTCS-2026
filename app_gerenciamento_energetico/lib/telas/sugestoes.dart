@@ -41,7 +41,12 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snap.hasError) {
-            return MensagemErro(snap.error.toString(), tentarDeNovo: () => setState(() => _sugestoes = _buscar()));
+            return MensagemErro(
+              snap.error.toString(),
+              tentarDeNovo: () => setState(() {
+                _sugestoes = _buscar();
+              }),
+            );
           }
           final s = snap.data!;
           return ListView(
@@ -50,20 +55,19 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
                 child: ListTile(
                   leading: Icon(iconeDaCategoria(aparelho.categoria)),
                   title: Text('Seu modelo: ${aparelho.nome}'),
-                  subtitle: Text('${numero(s.kwhAtual)} kWh/mês - ${reais(s.custoAtual)} por mês',
-                      style: const TextStyle(color: Cores.cinza)),
+                  subtitle: Text(
+                    '${numero(s.kwhAtual)} kWh/mês - ${reais(s.custoAtual)} por mês',
+                    style: Estilos.secundario,
+                  ),
                 ),
               ),
-              if (s.criterio != null) ...[
-                const Titulo('Comparando com modelos de'),
-                Text(s.criterio!),
-              ],
+              if (s.criterio != null) ...[const Titulo('Comparando com modelos de'), Text(s.criterio!)],
               const SizedBox(height: 12),
               if (s.mensagem != null)
                 Card(
                   color: Cores.amareloEscuro,
                   child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(Espaco.m),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -79,7 +83,7 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
                 const SizedBox(height: 8),
                 ListaAvisos([
                   '${s.suspeitosDescartados} modelo(s) com consumo baixo demais para ser real '
-                      '(provável erro no dado do Inmetro) ficaram de fora.'
+                      '(provável erro no dado do Inmetro) ficaram de fora.',
                 ]),
               ],
               if (s.sugestoes.isNotEmpty)
@@ -112,35 +116,49 @@ class _CartaoSugestao extends StatelessWidget {
     final a = s.aparelho;
     return Card(
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(Espaco.m),
           child: Row(
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(a.nome, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    Text([if (a.detalhe.isNotEmpty) a.detalhe, if (s.tipo.isNotEmpty) s.tipo].join(' - '),
-                        style: const TextStyle(color: Cores.cinza)),
-                    const SizedBox(height: 6),
-                    Text('${numero(s.kwhMes)} kWh/mês - ${reais(s.custoMes)} por mês'),
+                    Text(a.nome, style: Estilos.forte),
+                    Text(
+                      [if (a.detalhe.isNotEmpty) a.detalhe, if (s.tipo.isNotEmpty) s.tipo].join(' - '),
+                      style: Estilos.secundario,
+                    ),
+                    const SizedBox(height: Espaco.p),
+                    Text('${numero(s.kwhMes)} kWh/mês · ${reais(s.custoMes)}/mês', style: Estilos.secundario),
                   ],
                 ),
               ),
               const SizedBox(width: 12),
+              // economia em verde: o valor e maior que o rotulo
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('-${reais(s.economiaMes)}',
-                      style: const TextStyle(color: Cores.amarelo, fontSize: 18, fontWeight: FontWeight.w800)),
-                  const Text('por mês', style: TextStyle(color: Cores.cinza, fontSize: 12)),
-                  Text('${numero(s.economiaPercentual, casas: 0)}% menos',
-                      style: const TextStyle(color: Cores.branco, fontSize: 12)),
+                  Text('-${reais(s.economiaMes)}', style: Estilos.valorMedio.copyWith(color: Cores.verde)),
+                  const Text('por mês', style: Estilos.secundario),
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: Espaco.p, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Cores.verde.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '${numero(s.economiaPercentual, casas: 0)}% menos',
+                      style: Estilos.rotulo.copyWith(color: Cores.verde),
+                    ),
+                  ),
                 ],
               ),
+              const SizedBox(width: 4),
+              const Icon(Icons.chevron_right, color: Cores.amarelo),
             ],
           ),
         ),
