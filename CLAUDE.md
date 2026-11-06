@@ -39,6 +39,8 @@ cd src && python criar_banco.py      # recarga manual;   python app_terminal.py 
 python scripts/executar_pipeline.py  # refaz a limpeza (raw -> processed)
 # ML (pip install -r requirements-ml.txt; nesta ordem, ~5 min no CPU):
 python scripts/gerar_seed.py; python scripts/treinar_ctgan.py; python scripts/treinar_kmeans.py
+# EDA (gera docs/graficos/*.png):
+jupyter nbconvert --to notebook --execute --inplace notebooks/eda.ipynb
 ```
 
 ## Banco (definido em `src/banco.py`, constante ESQUEMA)
