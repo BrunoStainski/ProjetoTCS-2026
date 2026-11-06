@@ -32,63 +32,71 @@ class _TelaResultadoState extends State<TelaResultado> {
   void _adicionar(Resultado r) {
     casa.adicionar(widget.consulta, r);
     setState(() => _adicionado = true);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${r.nome} foi para a sua casa.'),
-      action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasa(context)),
-    ));
+    final navegador = Navigator.of(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${r.nome} foi para a sua casa.'),
+        // o aviso pode continuar na tela depois de sair daqui: usa o navegador, nao o context
+        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Pagina(
-      titulo: 'Resultado',
-      passo: 4,
-      filho: FutureBuilder<Resultado>(
-        future: _resultado,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snap.hasError) {
-            return MensagemErro(snap.error.toString(),
-                tentarDeNovo: () => setState(() => _resultado = _calcular()));
-          }
-          final r = snap.data!;
-          return ListView(
-            children: [
-              _DetalhesDoResultado(r),
-              const SizedBox(height: 16),
-              if (_adicionado)
-                OutlinedButton.icon(
-                  onPressed: () => abrirMinhaCasa(context),
-                  icon: const Icon(Icons.check, color: Cores.amarelo),
-                  label: const Text('Na sua casa - ver total'),
-                )
-              else
-                FilledButton.icon(
-                  onPressed: () => _adicionar(r),
-                  icon: const Icon(Icons.add_home_outlined),
-                  label: const Text('Adicionar à minha casa'),
+    return FutureBuilder<Resultado>(
+      future: _resultado,
+      builder: (context, snap) {
+        final r = snap.connectionState == ConnectionState.done && !snap.hasError ? snap.data : null;
+        return Pagina(
+          titulo: 'Resultado',
+          passo: 4,
+          rodape: r == null
+              ? null
+              : BotaoComConfirmacao(
+                  feito: _adicionado,
+                  textoAcao: 'Adicionar à minha casa',
+                  iconeAcao: Icons.add_home_outlined,
+                  onAcao: () => _adicionar(r),
+                  textoFeito: 'Na sua casa - ver total',
+                  onFeito: () => abrirMinhaCasa(context),
                 ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta)),
-                ),
-                icon: const Icon(Icons.trending_down, color: Cores.amarelo),
-                label: const Text('Ver modelos mais econômicos'),
-              ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
-                icon: const Icon(Icons.search),
-                label: const Text('Calcular outro aparelho'),
-              ),
-            ],
-          );
-        },
-      ),
+          filho: _corpo(snap),
+        );
+      },
+    );
+  }
+
+  Widget _corpo(AsyncSnapshot<Resultado> snap) {
+    if (snap.connectionState != ConnectionState.done) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (snap.hasError) {
+      return MensagemErro(
+        snap.error.toString(),
+        tentarDeNovo: () => setState(() {
+          _resultado = _calcular();
+        }),
+      );
+    }
+    final r = snap.data!;
+    return ListView(
+      children: [
+        _DetalhesDoResultado(r),
+        const SizedBox(height: Espaco.g),
+        OutlinedButton.icon(
+          onPressed: () =>
+              Navigator.push(context, MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta))),
+          icon: const Icon(Icons.trending_down, color: Cores.verde),
+          label: const Text('Ver modelos mais econômicos'),
+        ),
+        const SizedBox(height: Espaco.p),
+        TextButton.icon(
+          onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
+          icon: const Icon(Icons.search),
+          label: const Text('Calcular outro aparelho'),
+        ),
+      ],
     );
   }
 }
@@ -100,20 +108,42 @@ class _DetalhesDoResultado extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final texto = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(r.nome, style: texto.titleLarge),
-        if (r.detalhe.isNotEmpty) Text(r.detalhe, style: const TextStyle(color: Cores.cinza)),
-        if (r.distribuidora != '-')
-          Text('${r.distribuidora} - ${r.uf}', style: const TextStyle(color: Cores.cinza)),
-        const SizedBox(height: 16),
-        CartaoDestaque(titulo: 'Gasto por mês', valor: reais(r.custoMes), rodape: '${reais(r.custoAno)} por ano'),
-        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(iconeDaCategoria(r.categoria), color: Cores.amarelo, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(r.nome, style: Estilos.titulo),
+                  Text(
+                    [
+                      if (r.detalhe.isNotEmpty) r.detalhe,
+                      if (r.distribuidora != '-') '${r.distribuidora} - ${r.uf}',
+                    ].join(' · '),
+                    style: Estilos.secundario,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: Espaco.m),
+        CartaoDestaque(
+          titulo: 'Gasto por mês',
+          valor: r.custoMes,
+          formatar: reais,
+          rodape: '${reais(r.custoAno)} por ano',
+        ),
+        const SizedBox(height: Espaco.p),
         Row(
           children: [
             Expanded(child: CartaoInfo('Consumo', '${numero(r.kwhMes)} kWh/mês')),
+            const SizedBox(width: Espaco.p),
             Expanded(child: CartaoInfo('Tarifa', '${reais(r.tarifaKwh, casas: 4)}/kWh')),
           ],
         ),
@@ -121,7 +151,7 @@ class _DetalhesDoResultado extends StatelessWidget {
         Text(r.metodo),
         const Titulo('Fonte da tarifa'),
         Text(r.origemTarifa),
-        const SizedBox(height: 16),
+        const SizedBox(height: Espaco.m),
         ListaAvisos(r.avisos),
       ],
     );

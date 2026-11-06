@@ -318,7 +318,19 @@ Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
 ## 8. O app Flutter
 
-Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco. As cores ficam todas em `lib/tema.dart`.
+Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco, pensada primeiro para celular Android. Cores, tamanhos de texto e espaçamentos ficam todos em `lib/tema.dart`.
+
+| Regra | Como aparece no app |
+|---|---|
+| 60/30/10 | 60% preto, 30% branco e superfícies escuras, 10% amarelo (botões e o valor principal) |
+| Detalhes amarelos | Ícones, bordas, divisórias e contornos são amarelos; o branco fica só para o texto |
+| Cores com significado | Verde = economia ou resultado bom; vermelho = alerta ou erro |
+| Hierarquia | 4 tamanhos de texto e 2 pesos; o valor é maior que o rótulo; texto secundário em branco 60% |
+| Zona do polegar | O botão principal de cada tela fica fixo embaixo |
+| Toque | Áreas de toque de no mínimo 48dp (padrão do Android) |
+| Momento de pico | Valores "contam" até o resultado; adicionar à casa e o payback têm animação |
+
+Ícone do app: raio amarelo em fundo preto (`assets/icone/`). Depois de mudar a imagem, rode `dart run flutter_launcher_icons`.
 
 | Tela | O que faz |
 |---|---|

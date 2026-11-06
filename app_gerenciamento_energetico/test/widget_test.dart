@@ -7,20 +7,20 @@ import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
-      'categoria': categoria,
-      'marca': 'MARCA',
-      'modelo': categoria.toUpperCase(),
-      'detalhe': '',
-      'distribuidora': 'COPEL-DIS',
-      'uf': 'PR',
-      'kwh_mes': kwh,
-      'metodo': 'teste',
-      'tarifa_kwh': tarifa,
-      'origem_tarifa': 'teste',
-      'custo_mes': custo,
-      'custo_ano': custo * 12,
-      'avisos': <String>[],
-    });
+  'categoria': categoria,
+  'marca': 'MARCA',
+  'modelo': categoria.toUpperCase(),
+  'detalhe': '',
+  'distribuidora': 'COPEL-DIS',
+  'uf': 'PR',
+  'kwh_mes': kwh,
+  'metodo': 'teste',
+  'tarifa_kwh': tarifa,
+  'origem_tarifa': 'teste',
+  'custo_mes': custo,
+  'custo_ano': custo * 12,
+  'avisos': <String>[],
+});
 
 Consulta consulta(String categoria, {int id = 1}) =>
     Consulta(Aparelho(id: id, categoria: categoria, marca: 'MARCA', modelo: categoria.toUpperCase()));
@@ -74,14 +74,16 @@ void main() {
   test('trocar mantem a quantidade e qualquer mudanca apaga o perfil', () {
     final item = casa.adicionar(consulta('refrigerador'), resultado('refrigerador', 40, 32));
     casa.mudarQuantidade(item, 2);
-    casa.guardarPerfil(Classificacao.fromJson({
-      'perfil': 'Moderado',
-      'kwh_total': 80,
-      'kwh_por_morador': 40,
-      'comparacao_media': {'mediana_kwh_por_morador': 50, 'diferenca_percentual': -20, 'texto': '20% abaixo'},
-      'fracoes': {'frac_refrigerador': 1.0},
-      'aviso': 'sintetico',
-    }));
+    casa.guardarPerfil(
+      Classificacao.fromJson({
+        'perfil': 'Moderado',
+        'kwh_total': 80,
+        'kwh_por_morador': 40,
+        'comparacao_media': {'mediana_kwh_por_morador': 50, 'diferenca_percentual': -20, 'texto': '20% abaixo'},
+        'fracoes': {'frac_refrigerador': 1.0},
+        'aviso': 'sintetico',
+      }),
+    );
     expect(casa.perfil, isNotNull);
 
     casa.trocar(item, consulta('refrigerador', id: 9), resultado('refrigerador', 25, 20));
@@ -90,6 +92,14 @@ void main() {
     expect(casa.itens.single.quantidade, 2);
     expect(casa.itens.single.consulta.aparelho.id, 9);
     expect(casa.custoMes, 40);
+  });
+
+  test('pergunta de uso entende horas opcionais (TV e ar-condicionado)', () {
+    final tv = PerguntaDeUso.fromJson({'pergunta': 'horas', 'opcoes': null, 'padrao': null, 'opcional': true});
+    expect(tv.pergunta, 'horas');
+    expect(tv.opcional, isTrue);
+    // respostas antigas da API, sem o campo, continuam funcionando
+    expect(PerguntaDeUso.fromJson({'pergunta': 'horas', 'padrao': null}).opcional, isFalse);
   });
 
   test('consulta manda o uso e a tarifa para a API', () {
@@ -104,7 +114,9 @@ void main() {
       'velocidade': null,
     });
     // a copia com outro aparelho mantem o uso e a tarifa
-    final troca = c.copiar(aparelho: const Aparelho(id: 5, categoria: 'chuveiro', marca: 'X', modelo: 'Y'));
+    final troca = c.copiar(
+      aparelho: const Aparelho(id: 5, categoria: 'chuveiro', marca: 'X', modelo: 'Y'),
+    );
     expect(troca.paraApi(), c.paraApi());
     expect(troca.aparelho.id, 5);
   });

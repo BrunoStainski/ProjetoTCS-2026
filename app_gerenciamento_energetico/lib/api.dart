@@ -15,8 +15,8 @@ const String _apiUrlInformada = String.fromEnvironment('API_URL');
 final String apiUrl = _apiUrlInformada.isNotEmpty
     ? _apiUrlInformada
     : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
-        ? 'http://10.0.2.2:8000'
-        : 'http://localhost:8000';
+    ? 'http://10.0.2.2:8000'
+    : 'http://localhost:8000';
 
 class ApiErro implements Exception {
   final String mensagem;
@@ -48,11 +48,11 @@ class Aparelho {
   });
 
   Aparelho.fromJson(Map<String, dynamic> j)
-      : id = j['id'],
-        categoria = j['categoria'],
-        marca = j['marca'],
-        modelo = j['modelo'],
-        detalhe = j['detalhe'] ?? '';
+    : id = j['id'],
+      categoria = j['categoria'],
+      marca = j['marca'],
+      modelo = j['modelo'],
+      detalhe = j['detalhe'] ?? '';
 
   String get nome => '$marca $modelo';
   String get categoriaLegivel => legivel(categoria);
@@ -60,15 +60,18 @@ class Aparelho {
 
 /// O que o app precisa perguntar antes de calcular.
 /// pergunta: null (nada), "horas", "ciclos" ou "velocidade".
+/// opcional: o usuario pode deixar em branco e fica o consumo do Inmetro (TV e ar-condicionado).
 class PerguntaDeUso {
   final String? pergunta;
   final List<String> opcoes;
   final dynamic padrao;
+  final bool opcional;
 
   PerguntaDeUso.fromJson(Map<String, dynamic> j)
-      : pergunta = j['pergunta'],
-        opcoes = List<String>.from(j['opcoes'] ?? const []),
-        padrao = j['padrao'];
+    : pergunta = j['pergunta'],
+      opcoes = List<String>.from(j['opcoes'] ?? const []),
+      padrao = j['padrao'],
+      opcional = j['opcional'] ?? false;
 }
 
 class Distribuidora {
@@ -78,10 +81,10 @@ class Distribuidora {
   final double tarifaKwh;
 
   Distribuidora.fromJson(Map<String, dynamic> j)
-      : id = j['id'],
-        nome = j['nome'],
-        uf = j['uf'],
-        tarifaKwh = _real(j['tarifa_kwh']);
+    : id = j['id'],
+      nome = j['nome'],
+      uf = j['uf'],
+      tarifaKwh = _real(j['tarifa_kwh']);
 }
 
 class Resultado {
@@ -100,19 +103,19 @@ class Resultado {
   final List<String> avisos;
 
   Resultado.fromJson(Map<String, dynamic> j)
-      : categoria = j['categoria'],
-        marca = j['marca'],
-        modelo = j['modelo'],
-        detalhe = j['detalhe'] ?? '',
-        distribuidora = j['distribuidora'],
-        uf = j['uf'],
-        kwhMes = _real(j['kwh_mes']),
-        metodo = j['metodo'],
-        tarifaKwh = _real(j['tarifa_kwh']),
-        origemTarifa = j['origem_tarifa'],
-        custoMes = _real(j['custo_mes']),
-        custoAno = _real(j['custo_ano']),
-        avisos = List<String>.from(j['avisos'] ?? const []);
+    : categoria = j['categoria'],
+      marca = j['marca'],
+      modelo = j['modelo'],
+      detalhe = j['detalhe'] ?? '',
+      distribuidora = j['distribuidora'],
+      uf = j['uf'],
+      kwhMes = _real(j['kwh_mes']),
+      metodo = j['metodo'],
+      tarifaKwh = _real(j['tarifa_kwh']),
+      origemTarifa = j['origem_tarifa'],
+      custoMes = _real(j['custo_mes']),
+      custoAno = _real(j['custo_ano']),
+      avisos = List<String>.from(j['avisos'] ?? const []);
 
   String get nome => '$marca $modelo';
 }
@@ -129,14 +132,14 @@ class AparelhoSugerido {
   final double economiaPercentual;
 
   AparelhoSugerido.fromJson(Map<String, dynamic> j)
-      : aparelho = Aparelho.fromJson(j),
-        tipo = j['tipo'] ?? '',
-        kwhMes = _real(j['kwh_mes']),
-        custoMes = _real(j['custo_mes']),
-        economiaKwhMes = _real(j['economia_kwh_mes']),
-        economiaMes = _real(j['economia_mes']),
-        economiaAno = _real(j['economia_ano']),
-        economiaPercentual = _real(j['economia_percentual']);
+    : aparelho = Aparelho.fromJson(j),
+      tipo = j['tipo'] ?? '',
+      kwhMes = _real(j['kwh_mes']),
+      custoMes = _real(j['custo_mes']),
+      economiaKwhMes = _real(j['economia_kwh_mes']),
+      economiaMes = _real(j['economia_mes']),
+      economiaAno = _real(j['economia_ano']),
+      economiaPercentual = _real(j['economia_percentual']);
 }
 
 class Sugestoes {
@@ -148,12 +151,12 @@ class Sugestoes {
   final List<AparelhoSugerido> sugestoes;
 
   Sugestoes.fromJson(Map<String, dynamic> j)
-      : kwhAtual = _real(j['atual']['kwh_mes']),
-        custoAtual = _real(j['atual']['custo_mes']),
-        criterio = j['criterio'],
-        mensagem = j['mensagem'],
-        suspeitosDescartados = j['suspeitos_descartados'] ?? 0,
-        sugestoes = [for (final s in j['sugestoes']) AparelhoSugerido.fromJson(s)];
+    : kwhAtual = _real(j['atual']['kwh_mes']),
+      custoAtual = _real(j['atual']['custo_mes']),
+      criterio = j['criterio'],
+      mensagem = j['mensagem'],
+      suspeitosDescartados = j['suspeitos_descartados'] ?? 0,
+      sugestoes = [for (final s in j['sugestoes']) AparelhoSugerido.fromJson(s)];
 }
 
 class Payback {
@@ -163,10 +166,10 @@ class Payback {
   final String texto;
 
   Payback.fromJson(Map<String, dynamic> j)
-      : precoNovo = _real(j['preco_novo']),
-        meses = _realOuNulo(j['meses']),
-        anos = _realOuNulo(j['anos']),
-        texto = j['texto'];
+    : precoNovo = _real(j['preco_novo']),
+      meses = _realOuNulo(j['meses']),
+      anos = _realOuNulo(j['anos']),
+      texto = j['texto'];
 }
 
 class Comparacao {
@@ -179,13 +182,13 @@ class Comparacao {
   final List<String> avisos;
 
   Comparacao.fromJson(Map<String, dynamic> j)
-      : atual = Resultado.fromJson(j['atual']),
-        novo = Resultado.fromJson(j['novo']),
-        economiaKwhMes = _real(j['economia_kwh_mes']),
-        economiaMes = _real(j['economia_mes']),
-        economiaAno = _real(j['economia_ano']),
-        payback = j['payback'] == null ? null : Payback.fromJson(j['payback']),
-        avisos = List<String>.from(j['avisos'] ?? const []);
+    : atual = Resultado.fromJson(j['atual']),
+      novo = Resultado.fromJson(j['novo']),
+      economiaKwhMes = _real(j['economia_kwh_mes']),
+      economiaMes = _real(j['economia_mes']),
+      economiaAno = _real(j['economia_ano']),
+      payback = j['payback'] == null ? null : Payback.fromJson(j['payback']),
+      avisos = List<String>.from(j['avisos'] ?? const []);
 }
 
 /// Perfil da casa pelo K-Means (POST /classificar).
@@ -200,14 +203,14 @@ class Classificacao {
   final String aviso;
 
   Classificacao.fromJson(Map<String, dynamic> j)
-      : perfil = j['perfil'],
-        kwhTotal = _real(j['kwh_total']),
-        kwhPorMorador = _real(j['kwh_por_morador']),
-        medianaKwhPorMorador = _real(j['comparacao_media']['mediana_kwh_por_morador']),
-        diferencaPercentual = _real(j['comparacao_media']['diferenca_percentual']),
-        comparacaoTexto = j['comparacao_media']['texto'],
-        fracoes = {for (final e in (j['fracoes'] as Map).entries) e.key as String: _real(e.value)},
-        aviso = j['aviso'];
+    : perfil = j['perfil'],
+      kwhTotal = _real(j['kwh_total']),
+      kwhPorMorador = _real(j['kwh_por_morador']),
+      medianaKwhPorMorador = _real(j['comparacao_media']['mediana_kwh_por_morador']),
+      diferencaPercentual = _real(j['comparacao_media']['diferenca_percentual']),
+      comparacaoTexto = j['comparacao_media']['texto'],
+      fracoes = {for (final e in (j['fracoes'] as Map).entries) e.key as String: _real(e.value)},
+      aviso = j['aviso'];
 }
 
 class Api {
@@ -218,11 +221,7 @@ class Api {
 
   static Future<dynamic> _post(String caminho, Map<String, dynamic> corpo) async {
     final uri = Uri.parse('$apiUrl$caminho');
-    return _tratar(() => http.post(
-          uri,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode(corpo),
-        ));
+    return _tratar(() => http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(corpo)));
   }
 
   static Future<dynamic> _tratar(Future<http.Response> Function() chamada) async {
@@ -247,11 +246,7 @@ class Api {
   static Future<List<String>> categorias() async => List<String>.from(await _get('/categorias'));
 
   static Future<List<Aparelho>> buscarAparelhos(String busca, {String? categoria}) async {
-    final lista = await _get('/aparelhos', {
-      'busca': busca,
-      'categoria': ?categoria,
-      'limite': '30',
-    });
+    final lista = await _get('/aparelhos', {'busca': busca, 'categoria': ?categoria, 'limite': '30'});
     return [for (final j in lista) Aparelho.fromJson(j)];
   }
 
@@ -272,14 +267,19 @@ class Api {
   static Future<Sugestoes> sugestoes(int aparelhoId, Map<String, dynamic> usoETarifa) async =>
       Sugestoes.fromJson(await _post('/sugestoes', {'aparelho_id': aparelhoId, ...usoETarifa}));
 
-  static Future<Comparacao> comparar(int aparelhoId, int alternativaId, Map<String, dynamic> usoETarifa,
-          {double? precoNovo}) async =>
-      Comparacao.fromJson(await _post('/comparar', {
-        'aparelho_id': aparelhoId,
-        'alternativa_id': alternativaId,
-        'preco_novo': precoNovo,
-        ...usoETarifa,
-      }));
+  static Future<Comparacao> comparar(
+    int aparelhoId,
+    int alternativaId,
+    Map<String, dynamic> usoETarifa, {
+    double? precoNovo,
+  }) async => Comparacao.fromJson(
+    await _post('/comparar', {
+      'aparelho_id': aparelhoId,
+      'alternativa_id': alternativaId,
+      'preco_novo': precoNovo,
+      ...usoETarifa,
+    }),
+  );
 
   /// itens: [{categoria, kwh_mes}] da casa.
   static Future<Classificacao> classificar(int moradores, List<Map<String, dynamic>> itens) async =>
