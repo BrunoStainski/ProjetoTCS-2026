@@ -20,6 +20,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
 import banco
+import ml_pipeline
 import servico
 from calculadora_residencial import LIMITE_BUSCA
 
@@ -139,6 +140,32 @@ class Resultado(BaseModel):
     fonte_dados: str
 
 
+class ItemConsumo(BaseModel):
+    categoria: str = Field(..., description="Categoria do aparelho (GET /categorias). Ex.: chuveiro")
+    kwh_mes: float = Field(..., ge=0, description="Consumo mensal, normalmente o kwh_mes de POST /calcular.")
+
+
+class ClassificacaoEntrada(BaseModel):
+    moradores: int = Field(..., ge=1, le=20)
+    itens: list[ItemConsumo] = Field(..., min_length=1, description="Aparelhos da casa com o consumo de cada um.")
+
+
+class ComparacaoMedia(BaseModel):
+    mediana_kwh_por_morador: float
+    diferenca_percentual: float
+    texto: str
+
+
+class Classificacao(BaseModel):
+    perfil: Literal["Consciente", "Moderado", "Ineficiente"]
+    kwh_total: float
+    kwh_por_morador: float
+    comparacao_media: ComparacaoMedia
+    fracoes: dict[str, float]
+    aviso: str
+    fonte: str
+
+
 def conexao():
     try:
         con = banco.conectar()
@@ -219,3 +246,14 @@ def calcular(entrada: CalculoEntrada, con=Depends(conexao)):
         )
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
+
+
+@app.post("/classificar", response_model=Classificacao, tags=["Perfil (ML)"])
+def classificar(entrada: ClassificacaoEntrada):
+    """Perfil de consumo da casa (K-Means treinado com residencias sinteticas)."""
+    try:
+        return ml_pipeline.classificar_residencia(entrada.model_dump())
+    except FileNotFoundError as erro:
+        raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
+    except ValueError as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro

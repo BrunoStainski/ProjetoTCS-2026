@@ -6,7 +6,8 @@ __pycache__
 .vscode
 app_gerenciamento_energetico
 datasets/raw
-models
+models/*
+!models/kmeans.pkl
 docs
 infra
 prompts

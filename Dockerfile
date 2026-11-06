@@ -10,6 +10,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
 COPY datasets/processed ./datasets/processed
+# so o K-Means (numeros puros, sem scikit-learn); o ctgan.pkl precisaria do torch
+COPY models/kmeans.pkl ./models/kmeans.pkl
 
 WORKDIR /app/src
 EXPOSE 8000
