@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field, model_validator
 
 import banco
 import ml_pipeline
+import rag_agent
 import servico
 from calculadora_residencial import LIMITE_BUSCA
 from criar_banco import COLUNAS_APARELHOS
@@ -331,3 +332,66 @@ def classificar(entrada: ClassificacaoEntrada):
         raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
+
+
+# Eco-Coach (RAG + LLM) -------------------------------------------------------------------
+
+class ItemEco(ItemConsumo):
+    custo_mes: Optional[float] = Field(None, ge=0, description="R$/mes do aparelho (custo_mes de POST /calcular).")
+
+
+class TrocaAvaliada(BaseModel):
+    aparelho: str = Field(..., description="Aparelho atual. Ex.: geladeira Brastemp BRM44")
+    alternativa: str = Field(..., description="Modelo sugerido. Ex.: geladeira Electrolux TF39")
+    economia_mes: float = Field(..., description="R$/mes economizados (de POST /comparar).")
+    payback_meses: Optional[float] = Field(None, ge=0, description="Meses para a troca se pagar (de /comparar).")
+
+
+class EcoCoachEntrada(BaseModel):
+    moradores: int = Field(..., ge=1, le=20)
+    itens: list[ItemEco] = Field(..., min_length=1, description="Aparelhos da casa com consumo (e custo).")
+    trocas: list[TrocaAvaliada] = Field(default_factory=list, max_length=5,
+                                        description="Trocas ja calculadas no /comparar (opcional).")
+
+
+class FonteCitada(BaseModel):
+    n: int
+    documento: str
+    orgao: str
+    url: str
+    secao: Optional[str] = None
+    pagina: Optional[int] = None
+
+
+class MaiorConsumo(BaseModel):
+    categoria: str
+    nome: str
+    kwh_mes: float
+    custo_mes: Optional[float] = None
+    percentual: float
+
+
+class EcoCoach(BaseModel):
+    perfil: Literal["Consciente", "Moderado", "Ineficiente"]
+    kwh_total: float
+    custo_total: Optional[float] = None
+    maiores_consumos: list[MaiorConsumo]
+    plano: str = Field(..., description="Texto em markdown; as citacoes [n] apontam para 'fontes'.")
+    fontes: list[FonteCitada]
+    modelo: str
+    aviso: str
+
+
+@app.post("/eco-coach", response_model=EcoCoach, tags=["Eco-Coach (RAG)"])
+def eco_coach(entrada: EcoCoachEntrada, con=Depends(conexao)):
+    """Plano de acao em linguagem simples, com dicas oficiais citadas. Os numeros sao calculados
+    pelo iamp; o LLM (Gemini) so escreve. Pode levar alguns segundos."""
+    dados = entrada.model_dump()
+    try:
+        return rag_agent.gerar_plano(con, dados, trocas=dados.pop("trocas"))
+    except ValueError as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
+    except FileNotFoundError as erro:
+        raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
+    except (LookupError, RuntimeError) as erro:
+        raise HTTPException(status_code=503, detail=f"Eco-Coach indisponivel: {erro}") from erro

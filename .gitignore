@@ -6,6 +6,9 @@ venv/
 # Variáveis de ambiente (credenciais)
 .env
 
+# Configurações pessoais do Claude Code (permissões de cada pessoa)
+.claude/settings.local.json
+
 # Arquivos temporários do Python e Jupyter
 __pycache__/
 *.pyc
@@ -18,3 +21,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+
+# Cache do modelo de embeddings do RAG (baixado pelo fastembed)
+models/fastembed/
