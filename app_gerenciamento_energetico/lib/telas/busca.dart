@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../casa.dart';
+import '../tema.dart';
 import 'comum.dart';
 import 'uso.dart';
 
@@ -23,7 +25,9 @@ class _TelaBuscaState extends State<TelaBusca> {
   @override
   void initState() {
     super.initState();
-    Api.categorias().then((c) => setState(() => _categorias = c)).catchError((_) {});
+    Api.categorias().then((c) {
+      if (mounted) setState(() => _categorias = c);
+    }).catchError((_) {});
   }
 
   @override
@@ -59,14 +63,18 @@ class _TelaBuscaState extends State<TelaBusca> {
   @override
   Widget build(BuildContext context) {
     return Pagina(
-      titulo: 'iamp - Qual é o aparelho?',
+      titulo: 'iamp',
+      tituloWidget: const LogoIamp(),
       passo: 1,
       filho: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Descubra quanto um aparelho pesa na sua conta de luz.',
-              style: Theme.of(context).textTheme.titleMedium),
+          Text('Quanto cada aparelho pesa na sua conta de luz?',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          const Text('Dados oficiais do Inmetro e tarifas da ANEEL.', style: TextStyle(color: Cores.cinza)),
           const SizedBox(height: 16),
+          const _AtalhoCasa(),
           TextField(
             controller: _texto,
             textInputAction: TextInputAction.search,
@@ -74,16 +82,17 @@ class _TelaBuscaState extends State<TelaBusca> {
             decoration: InputDecoration(
               labelText: 'Marca e/ou modelo',
               hintText: 'Ex.: brastemp, bosch ewi, samsung',
-              suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _buscar),
+              suffixIcon: IconButton(icon: const Icon(Icons.search, color: Cores.amarelo), onPressed: _buscar),
             ),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String?>(
             initialValue: _categoria,
+            dropdownColor: Cores.superficieAlta,
             decoration: const InputDecoration(labelText: 'Tipo de aparelho (opcional)'),
             items: [
               const DropdownMenuItem(value: null, child: Text('Todos')),
-              for (final c in _categorias) DropdownMenuItem(value: c, child: Text(c.replaceAll('_', ' '))),
+              for (final c in _categorias) DropdownMenuItem(value: c, child: Text(legivel(c))),
             ],
             onChanged: (c) => setState(() => _categoria = c),
           ),
@@ -96,13 +105,15 @@ class _TelaBuscaState extends State<TelaBusca> {
             Expanded(
               child: ListView.separated(
                 itemCount: _resultados!.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
+                separatorBuilder: (_, _) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   final a = _resultados![i];
                   return ListTile(
+                    leading: Icon(iconeDaCategoria(a.categoria)),
                     title: Text(a.nome),
-                    subtitle: Text([a.categoriaLegivel, if (a.detalhe.isNotEmpty) a.detalhe].join(' - ')),
-                    trailing: const Icon(Icons.chevron_right),
+                    subtitle: Text([a.categoriaLegivel, if (a.detalhe.isNotEmpty) a.detalhe].join(' - '),
+                        style: const TextStyle(color: Cores.cinza)),
+                    trailing: const Icon(Icons.chevron_right, color: Cores.cinza),
                     onTap: () => _escolher(a),
                   );
                 },
@@ -110,6 +121,34 @@ class _TelaBuscaState extends State<TelaBusca> {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Resumo da casa na tela inicial (aparece depois do primeiro aparelho adicionado).
+class _AtalhoCasa extends StatelessWidget {
+  const _AtalhoCasa();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: casa,
+      builder: (context, _) {
+        if (casa.vazia) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            child: ListTile(
+              leading: const Icon(Icons.home_outlined),
+              title: Text('Minha casa: ${reais(casa.custoMes)} por mês'),
+              subtitle: Text('${casa.totalAparelhos} aparelho(s) - ${numero(casa.kwhMes)} kWh/mês',
+                  style: const TextStyle(color: Cores.cinza)),
+              trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
+              onTap: () => abrirMinhaCasa(context),
+            ),
+          ),
+        );
+      },
     );
   }
 }

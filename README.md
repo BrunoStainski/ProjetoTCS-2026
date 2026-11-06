@@ -2,7 +2,7 @@
 
 Copiloto de eficiência energética residencial.
 
-O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da casa. O iamp mostra quanto esse aparelho gasta por mês, em kWh e em reais.
+O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da casa. O iamp mostra quanto esse aparelho gasta por mês, em kWh e em reais, soma os aparelhos da casa, classifica o perfil de consumo e sugere modelos mais econômicos, com o tempo que a troca leva para se pagar.
 
 ---
 
@@ -17,6 +17,9 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 - Junta as tabelas de consumo do **Inmetro** e as tarifas da **ANEEL** num banco de dados.
 - O usuário busca o aparelho e escolhe a distribuidora.
 - O app calcula: `consumo (kWh/mês) x tarifa (R$/kWh) = custo por mês`.
+- Soma vários aparelhos em "Minha casa" e mostra o que mais pesa na conta.
+- Classifica o perfil de consumo da casa com Machine Learning (K-Means).
+- Sugere modelos equivalentes que gastam menos e calcula o payback da troca.
 - Mostra também como o valor foi calculado e de onde veio cada dado.
 
 ---
@@ -39,12 +42,12 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
  PostgreSQL (Docker)                   docker-compose.yml
             |
             v
- Regras de cálculo                     src/calculadora_residencial.py
+ Regras de cálculo e de equivalência   src/calculadora_residencial.py
             |
             v
- Funções para as telas                 src/servico.py
-            |
-            +--------------------------------------+
+ Funções para as telas                 src/servico.py      Perfil (K-Means)  src/ml_pipeline.py
+            |                                                      |
+            +--------------------------------------+---------------+
             v                                      v
  API FastAPI (Docker)  src/main.py      App de terminal (testes)  src/app_terminal.py
             |
@@ -61,13 +64,15 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 | Banco de dados | PostgreSQL 15 |
 | Acesso ao banco | SQLAlchemy + psycopg2 |
 | API | FastAPI + Uvicorn |
+| Machine Learning | SDV (CTGAN) e scikit-learn (K-Means) |
+| App | Flutter (Dart) |
 | Containers | Docker e Docker Compose |
 
 ### Tabelas do banco
 
 | Tabela | O que guarda |
 |---|---|
-| `aparelhos` | Catálogo com marca, modelo e consumo de cada aparelho |
+| `aparelhos` | Catálogo com marca, modelo, consumo e medidas de cada aparelho (litros, polegadas, BTU/h, kg, lumens...) |
 | `distribuidoras` | Distribuidoras de energia e o estado de cada uma |
 | `tarifas` | Tarifa residencial (B1) de cada distribuidora e quando ela vale |
 | `vw_tarifa_vigente` | Visão com a tarifa que vale hoje para cada distribuidora |
@@ -88,17 +93,18 @@ Ficaram de fora: aquecedores e fogões a gás (não usam energia elétrica), for
 iamp/
 ├── datasets/
 │   ├── raw/              # dados originais do Inmetro e da ANEEL
-│   └── processed/        # dados limpos, prontos para o banco
-├── scripts/              # limpeza dos dados (um script por dataset)
-├── src/                  # aplicação: banco, cálculo e app
-├── app_gerenciamento_energetico/   # app Flutter (em construção)
+│   └── processed/        # dados limpos, prontos para o banco (+ residências da seed e sintéticas)
+├── scripts/              # limpeza dos dados (um script por dataset) e treino dos modelos
+├── src/                  # aplicação: banco, cálculo, API e app de terminal
+├── app_gerenciamento_energetico/   # app Flutter
 ├── docs/                 # BPMN e documentação
 ├── infra/                # Terraform (em construção)
-├── models/               # modelos de Machine Learning (em construção)
+├── models/               # modelos treinados (ctgan.pkl e kmeans.pkl)
 ├── prompts/              # registro dos prompts usados com IA
 ├── Dockerfile            # imagem da API
 ├── docker-compose.yml    # sobe o PostgreSQL e a API
-├── requirements.txt      # bibliotecas Python
+├── requirements.txt      # bibliotecas Python da API
+├── requirements-ml.txt   # bibliotecas para treinar os modelos (sdv, torch)
 └── .env.example          # modelo das credenciais do banco
 ```
 
@@ -111,6 +117,7 @@ Instale nesta ordem:
 1. **Git**: https://git-scm.com/downloads
 2. **Python 3.12**: https://www.python.org/downloads/ (no Windows, marque "Add Python to PATH")
 3. **Docker Desktop**: https://www.docker.com/products/docker-desktop/
+4. **Flutter** (só para rodar o app): https://docs.flutter.dev/get-started/install
 
 Para conferir se deu certo:
 
@@ -118,6 +125,7 @@ Para conferir se deu certo:
 git --version
 python --version
 docker --version
+flutter --version
 ```
 
 ---
@@ -171,6 +179,9 @@ Isso sobe dois containers:
 - `api_iamp`: a API FastAPI (porta 8000)
 
 Na primeira vez, a API carrega os dados de `datasets/processed/` no banco sozinha (leva cerca de 1 minuto).
+Ela também recarrega sozinha quando o banco foi criado por uma versão antiga do código (falta alguma coluna nova).
+Depois de um `git pull`, rode o mesmo comando de novo para a API usar o código novo.
+
 Para conferir se os dois estão `healthy`:
 
 ```bash
@@ -221,6 +232,23 @@ Exemplo de uso:
 
 Resultado: cerca de 41 kWh por mês, ou **R$ 31,68 por mês**.
 
+### Passo 9: abrir o app Flutter
+
+Com a API rodando (Passo 5):
+
+```bash
+cd app_gerenciamento_energetico
+flutter pub get
+flutter run -d chrome
+```
+
+- `-d chrome` abre no navegador e é o jeito mais simples.
+- `-d windows` abre como programa do Windows, mas precisa do Visual Studio com "Desenvolvimento para desktop com C++".
+- No emulador Android, o app já usa `http://10.0.2.2:8000` (o computador visto pelo emulador).
+- Em outro endereço: `flutter run -d chrome --dart-define=API_URL=http://192.168.0.10:8000`.
+
+Testes do app: `flutter test`.
+
 ---
 
 ## 7. API
@@ -233,10 +261,13 @@ Documentação interativa: **http://localhost:8000/docs** (dá para testar cada 
 | `GET /aparelhos/{id}/uso` | Diz o que o app precisa perguntar: `horas`, `ciclos`, `velocidade` ou nada (`null`) |
 | `GET /distribuidoras?uf=PR` | Lista as distribuidoras com tarifa vigente (opcional: `busca=copel`) |
 | `POST /calcular` | Devolve o consumo (kWh/mês) e o custo (R$/mês e R$/ano) |
+| `POST /sugestoes` | Modelos equivalentes que gastam menos, com a economia por mês e por ano |
+| `POST /comparar` | Aparelho atual x modelo novo: economia e, com o preço, o payback em meses |
+| `POST /classificar` | Perfil de consumo da casa (K-Means): Consciente, Moderado ou Ineficiente |
 | `GET /categorias`, `GET /ufs` | Listas para preencher filtros no app |
 | `GET /saude` | Diz se a API e o banco estão no ar |
 
-Fluxo do app: buscar o aparelho → perguntar o uso → escolher a distribuidora → calcular.
+Fluxo do app: buscar o aparelho → perguntar o uso → escolher a distribuidora → calcular → adicionar à casa ou ver modelos mais econômicos.
 
 Exemplo de `POST /calcular` (chuveiro Bosch EWI 5.5, 15 min por dia, Copel):
 
@@ -250,18 +281,61 @@ Exemplo de `POST /calcular` (chuveiro Bosch EWI 5.5, 15 min por dia, Copel):
 
 Resposta (resumida): `"kwh_mes": 41.25`, `"custo_mes": 31.68`, `"custo_ano": 380.17`, além de `metodo` e `avisos`.
 
+`POST /sugestoes` recebe o mesmo corpo (mais `limite`, padrão 5). `POST /comparar` recebe também `alternativa_id` e, se quiser o payback, `preco_novo` em reais (os ids dos exemplos são ilustrativos):
+
+```json
+{
+  "aparelho_id": 9844,
+  "alternativa_id": 10233,
+  "distribuidora_id": 60,
+  "preco_novo": 2499.90
+}
+```
+
+`POST /classificar` recebe os aparelhos da casa com o consumo de cada um:
+
+```json
+{
+  "moradores": 3,
+  "itens": [
+    {"categoria": "chuveiro", "kwh_mes": 82.5},
+    {"categoria": "refrigerador", "kwh_mes": 30},
+    {"categoria": "televisor", "kwh_mes": 10}
+  ]
+}
+```
+
 Regras do corpo:
 
 - Envie `distribuidora_id` **ou** `tarifa_manual` (R$/kWh da conta de luz), nunca os dois.
 - `horas_dia` (0 a 24), `ciclos_mes` ou `velocidade` (`baixa`, `media`, `alta`) conforme o `GET /uso`. Se faltar, usa o valor padrão quando existe.
-- `registrar` (padrão `true`) grava o cálculo na tabela `consultas`.
-- Erros: `404` quando o aparelho ou a distribuidora não existe, `422` quando falta ou sobra algum dado.
+- `registrar` (padrão `true`, só no `/calcular`) grava o cálculo na tabela `consultas`.
+- Erros: `404` quando o aparelho ou a distribuidora não existe, `422` quando falta ou sobra algum dado, `503` quando o banco ou o modelo não está disponível.
 
 Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
 ---
 
-## 8. Como o cálculo funciona
+## 8. O app Flutter
+
+Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco. As cores ficam todas em `lib/tema.dart`.
+
+| Tela | O que faz |
+|---|---|
+| Busca | Procura o aparelho por marca e/ou modelo, com filtro por tipo |
+| Uso | Pergunta horas por dia, lavagens por mês ou velocidade, só quando precisa |
+| Distribuidora | Estado + distribuidora, ou a tarifa da conta de luz. Oferece repetir a última escolhida |
+| Resultado | Gasto por mês e por ano, como foi calculado e os avisos |
+| Minha casa | Soma os aparelhos (com quantidade), mostra o que mais pesa e o perfil da casa |
+| Modelos mais econômicos | Lista modelos equivalentes que gastam menos |
+| Vale a pena trocar? | Compara os dois modelos e calcula o payback com o preço digitado |
+
+O botão de casa no topo de todas as telas abre "Minha casa" e mostra quantos aparelhos já foram adicionados.
+A lista fica só na memória: ao fechar o app, ela recomeça vazia.
+
+---
+
+## 9. Como o cálculo funciona
 
 | Caso | Como calcula |
 |---|---|
@@ -276,16 +350,64 @@ Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
 ---
 
-## 9. Limitações
+## 10. Sugestão de troca e payback
+
+O iamp só compara modelos que fazem o mesmo serviço, com o **mesmo uso** e a **mesma tarifa** do aparelho do usuário:
+
+| Aparelho | É equivalente quando tem |
+|---|---|
+| Geladeira e freezer | Mesmo tipo e volume parecido (15% para mais ou para menos) |
+| TV | Tela do mesmo tamanho (5%) |
+| Ar-condicionado | Mesmo tipo e mesma capacidade em BTU/h (5%) |
+| Ventilador de mesa e de teto | Diâmetro parecido (10%) |
+| Máquina de lavar | Mesmo tipo e capacidade parecida em kg (15%) |
+| Lâmpada LED ou fluorescente | Mesma luminosidade em lumens (10%). Fluorescente pode virar LED |
+| Bomba d'água | Motor de mesma potência (cv) |
+
+Regras extras:
+
+- Só entra modelo com consumo vindo do Inmetro (não os completados na limpeza dos dados).
+- O modelo sugerido precisa gastar pelo menos 5% menos.
+- Consumo abaixo de 40% da mediana dos equivalentes é tratado como erro de digitação no dado e fica de fora (exemplo real: HISENSE RS3P428NEDA com 28,0 kWh e a versão 127 V com 2,8 kWh).
+- Variações do mesmo modelo (cor, voltagem) aparecem uma vez só.
+- Sem sugestão para chuveiro (os modelos têm eficiência parecida, então a dica é reduzir o tempo de banho), micro-ondas (o Inmetro só informa a potência) e lâmpada de vapor de sódio (sem lumens no dataset).
+
+**Payback** (calculado na API, em Python): `preço do modelo novo / economia por mês = meses para a troca se pagar`.
+O catálogo do Inmetro não tem preços, então o usuário digita o preço que encontrou.
+
+---
+
+## 11. Perfil de consumo (Machine Learning)
+
+1. `scripts/gerar_seed.py`: cria 3.000 residências por regras, com aparelhos reais do catálogo e tarifas da ANEEL.
+2. `scripts/treinar_ctgan.py`: treina um CTGAN (SDV) e gera 5.000 residências sintéticas.
+3. `scripts/treinar_kmeans.py`: agrupa as residências em 3 perfis (K-Means) pelo kWh por morador e pela parte do consumo de chuveiro, ar-condicionado e geladeira.
+4. `src/ml_pipeline.py`: usa o `models/kmeans.pkl` para classificar uma casa (`POST /classificar`). A API não precisa de scikit-learn.
+
+Para treinar de novo (cerca de 5 minutos no CPU):
+
+```bash
+pip install -r requirements-ml.txt
+python scripts/gerar_seed.py
+python scripts/treinar_ctgan.py
+python scripts/treinar_kmeans.py
+```
+
+---
+
+## 12. Limitações
 
 - O valor é uma estimativa: não inclui impostos (ICMS, PIS/COFINS), bandeira tarifária nem iluminação pública.
 - O consumo do Inmetro é medido em laboratório. O uso real pode ser diferente.
 - As horas de uso padrão foram definidas pelo grupo e ainda precisam de uma fonte oficial.
 - A tarifa usada é a residencial comum (B1). Não vale para baixa renda, tarifa branca ou indústria.
+- O perfil da casa vem de um modelo treinado com residências sintéticas: serve como referência, não como avaliação oficial.
+- O payback é simples: não considera juros, a venda do aparelho antigo nem reajustes da tarifa.
+- O filtro de consumo suspeito (40% da mediana) é uma regra do grupo para evitar recomendar um modelo por causa de um erro no dado.
 
 ---
 
-## 10. Fontes dos dados
+## 13. Fontes dos dados
 
 | Dado | Fonte |
 |---|---|
@@ -294,20 +416,20 @@ Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
 ---
 
-## 11. O que já foi feito
+## 14. O que já foi feito
 
 - Dados do Inmetro e da ANEEL baixados e limpos com Pandas
 - Banco PostgreSQL no Docker com as tabelas do projeto
 - Cálculo de consumo e custo para 12 tipos de aparelho
 - App de terminal funcionando de ponta a ponta
 - API FastAPI no Docker, subindo junto com o banco (`docker compose up -d`)
-- Diagrama BPMN inicial em `docs/`
+- Machine Learning: residências sintéticas (CTGAN) e perfil de consumo (K-Means)
+- App Flutter ligado à API: cálculo, "Minha casa", perfil da casa, sugestão de troca e payback
+- Diagrama BPMN em `docs/`
 
-## 12. Próximas etapas
+## 15. Próximas etapas
 
 - Análise exploratória com gráficos (Matplotlib/Seaborn)
-- Modelo de Machine Learning para estimar o consumo de aparelhos fora do catálogo
-- Assistente com IA generativa (RAG com LangChain)
-- App Flutter ligado à API
+- Assistente com IA generativa "Eco-Coach" (RAG com LangChain)
 - Terraform
 - Documentação de ética e governança

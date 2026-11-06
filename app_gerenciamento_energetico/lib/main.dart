@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'tema.dart';
 import 'telas/busca.dart';
 
 void main() {
@@ -14,11 +15,7 @@ class IampApp extends StatelessWidget {
     return MaterialApp(
       title: 'iamp',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
-      ),
+      theme: temaIamp(),
       home: const TelaBusca(),
     );
   }

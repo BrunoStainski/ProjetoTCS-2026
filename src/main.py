@@ -23,6 +23,7 @@ import banco
 import ml_pipeline
 import servico
 from calculadora_residencial import LIMITE_BUSCA
+from criar_banco import COLUNAS_APARELHOS
 
 
 def esperar_banco(tentativas=30, pausa=2):
@@ -39,6 +40,12 @@ def banco_carregado(con):
     sql = ("SELECT to_regclass('public.aparelhos') IS NOT NULL "
            "AND to_regclass('public.vw_tarifa_vigente') IS NOT NULL")
     if not banco.executar(con, sql).scalar_one():
+        return False
+    # banco criado por uma versao antiga do codigo (falta coluna nova): recarrega
+    sql = "SELECT column_name FROM information_schema.columns WHERE table_name = 'aparelhos'"
+    colunas = set(banco.consulta(con, sql)["column_name"])
+    if not set(COLUNAS_APARELHOS) <= colunas:
+        print("esquema do banco desatualizado", flush=True)
         return False
     return banco.executar(con, "SELECT COUNT(*) FROM aparelhos").scalar_one() > 0
 
@@ -58,7 +65,7 @@ async def ciclo_de_vida(app):
     con = esperar_banco()
     try:
         if os.getenv("RECARREGAR_BANCO") == "1" or not banco_carregado(con):
-            print("banco vazio, carregando os dados...", flush=True)
+            print("banco vazio ou desatualizado, carregando os dados...", flush=True)
             carregar_dados(con)
     finally:
         con.close()
@@ -106,20 +113,38 @@ class Distribuidora(BaseModel):
     fonte: Optional[str] = None
 
 
-class CalculoEntrada(BaseModel):
-    aparelho_id: int
+class UsoETarifa(BaseModel):
+    """Campos comuns: como o aparelho e usado e qual tarifa vale."""
     distribuidora_id: Optional[int] = Field(None, description="Id vindo de GET /distribuidoras.")
     tarifa_manual: Optional[float] = Field(None, gt=0, description="R$/kWh da conta de luz do usuario.")
     horas_dia: Optional[float] = Field(None, ge=0, le=24)
     ciclos_mes: Optional[float] = Field(None, ge=0)
     velocidade: Optional[Literal["baixa", "media", "alta"]] = None
-    registrar: bool = Field(True, description="Grava o calculo no historico (tabela consultas).")
 
     @model_validator(mode="after")
     def exigir_uma_tarifa(self):
         if (self.distribuidora_id is None) == (self.tarifa_manual is None):
             raise ValueError("informe distribuidora_id ou tarifa_manual (apenas um dos dois)")
         return self
+
+    def uso_e_tarifa(self):
+        return self.model_dump(include={"distribuidora_id", "tarifa_manual", "horas_dia", "ciclos_mes", "velocidade"})
+
+
+class CalculoEntrada(UsoETarifa):
+    aparelho_id: int
+    registrar: bool = Field(True, description="Grava o calculo no historico (tabela consultas).")
+
+
+class SugestaoEntrada(UsoETarifa):
+    aparelho_id: int = Field(..., description="Aparelho que o usuario tem hoje.")
+    limite: int = Field(5, ge=1, le=10)
+
+
+class ComparacaoEntrada(UsoETarifa):
+    aparelho_id: int = Field(..., description="Aparelho que o usuario tem hoje.")
+    alternativa_id: int = Field(..., description="Modelo novo (normalmente vindo de POST /sugestoes).")
+    preco_novo: Optional[float] = Field(None, gt=0, description="Preco do modelo novo em R$, para o payback.")
 
 
 class Resultado(BaseModel):
@@ -164,6 +189,45 @@ class Classificacao(BaseModel):
     fracoes: dict[str, float]
     aviso: str
     fonte: str
+
+
+class AparelhoConsumo(AparelhoResumo):
+    tipo: str = ""
+    kwh_mes: float
+    custo_mes: float
+
+
+class AparelhoSugerido(AparelhoConsumo):
+    economia_kwh_mes: float
+    economia_mes: float
+    economia_ano: float
+    economia_percentual: float
+
+
+class Sugestoes(BaseModel):
+    atual: AparelhoConsumo
+    tarifa_kwh: float
+    criterio: Optional[str] = Field(None, description="Como os modelos equivalentes foram escolhidos.")
+    mensagem: Optional[str] = Field(None, description="Explica por que nao ha sugestao, quando a lista vem vazia.")
+    suspeitos_descartados: int = Field(0, description="Modelos com consumo baixo demais para ser real (provavel erro no dado).")
+    sugestoes: list[AparelhoSugerido]
+
+
+class Payback(BaseModel):
+    preco_novo: float
+    meses: Optional[float] = Field(None, description="null = a troca nao se paga pela conta de luz.")
+    anos: Optional[float] = None
+    texto: str
+
+
+class Comparacao(BaseModel):
+    atual: Resultado
+    novo: Resultado
+    economia_kwh_mes: float
+    economia_mes: float
+    economia_ano: float
+    payback: Optional[Payback] = Field(None, description="So vem quando preco_novo e informado.")
+    avisos: list[str]
 
 
 def conexao():
@@ -234,16 +298,26 @@ def listar_distribuidoras(
 @app.post("/calcular", response_model=Resultado, tags=["Calculo"])
 def calcular(entrada: CalculoEntrada, con=Depends(conexao)):
     try:
-        return servico.calcular(
-            con,
-            entrada.aparelho_id,
-            distribuidora_id=entrada.distribuidora_id,
-            tarifa_manual=entrada.tarifa_manual,
-            horas_dia=entrada.horas_dia,
-            ciclos_mes=entrada.ciclos_mes,
-            velocidade=entrada.velocidade,
-            registrar=entrada.registrar,
-        )
+        return servico.calcular(con, entrada.aparelho_id, registrar=entrada.registrar, **entrada.uso_e_tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.post("/sugestoes", response_model=Sugestoes, tags=["Economia"])
+def sugerir(entrada: SugestaoEntrada, con=Depends(conexao)):
+    """Modelos equivalentes (mesmo servico) que gastam pelo menos 5% menos, com o mesmo uso e tarifa."""
+    try:
+        return servico.sugerir_alternativas(con, entrada.aparelho_id, limite=entrada.limite, **entrada.uso_e_tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.post("/comparar", response_model=Comparacao, tags=["Economia"])
+def comparar(entrada: ComparacaoEntrada, con=Depends(conexao)):
+    """Economia de trocar o aparelho atual pelo novo e, com preco_novo, o payback (em meses)."""
+    try:
+        return servico.comparar(con, entrada.aparelho_id, entrada.alternativa_id,
+                                preco_novo=entrada.preco_novo, **entrada.uso_e_tarifa())
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
 
