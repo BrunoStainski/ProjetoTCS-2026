@@ -84,10 +84,33 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 `POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
 `POST /eco-coach` ({moradores, itens:[{categoria, kwh_mes, custo_mes}], trocas?} -> plano com fontes [n]),
-`POST /comparar` (+ alternativa_id e preco_novo opcional -> economia e payback em meses).
-Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py).
+`POST /comparar` (+ alternativa_id e preco_novo opcional -> economia e payback em meses),
+`POST /calcular/refrigerador-antigo` (geladeira fora do catálogo), `POST /calcular/resistivo`, `GET /resistivos`.
+Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py); os de estimativa, de `Tarifa`.
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
-A imagem da API leva só `models/kmeans.pkl` (`.dockerignore` exclui o resto de `models/`).
+A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
+
+## Estimativa fora do catálogo (`src/estimativa.py`, `scripts/treinar_refrigerador.py`)
+
+- Geladeira, em ordem: modelo no catálogo -> consumo do Inmetro; **etiqueta** informada -> kWh da etiqueta
+  (antes de 2023 convertido para a metodologia atual) × Fi; sem etiqueta -> estimativa com faixa (`aproximado`).
+- Sem etiqueta, compra antes de 2023: `Ie × Cp(AV)` da **Portaria Inmetro 20/2006** (Anexo VI: AV = Vr + f×Vc,
+  f = 1,41/1,63/1,85 por estrelas, ×1,2 se frost-free; Cp = a×AV + b por categoria). O Cp foi feito com a tabela
+  Inmetro de 2001 (`datasets/raw/refrigeradores_inmetro_2001.csv`, Queiroz et al. ACEEE 2003): Ie médio = 1,000.
+  Até 2005: Ie da tabela 2001 (p25–p75). 2006–2022: faixa entre a mediana do Ie dos modelos atuais e o limite da
+  classe A (0,846 combinado frost-free; 0,855 demais), ponto = meio. Compra a partir de 2023: Random Forest.
+- Random Forest (tipo, frost-free, volume total; `monotonic_cst` no volume; GroupKFold por marca): MAE 3,88 kWh/mês
+  (escala 2025) e 6,46 (escala antiga). O pkl guarda só a grade de previsões (a API não precisa de scikit-learn).
+- Conversão antiga -> 2025: mediana de `consumo médio / consumo antigo` nos modelos com as duas medições no arquivo
+  bruto, sem os 31 pares com valor copiado (razão 1,000); duplex frost-free 0,67 (18 pares), demais 0,70 (geral).
+- Fi (desgaste): 1,00 até 5 anos, 1,10 até 10, 1,30 acima (premissa do grupo; fonte ainda não anexada).
+  Vida útil de 16 anos (Queiroz 2003) gera aviso. O Ft (1,13 a 1,31) foi medido e descartado: só 17 geladeiras
+  de 1 porta manuais no treino e extrapolação para 16 das 27 de 2001.
+- Caso de validação: Consul CRM45 (duplex frost-free 407 L, freezer 90 L, 2014, etiqueta 52,5 kWh/mês):
+  Ie = 0,762 (classe A); sem etiqueta a faixa contém a etiqueta (`tests/test_estimativa.py`).
+- Dados com problema (ainda não corrigidos na limpeza): consumo antigo imputado nas linhas do padrão 2025 sem
+  `consumo_imputado` (ex.: 41,831608 nas Consul CRM); Consul CRM44 com volume total 94 L.
+- Resistivos (`RESISTIVOS`): kWh = W/1000 × h/dia × dias; potência e uso padrão são premissas do grupo.
 `banco_carregado()` compara as colunas de `aparelhos` com `COLUNAS_APARELHOS` (criar_banco.py): ao
 adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
 

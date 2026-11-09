@@ -133,6 +133,26 @@ def calcular(con, aparelho_id, distribuidora_id=None, tarifa_manual=None,
     return resultado
 
 
+def calcular_estimado(con, consumo, distribuidora_id=None, tarifa_manual=None, marca=None, modelo=None,
+                      registrar=True):
+    tarifa, nome, uf, origem = escolher_tarifa(con, distribuidora_id, tarifa_manual)
+    aparelho = {"categoria": consumo["categoria"], "marca": marca or "Nao informado",
+                "modelo": modelo or "Estimado", "detalhe": consumo["detalhe"], "origem_dado": None}
+    resultado = montar_resultado(aparelho, consumo, tarifa, nome, origem, uf, consumo.get("horas_dia"),
+                                 tarifa_do_usuario=tarifa_manual is not None)
+    resultado["avisos"] += consumo["avisos"]
+    resultado["aproximado"] = consumo["aproximado"]
+    resultado["fonte_dados"] = consumo["fonte"]
+    if "kwh_min" in consumo:
+        resultado["kwh_min"] = round(consumo["kwh_min"], 2)
+        resultado["kwh_max"] = round(consumo["kwh_max"], 2)
+        resultado["custo_min_mes"] = round(consumo["kwh_min"] * tarifa, 2)
+        resultado["custo_max_mes"] = round(consumo["kwh_max"] * tarifa, 2)
+    if registrar:
+        banco.registrar_consulta(con, resultado, horas_dia=consumo.get("horas_dia"))
+    return resultado
+
+
 # 4. Aparelho mais economico ------------------------------------------------------
 
 def _candidatos(con, atual, regra, velocidade):

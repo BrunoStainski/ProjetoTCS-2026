@@ -20,6 +20,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
 import banco
+import estimativa
 import ml_pipeline
 import rag_agent
 import servico
@@ -114,19 +115,25 @@ class Distribuidora(BaseModel):
     fonte: Optional[str] = None
 
 
-class UsoETarifa(BaseModel):
-    """Campos comuns: como o aparelho e usado e qual tarifa vale."""
+class Tarifa(BaseModel):
     distribuidora_id: Optional[int] = Field(None, description="Id vindo de GET /distribuidoras.")
     tarifa_manual: Optional[float] = Field(None, gt=0, description="R$/kWh da conta de luz do usuario.")
-    horas_dia: Optional[float] = Field(None, ge=0, le=24)
-    ciclos_mes: Optional[float] = Field(None, ge=0)
-    velocidade: Optional[Literal["baixa", "media", "alta"]] = None
 
     @model_validator(mode="after")
     def exigir_uma_tarifa(self):
         if (self.distribuidora_id is None) == (self.tarifa_manual is None):
             raise ValueError("informe distribuidora_id ou tarifa_manual (apenas um dos dois)")
         return self
+
+    def tarifa(self):
+        return self.model_dump(include={"distribuidora_id", "tarifa_manual"})
+
+
+class UsoETarifa(Tarifa):
+    """Campos comuns: como o aparelho e usado e qual tarifa vale."""
+    horas_dia: Optional[float] = Field(None, ge=0, le=24)
+    ciclos_mes: Optional[float] = Field(None, ge=0)
+    velocidade: Optional[Literal["baixa", "media", "alta"]] = None
 
     def uso_e_tarifa(self):
         return self.model_dump(include={"distribuidora_id", "tarifa_manual", "horas_dia", "ciclos_mes", "velocidade"})
@@ -164,6 +171,39 @@ class Resultado(BaseModel):
     custo_ano: float
     avisos: list[str]
     fonte_dados: str
+    aproximado: bool = Field(False, description="true = gasto aproximado (modelo fora do catalogo ou valor padrao).")
+    kwh_min: Optional[float] = Field(None, description="Faixa da estimativa, quando aproximada.")
+    kwh_max: Optional[float] = None
+    custo_min_mes: Optional[float] = None
+    custo_max_mes: Optional[float] = None
+
+
+class RefrigeradorAntigoEntrada(Tarifa):
+    tipo: Literal[tuple(estimativa.TIPOS)] = Field(..., description="1_porta, frigobar, duplex, freezer_vertical ou freezer_horizontal.")
+    frost_free: bool
+    volume_total_l: float = Field(..., gt=0, le=estimativa.VOLUME_MAXIMO_L)
+    volume_congelador_l: Optional[float] = Field(None, ge=0, description="Volume do freezer. Em branco = proporcao tipica do tipo.")
+    ano_compra: int = Field(..., ge=estimativa.ANO_MINIMO)
+    kwh_etiqueta: Optional[float] = Field(None, gt=0, le=300, description="kWh/mes da etiqueta do Inmetro colada no aparelho.")
+    marca: Optional[str] = Field(None, max_length=60)
+    modelo: Optional[str] = Field(None, max_length=60)
+    registrar: bool = True
+
+
+class ResistivoEntrada(Tarifa):
+    categoria: Literal[tuple(estimativa.RESISTIVOS)]
+    potencia_w: Optional[float] = Field(None, gt=0, le=10000, description="Potencia da etiqueta. Em branco = tipica da categoria.")
+    horas_dia: Optional[float] = Field(None, ge=0, le=24)
+    dias_mes: Optional[float] = Field(None, ge=0, le=31)
+    registrar: bool = True
+
+
+class Resistivo(BaseModel):
+    categoria: str
+    nome: str
+    potencia_w: float
+    horas_dia: float
+    dias_mes: float
 
 
 class ItemConsumo(BaseModel):
@@ -300,6 +340,37 @@ def listar_distribuidoras(
 def calcular(entrada: CalculoEntrada, con=Depends(conexao)):
     try:
         return servico.calcular(con, entrada.aparelho_id, registrar=entrada.registrar, **entrada.uso_e_tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.post("/calcular/refrigerador-antigo", response_model=Resultado, tags=["Calculo"])
+def calcular_refrigerador_antigo(entrada: RefrigeradorAntigoEntrada, con=Depends(conexao)):
+    """Geladeira fora do catalogo: usa a etiqueta, se houver; senao estima por tipo, volume e ano de compra."""
+    try:
+        consumo = estimativa.consumo_refrigerador_estimado(
+            entrada.tipo, entrada.frost_free, entrada.volume_total_l, entrada.ano_compra,
+            volume_congelador_l=entrada.volume_congelador_l, kwh_etiqueta=entrada.kwh_etiqueta)
+        return servico.calcular_estimado(con, consumo, marca=entrada.marca, modelo=entrada.modelo,
+                                         registrar=entrada.registrar, **entrada.tarifa())
+    except FileNotFoundError as erro:
+        raise HTTPException(status_code=503, detail="modelo de estimativa indisponivel") from erro
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.get("/resistivos", response_model=list[Resistivo], tags=["Calculo"])
+def listar_resistivos():
+    """Aparelhos resistivos e os valores padrao (premissas do grupo) usados quando o usuario nao informa."""
+    return [{"categoria": c, **v} for c, v in estimativa.RESISTIVOS.items()]
+
+
+@app.post("/calcular/resistivo", response_model=Resultado, tags=["Calculo"])
+def calcular_resistivo(entrada: ResistivoEntrada, con=Depends(conexao)):
+    """kWh/mes = potencia (W) / 1000 x horas por dia x dias de uso no mes."""
+    try:
+        consumo = estimativa.consumo_resistivo(entrada.categoria, entrada.potencia_w, entrada.horas_dia, entrada.dias_mes)
+        return servico.calcular_estimado(con, consumo, registrar=entrada.registrar, **entrada.tarifa())
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
 
