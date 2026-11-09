@@ -21,6 +21,7 @@ class _TelaBuscaState extends State<TelaBusca> {
   List<Aparelho>? _resultados;
   bool _carregando = false;
   String? _erro;
+  int _pedido = 0; // so a busca mais recente vale (trocar o tipo rapido dispara varias)
 
   @override
   void initState() {
@@ -44,18 +45,26 @@ class _TelaBuscaState extends State<TelaBusca> {
       setState(() => _erro = 'Digite pelo menos 2 letras.');
       return;
     }
+    final pedido = ++_pedido;
     setState(() {
       _carregando = true;
       _erro = null;
     });
     try {
       final lista = await Api.buscarAparelhos(busca, categoria: _categoria);
-      setState(() => _resultados = lista);
+      if (mounted && pedido == _pedido) setState(() => _resultados = lista);
     } on ApiErro catch (e) {
-      setState(() => _erro = e.mensagem);
+      if (mounted && pedido == _pedido) setState(() => _erro = e.mensagem);
     } finally {
-      setState(() => _carregando = false);
+      if (mounted && pedido == _pedido) setState(() => _carregando = false);
     }
+  }
+
+  /// Trocar o tipo de aparelho refaz a busca na hora (se ja tem texto para buscar).
+  /// Sem texto ainda, so guarda o tipo: a busca acontece quando a pessoa digitar.
+  void _trocarTipo(String? categoria) {
+    setState(() => _categoria = categoria);
+    if (_texto.text.trim().length >= 2) _buscar();
   }
 
   void _escolher(Aparelho aparelho) {
@@ -102,7 +111,7 @@ class _TelaBuscaState extends State<TelaBusca> {
               const DropdownMenuItem(value: null, child: Text('Todos')),
               for (final c in _categorias) DropdownMenuItem(value: c, child: Text(legivel(c))),
             ],
-            onChanged: (c) => setState(() => _categoria = c),
+            onChanged: _trocarTipo,
           ),
           const SizedBox(height: 16),
           if (_carregando) const Center(child: CircularProgressIndicator()),

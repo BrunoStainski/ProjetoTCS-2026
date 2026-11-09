@@ -148,7 +148,8 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
   avisos (SnackBar) que navegam usam o `NavigatorState` guardado antes, não o `context` da tela.
 - Busca (`busca.dart`): resultados agrupados por tipo em seções que abrem (`ResultadosPorTipo`, nome do
   tipo em `tituloDaCategoria`), com a quantidade; um tipo só já vem aberto; acima de 30 por tipo
-  (`limiteBuscaPorTipo`) avisa para digitar parte do modelo.
+  (`limiteBuscaPorTipo`) avisa para digitar parte do modelo. Trocar o tipo refaz a busca na hora (só a
+  resposta mais recente vale: `_pedido`). Teste com API falsa: `http.runWithClient` + `MockClient`.
 - Aviso "foi para a sua casa": `avisarAdicionado` (comum.dart) some em 5 s (`duracaoAviso`). Desde o
   Flutter 3.29 SnackBar com botão fica até alguém tocar (`persist`), por isso o `persist: false`.
 - Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional, Eco-Coach,

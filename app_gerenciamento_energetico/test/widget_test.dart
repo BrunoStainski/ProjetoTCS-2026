@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
@@ -202,6 +206,42 @@ void main() {
     testWidgets('um tipo so ja vem aberto', (tester) async {
       await mostrar(tester, [ap(1, 'refrigerador', 1)]);
       expect(find.text('BRASTEMP M1'), findsOneWidget);
+    });
+
+    testWidgets('trocar o tipo de aparelho refaz a busca', (tester) async {
+      final pedidos = <Uri>[];
+      // API falsa: /categorias e /aparelhos (filtra pela categoria pedida)
+      final api = MockClient((r) async {
+        pedidos.add(r.url);
+        if (r.url.path == '/categorias') return http.Response(jsonEncode(['maquina_de_lavar', 'refrigerador']), 200);
+        final tipo = r.url.queryParameters['categoria'];
+        final todos = [
+          {'id': 1, 'categoria': 'maquina_de_lavar', 'marca': 'BRASTEMP', 'modelo': 'LAVA', 'total_categoria': 1},
+          {'id': 2, 'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'modelo': 'GELA', 'total_categoria': 1},
+        ];
+        final lista = [
+          for (final a in todos)
+            if (tipo == null || a['categoria'] == tipo) a,
+        ];
+        return http.Response(jsonEncode(lista), 200, headers: {'content-type': 'application/json; charset=utf-8'});
+      });
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaBusca()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'brastemp');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(find.text('Máquinas de lavar'), findsOneWidget);
+        expect(find.text('Geladeiras'), findsOneWidget);
+
+        await tester.tap(find.text('Todos'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('refrigerador').last);
+        await tester.pumpAndSettle();
+      }, () => api);
+      expect(pedidos.last.queryParameters['categoria'], 'refrigerador'); // buscou sem apertar o botao
+      expect(find.text('BRASTEMP GELA'), findsOneWidget); // um tipo so: secao ja aberta
+      expect(find.text('Máquinas de lavar'), findsNothing);
     });
   });
 
