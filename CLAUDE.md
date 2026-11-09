@@ -162,10 +162,31 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 - Dependências pesadas (sdv/torch) ficam em `requirements-ml.txt`, fora da imagem da API.
 - Extra opcional: regressão do consumo de geladeiras (sem a classe de eficiência como variável: vazamento).
 
+## Terraform (`infra/`; passo a passo em `infra/README.md`)
+
+**Em uso: `infra/local/`** (provider `kreuzwerker/docker`, Docker Desktop). Recria o compose como IaC,
+com prefixo `iamp_tf` e portas 8080 (API) / 5435 (banco, só 127.0.0.1) para conviver com o compose:
+rede + volume + postgres (`wait` até healthy) + imagem da API via `terraform_data` + `local-exec`
+`docker build` (tag = hash de src/, datasets/processed, requirements, Dockerfile, kmeans.pkl; o bloco
+`build` do provider trava no Docker Desktop em "load remote build context") + API (`wait` no /saude) +
+`docker_container.carga_rag` (`attach`, `must_run=false`) que roda `carregar_rag.py` com o script e os
+documentos copiados por `upload` (não estão na imagem). Senha via `random_password`; `cd infra/local;
+terraform init; terraform apply`.
+
+**Pronto para depois: `infra/oracle/`** (sem conta ainda):
+- Oracle Cloud Always Free: 1 VM ARM `VM.Standard.A1.Flex` (Ubuntu 24.04) rodando o próprio
+  `docker-compose.yml`. O PostgreSQL gerenciado da Oracle não é gratuito, então o banco é container.
+- Rede própria (VCN, sub-rede pública); firewall libera só 22 (`ssh_origem_permitida`) e 8000.
+- Repo privado: a VM não faz `git clone`. O `archive_file` zipa o projeto (excludes ~ `.dockerignore`,
+  mas mantém `scripts/` e `datasets/raw/rag/`) e o `terraform_data.deploy` envia por SSH, grava o
+  `.env` (senha do banco via `random_password`), roda `docker compose up --build --wait` e o
+  `carregar_rag.py` dentro da imagem da API. `terraform apply` de novo = publicar código novo.
+- Segredos só no state/tfvars (no `.gitignore`), nunca nos metadados da VM. State local, API em HTTP.
+- Credenciais da Oracle: `~/.oci/config` (perfil `oci_perfil`). App: `--dart-define=API_URL=<api_url>`.
+
 ## Próximas etapas
 
-tela do Eco-Coach no app, Terraform (`infra/main.tf`
-vazio), documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
+tela do Eco-Coach no app, documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
 No app: salvar "Minha casa" entre sessões e a tela do Eco-Coach.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em

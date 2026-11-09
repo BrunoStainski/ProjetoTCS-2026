@@ -1,0 +1,6 @@
+# Opcional: copie para terraform.tfvars (NAO vai para o git). Sem ele, tudo usa o padrao.
+gemini_api_key = ""
+
+# porta_api      = 8080
+# porta_postgres = 5435
+# docker_host    = "npipe:////./pipe/dockerDesktopLinuxEngine"   # se o padrao nao achar o Docker

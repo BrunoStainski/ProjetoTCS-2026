@@ -1,0 +1,10 @@
+# Copie para terraform.tfvars e preencha. O terraform.tfvars NAO vai para o git (tem a chave do Gemini).
+tenancy_ocid = "ocid1.tenancy.oc1..xxxxxxxx"
+regiao       = "sa-saopaulo-1"
+
+# chaves SSH (crie com: ssh-keygen -t ed25519)
+ssh_chave_publica  = "~/.ssh/id_ed25519.pub"
+ssh_chave_privada  = "~/.ssh/id_ed25519"
+# ssh_origem_permitida = "203.0.113.10/32"   # recomendado: so o seu IP
+
+gemini_api_key = ""

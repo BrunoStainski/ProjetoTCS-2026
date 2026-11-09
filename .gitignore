@@ -24,3 +24,10 @@ Thumbs.db
 
 # Cache do modelo de embeddings do RAG (baixado pelo fastembed)
 models/fastembed/
+
+# Terraform (state e tfvars tem segredos: senha do banco e chave do Gemini)
+infra/**/.terraform/
+infra/**/.build/
+*.tfstate
+*.tfstate.*
+infra/**/terraform.tfvars
