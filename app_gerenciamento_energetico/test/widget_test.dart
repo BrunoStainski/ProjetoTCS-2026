@@ -5,6 +5,8 @@ import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
 import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
+import 'package:app_gerenciamento_energetico/telas/busca.dart';
+import 'package:app_gerenciamento_energetico/telas/comum.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
@@ -164,6 +166,66 @@ void main() {
       casa.mudarMoradores(4);
       expect(casa.plano, isNull);
     });
+  });
+
+  group('Busca por marca com varios tipos', () {
+    Aparelho ap(int id, String categoria, int total) => Aparelho.fromJson({
+      'id': id,
+      'categoria': categoria,
+      'marca': 'BRASTEMP',
+      'modelo': 'M$id',
+      'detalhe': '',
+      'total_categoria': total,
+    });
+
+    Future<void> mostrar(WidgetTester tester, List<Aparelho> lista) => tester.pumpWidget(
+      MaterialApp(
+        theme: temaIamp(),
+        home: Scaffold(body: ResultadosPorTipo(lista, aoEscolher: (_) {})),
+      ),
+    );
+
+    testWidgets('cada tipo vira uma secao fechada que abre ao tocar', (tester) async {
+      await mostrar(tester, [ap(1, 'maquina_de_lavar', 45), ap(2, 'maquina_de_lavar', 45), ap(3, 'refrigerador', 1)]);
+      expect(find.text('Máquinas de lavar'), findsOneWidget);
+      expect(find.text('45 modelos'), findsOneWidget);
+      expect(find.text('Geladeiras'), findsOneWidget);
+      expect(find.text('BRASTEMP M3'), findsNothing); // fechada
+      await tester.tap(find.text('Geladeiras'));
+      await tester.pumpAndSettle();
+      expect(find.text('BRASTEMP M3'), findsOneWidget);
+      await tester.tap(find.text('Máquinas de lavar'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Mostrando 2 de 45'), findsOneWidget);
+    });
+
+    testWidgets('um tipo so ja vem aberto', (tester) async {
+      await mostrar(tester, [ap(1, 'refrigerador', 1)]);
+      expect(find.text('BRASTEMP M1'), findsOneWidget);
+    });
+  });
+
+  testWidgets('aviso de aparelho adicionado some sozinho depois de 5 s', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaIamp(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => avisarAdicionado(ScaffoldMessenger.of(context), Navigator.of(context), 'Foi.'),
+              child: const Text('adicionar'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('adicionar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Foi.'), findsOneWidget);
+    expect(find.text('Ver'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(find.text('Foi.'), findsNothing);
   });
 }
 

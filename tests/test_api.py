@@ -53,7 +53,18 @@ def test_busca_de_aparelhos(api):
     assert r.status_code == 200
     lista = r.json()
     assert lista and all("brastemp" in a["marca"].lower() for a in lista)
-    assert set(lista[0]) >= {"id", "categoria", "marca", "modelo"}
+    assert set(lista[0]) >= {"id", "categoria", "marca", "modelo", "total_categoria"}
+
+
+@pytest.mark.banco
+def test_busca_traz_todos_os_tipos_da_marca(api):
+    """Brastemp tem maquina de lavar, micro-ondas e geladeira: antes so a 1a (lavar) aparecia."""
+    lista = api.get("/aparelhos", params={"busca": "brastemp", "limite": 3}).json()
+    tipos = {a["categoria"] for a in lista}
+    assert {"maquina_de_lavar", "microondas", "refrigerador"} <= tipos
+    for tipo in tipos:
+        do_tipo = [a for a in lista if a["categoria"] == tipo]
+        assert len(do_tipo) <= 3 and all(a["total_categoria"] >= len(do_tipo) for a in do_tipo)
 
 
 @pytest.mark.banco

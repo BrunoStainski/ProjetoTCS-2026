@@ -79,7 +79,8 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 
 ## API (`src/main.py`)
 
-`GET /aparelhos?busca=`, `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
+`GET /aparelhos?busca=` (`limite` vale **por tipo** de aparelho, padrão 15, + `total_categoria`; antes era
+no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética), `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
 `POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
@@ -145,7 +146,13 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 - `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, em branco = valor do Inmetro.
 - Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra);
   avisos (SnackBar) que navegam usam o `NavigatorState` guardado antes, não o `context` da tela.
-- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional, Eco-Coach).
+- Busca (`busca.dart`): resultados agrupados por tipo em seções que abrem (`ResultadosPorTipo`, nome do
+  tipo em `tituloDaCategoria`), com a quantidade; um tipo só já vem aberto; acima de 30 por tipo
+  (`limiteBuscaPorTipo`) avisa para digitar parte do modelo.
+- Aviso "foi para a sua casa": `avisarAdicionado` (comum.dart) some em 5 s (`duracaoAviso`). Desde o
+  Flutter 3.29 SnackBar com botão fica até alguém tocar (`persist`), por isso o `persist: false`.
+- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional, Eco-Coach,
+  busca por tipo, aviso que some).
 
 ## Machine Learning (Dupla 2)
 

@@ -257,7 +257,7 @@ Documentação interativa: **http://localhost:8000/docs** (dá para testar cada 
 
 | Endereço | Para que serve |
 |---|---|
-| `GET /aparelhos?busca=brastemp` | Busca aparelhos por marca e/ou modelo (opcional: `categoria`, `limite`) |
+| `GET /aparelhos?busca=brastemp` | Busca aparelhos por marca e/ou modelo (opcional: `categoria`, `limite` por tipo de aparelho; cada item traz `total_categoria`) |
 | `GET /aparelhos/{id}/uso` | Diz o que o app precisa perguntar: `horas`, `ciclos`, `velocidade` ou nada (`null`) |
 | `GET /distribuidoras?uf=PR` | Lista as distribuidoras com tarifa vigente (opcional: `busca=copel`) |
 | `POST /calcular` | Devolve o consumo (kWh/mês) e o custo (R$/mês e R$/ano) |
@@ -334,7 +334,7 @@ Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto
 
 | Tela | O que faz |
 |---|---|
-| Busca | Procura o aparelho por marca e/ou modelo, com filtro por tipo |
+| Busca | Procura o aparelho por marca e/ou modelo, com filtro por tipo. Os resultados vêm separados por tipo (geladeiras, ar-condicionado...) em seções que abrem ao tocar |
 | Uso | Pergunta horas por dia, lavagens por mês ou velocidade, só quando precisa |
 | Distribuidora | Estado + distribuidora, ou a tarifa da conta de luz. Oferece repetir a última escolhida |
 | Resultado | Gasto por mês e por ano, como foi calculado e os avisos |

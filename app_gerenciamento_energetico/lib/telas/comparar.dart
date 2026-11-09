@@ -89,13 +89,7 @@ class _TelaCompararState extends State<TelaComparar> {
     }
     casa.adicionar(nova, c.novo);
     setState(() => _feito = true);
-    avisos.showSnackBar(
-      SnackBar(
-        content: Text('${c.novo.nome} foi para a sua casa.'),
-        // o aviso pode continuar na tela depois de sair daqui: usa o navegador, nao o context
-        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
-      ),
-    );
+    avisarAdicionado(avisos, navegador, '${c.novo.nome} foi para a sua casa.');
   }
 
   @override

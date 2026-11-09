@@ -32,6 +32,9 @@ double? _realOuNulo(dynamic v) => v == null ? null : (v as num).toDouble();
 /// "lampada_led" -> "lampada led"
 String legivel(String categoria) => categoria.replaceAll('_', ' ');
 
+/// Quantos modelos de cada tipo de aparelho a busca traz (GET /aparelhos?limite=).
+const limiteBuscaPorTipo = 30;
+
 class Aparelho {
   final int id;
   final String categoria;
@@ -39,12 +42,16 @@ class Aparelho {
   final String modelo;
   final String detalhe;
 
+  /// Na busca: quantos modelos desse tipo bateram com o texto (a API manda no maximo `limite` por tipo).
+  final int totalCategoria;
+
   const Aparelho({
     required this.id,
     required this.categoria,
     required this.marca,
     required this.modelo,
     this.detalhe = '',
+    this.totalCategoria = 0,
   });
 
   Aparelho.fromJson(Map<String, dynamic> j)
@@ -52,7 +59,8 @@ class Aparelho {
       categoria = j['categoria'],
       marca = j['marca'],
       modelo = j['modelo'],
-      detalhe = j['detalhe'] ?? '';
+      detalhe = j['detalhe'] ?? '',
+      totalCategoria = j['total_categoria'] ?? 0;
 
   String get nome => '$marca $modelo';
   String get categoriaLegivel => legivel(categoria);
@@ -256,7 +264,8 @@ class Api {
   static Future<List<String>> categorias() async => List<String>.from(await _get('/categorias'));
 
   static Future<List<Aparelho>> buscarAparelhos(String busca, {String? categoria}) async {
-    final lista = await _get('/aparelhos', {'busca': busca, 'categoria': ?categoria, 'limite': '30'});
+    // limite por tipo de aparelho: uma marca com varios tipos traz todos
+    final lista = await _get('/aparelhos', {'busca': busca, 'categoria': ?categoria, 'limite': '$limiteBuscaPorTipo'});
     return [for (final j in lista) Aparelho.fromJson(j)];
   }
 
