@@ -346,6 +346,37 @@ Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto
 O botão de casa no topo de todas as telas abre "Minha casa" e mostra quantos aparelhos já foram adicionados.
 A lista fica só na memória: ao fechar o app, ela recomeça vazia.
 
+### Gerar o APK e publicar uma versão nova
+
+O histórico das versões fica no [CHANGELOG.md](CHANGELOG.md). A cada versão nova:
+
+1. Merge do Pull Request na `main`.
+2. Subir a versão em `pubspec.yaml` (ex.: `1.1.0+2` → `1.2.0+3`; o número depois do `+` sempre sobe)
+   e, se a API mudou, em `src/main.py`. Anotar o que mudou no `CHANGELOG.md`.
+3. Publicar a API **antes** do APK (o app depende dela). Mudanças na API só acrescentam campos,
+   para o app antigo continuar funcionando com a API nova.
+4. Gerar o APK, sempre com `--split-per-abi` (o Flutter soma 1000 × arquitetura ao número de build;
+   misturar com e sem essa opção faz o celular achar que a versão é mais antiga):
+   ```bash
+   cd app_gerenciamento_energetico
+   flutter build apk --release --split-per-abi --dart-define=API_URL=http://<ip-ou-servidor>:8000
+   ```
+   O arquivo para quase todo celular: `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`.
+5. Criar a tag (`git tag v1.2.0` + `git push origin v1.2.0`) e uma Release no GitHub com o APK anexado.
+   O APK não vai para dentro do repositório.
+
+**Chave do projeto.** O celular só aceita a atualização se o APK novo for assinado com a mesma chave
+do anterior. Sem chave, cada PC assina com a sua chave de teste e o APK de um colega não atualiza o de
+outro (é preciso desinstalar). A chave é criada uma vez só:
+
+```bash
+keytool -genkey -v -keystore C:/Users/<usuario>/chaves/iamp.jks -keyalg RSA -keysize 2048 -validity 10000 -alias iamp
+```
+
+Depois copie `android/key.properties.example` para `android/key.properties` e preencha. O `.jks` e o
+`key.properties` ficam fora do git e são passados para a equipe por canal privado. Se a chave se
+perder, nenhum celular aceita mais atualizações: guarde uma cópia.
+
 ---
 
 ## 9. Como o cálculo funciona

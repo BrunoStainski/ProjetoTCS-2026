@@ -196,6 +196,16 @@ terraform init; terraform apply`.
 - Segredos só no state/tfvars (no `.gitignore`), nunca nos metadados da VM. State local, API em HTTP.
 - Credenciais da Oracle: `~/.oci/config` (perfil `oci_perfil`). App: `--dart-define=API_URL=<api_url>`.
 
+## Versionamento e APK (passo a passo no README, seção 8)
+
+- Versão do app em `pubspec.yaml` (`1.1.0+2`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.2.0`); histórico em `CHANGELOG.md`. Tag `vX.Y.Z` + Release no GitHub com o APK (nunca no git).
+- Sempre `flutter build apk --release --split-per-abi --dart-define=API_URL=...` (o split soma 1000 × ABI
+  ao versionCode; misturar com e sem split parece downgrade). Publicar a API antes do APK; mudanças na
+  API só acrescentam campos.
+- Assinatura (`android/app/build.gradle.kts`): com `android/key.properties` usa a chave do projeto;
+  sem ele, a chave de teste do PC (aviso no build). Chave e senhas fora do git (`.gitignore` do android/).
+
 ## Próximas etapas
 
 Documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
