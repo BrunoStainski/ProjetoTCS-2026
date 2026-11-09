@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
@@ -9,6 +13,7 @@ import 'package:app_gerenciamento_energetico/telas/busca.dart';
 import 'package:app_gerenciamento_energetico/telas/comum.dart';
 import 'package:app_gerenciamento_energetico/telas/dicas.dart';
 import 'package:app_gerenciamento_energetico/telas/estimar.dart';
+import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
   'categoria': categoria,
@@ -347,4 +352,159 @@ void main() {
     expect(find.textContaining('GEMINI_API_KEY'), findsOneWidget);
     expect(find.text('Tentar de novo'), findsOneWidget);
   });
+
+  group('Eco-Coach', () {
+    test('plano: citacoes [n] em amarelo e **negrito** sem os asteriscos', () {
+      const base = TextStyle(fontSize: 16);
+      final pedacos = pedacosDoTexto('Desligue o **ar** nas saidas [1] e use o timer [2, 3].', base);
+      expect(pedacos.map((p) => p.text).join(), 'Desligue o ar nas saidas [1] e use o timer [2, 3].');
+      final citacoes = pedacos.where((p) => p.text!.startsWith('['));
+      expect(citacoes.map((p) => p.text), ['[1]', '[2, 3]']);
+      expect(citacoes.every((p) => p.style!.color == Cores.amarelo), isTrue);
+      expect(pedacos.firstWhere((p) => p.text == 'ar').style!.fontWeight, FontWeight.bold);
+    });
+
+    testWidgets('plano: titulos, listas e paragrafos viram widgets', (tester) async {
+      const md = '## Ações recomendadas\n\n1. Banho mais curto [1]\n- Geladeira longe do fogão [2]\nTexto final.';
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: TextoPlano(md))));
+      expect(find.text('AÇÕES RECOMENDADAS'), findsOneWidget);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.byIcon(Icons.bolt), findsOneWidget); // marcador da lista
+      expect(find.textContaining('Texto final.', findRichText: true), findsOneWidget);
+    });
+
+    test('casa manda o custo de cada item e guarda as trocas sem repetir', () {
+      final item = casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
+      casa.mudarQuantidade(item, 2);
+      expect(casa.itensParaEcoCoach().single, {'categoria': 'chuveiro', 'kwh_mes': 82.5, 'custo_mes': 63.36});
+
+      const t1 = TrocaAvaliada(aparelho: 'geladeira A', alternativa: 'B', economiaMes: 7, paybackMeses: 300);
+      casa.registrarTroca(t1);
+      casa.registrarTroca(t1); // a mesma troca de novo nao duplica
+      expect(casa.trocas, hasLength(1));
+      for (var i = 0; i < 6; i++) {
+        casa.registrarTroca(TrocaAvaliada(aparelho: 'tv $i', alternativa: 'x', economiaMes: 1));
+      }
+      expect(casa.trocas, hasLength(5)); // so as 5 mais recentes
+    });
+
+    test('plano guardado some quando a casa muda', () {
+      casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
+      casa.guardarPlano(EcoCoach.fromJson(planoExemplo));
+      expect(casa.plano!.fontes.single.pagina, 7);
+      casa.mudarMoradores(4);
+      expect(casa.plano, isNull);
+    });
+  });
+
+  group('Busca por marca com varios tipos', () {
+    Aparelho ap(int id, String categoria, int total) => Aparelho.fromJson({
+      'id': id,
+      'categoria': categoria,
+      'marca': 'BRASTEMP',
+      'modelo': 'M$id',
+      'detalhe': '',
+      'total_categoria': total,
+    });
+
+    Future<void> mostrar(WidgetTester tester, List<Aparelho> lista) => tester.pumpWidget(
+      MaterialApp(
+        theme: temaIamp(),
+        home: Scaffold(body: ResultadosPorTipo(lista, aoEscolher: (_) {})),
+      ),
+    );
+
+    testWidgets('cada tipo vira uma secao fechada que abre ao tocar', (tester) async {
+      await mostrar(tester, [ap(1, 'maquina_de_lavar', 45), ap(2, 'maquina_de_lavar', 45), ap(3, 'refrigerador', 1)]);
+      expect(find.text('Máquinas de lavar'), findsOneWidget);
+      expect(find.text('45 modelos'), findsOneWidget);
+      expect(find.text('Geladeiras'), findsOneWidget);
+      expect(find.text('BRASTEMP M3'), findsNothing); // fechada
+      await tester.tap(find.text('Geladeiras'));
+      await tester.pumpAndSettle();
+      expect(find.text('BRASTEMP M3'), findsOneWidget);
+      await tester.tap(find.text('Máquinas de lavar'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Mostrando 2 de 45'), findsOneWidget);
+    });
+
+    testWidgets('um tipo so ja vem aberto', (tester) async {
+      await mostrar(tester, [ap(1, 'refrigerador', 1)]);
+      expect(find.text('BRASTEMP M1'), findsOneWidget);
+    });
+
+    testWidgets('trocar o tipo de aparelho refaz a busca', (tester) async {
+      final pedidos = <Uri>[];
+      // API falsa: /categorias e /aparelhos (filtra pela categoria pedida)
+      final api = MockClient((r) async {
+        pedidos.add(r.url);
+        if (r.url.path == '/categorias') return http.Response(jsonEncode(['maquina_de_lavar', 'refrigerador']), 200);
+        final tipo = r.url.queryParameters['categoria'];
+        final todos = [
+          {'id': 1, 'categoria': 'maquina_de_lavar', 'marca': 'BRASTEMP', 'modelo': 'LAVA', 'total_categoria': 1},
+          {'id': 2, 'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'modelo': 'GELA', 'total_categoria': 1},
+        ];
+        final lista = [
+          for (final a in todos)
+            if (tipo == null || a['categoria'] == tipo) a,
+        ];
+        return http.Response(jsonEncode(lista), 200, headers: {'content-type': 'application/json; charset=utf-8'});
+      });
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaBusca()));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'brastemp');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        expect(find.text('Máquinas de lavar'), findsOneWidget);
+        expect(find.text('Geladeiras'), findsOneWidget);
+
+        await tester.tap(find.text('Todos'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('refrigerador').last);
+        await tester.pumpAndSettle();
+      }, () => api);
+      expect(pedidos.last.queryParameters['categoria'], 'refrigerador'); // buscou sem apertar o botao
+      expect(find.text('BRASTEMP GELA'), findsOneWidget); // um tipo so: secao ja aberta
+      expect(find.text('Máquinas de lavar'), findsNothing);
+    });
+  });
+
+  testWidgets('aviso de aparelho adicionado some sozinho depois de 5 s', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: temaIamp(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => avisarAdicionado(ScaffoldMessenger.of(context), Navigator.of(context), 'Foi.'),
+              child: const Text('adicionar'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('adicionar'));
+    await tester.pumpAndSettle();
+    expect(find.text('Foi.'), findsOneWidget);
+    expect(find.text('Ver'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(find.text('Foi.'), findsNothing);
+  });
 }
+
+const planoExemplo = {
+  'perfil': 'Moderado',
+  'kwh_total': 10.0,
+  'custo_total': 8.0,
+  'maiores_consumos': [
+    {'categoria': 'televisor', 'nome': 'televisão', 'kwh_mes': 10.0, 'custo_mes': 8.0, 'percentual': 100.0},
+  ],
+  'plano': 'Desligue a TV da tomada [1].',
+  'fontes': [
+    {'n': 1, 'documento': 'Cartilha', 'orgao': 'Cemig', 'url': 'https://x', 'secao': 'Sala', 'pagina': 7},
+  ],
+  'modelo': 'gemini-3.5-flash',
+  'aviso': 'Plano gerado por IA.',
+};

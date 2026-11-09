@@ -60,6 +60,15 @@ class _TelaCompararState extends State<TelaComparar> {
     try {
       // o setState nao pode receber um Future: espera a resposta e so depois troca o estado
       final comparacao = await _comparar(preco: preco);
+      // o Eco-Coach usa essa troca com os numeros calculados aqui (economia e payback)
+      casa.registrarTroca(
+        TrocaAvaliada(
+          aparelho: '${legivel(comparacao.atual.categoria)} ${comparacao.atual.nome}',
+          alternativa: comparacao.novo.nome,
+          economiaMes: comparacao.economiaMes,
+          paybackMeses: comparacao.payback?.meses,
+        ),
+      );
       if (!mounted) return;
       setState(() {
         _comparacao = Future.value(comparacao);
@@ -83,13 +92,7 @@ class _TelaCompararState extends State<TelaComparar> {
     }
     casa.adicionar(nova, c.novo);
     setState(() => _feito = true);
-    avisos.showSnackBar(
-      SnackBar(
-        content: Text('${c.novo.nome} foi para a sua casa.'),
-        // o aviso pode continuar na tela depois de sair daqui: usa o navegador, nao o context
-        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
-      ),
-    );
+    avisarAdicionado(avisos, navegador, '${c.novo.nome} foi para a sua casa.');
   }
 
   @override

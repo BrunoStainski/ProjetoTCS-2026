@@ -98,6 +98,43 @@ class CampoTempo extends StatelessWidget {
   }
 }
 
+/// Nome do tipo de aparelho para titulos (ex.: secoes da busca).
+String tituloDaCategoria(String categoria) => switch (categoria) {
+  'refrigerador' => 'Geladeiras',
+  'televisor' => 'Televisores',
+  'ar_condicionado' => 'Ar-condicionado',
+  'ventilador_de_mesa' => 'Ventiladores de mesa',
+  'ventilador_de_teto' => 'Ventiladores de teto',
+  'chuveiro' => 'Chuveiros',
+  'lampada_led' => 'Lâmpadas LED',
+  'lampada_fluorescente' => 'Lâmpadas fluorescentes',
+  'lampada_vapor_sodio' => 'Lâmpadas de vapor de sódio',
+  'microondas' => 'Micro-ondas',
+  'maquina_de_lavar' => 'Máquinas de lavar',
+  'bomba' => "Bombas d'água",
+  _ => categoria.isEmpty ? categoria : categoria[0].toUpperCase() + categoria.substring(1).replaceAll('_', ' '),
+};
+
+/// Tempo que o aviso "foi para a sua casa" fica na tela antes de sumir sozinho.
+const duracaoAviso = Duration(seconds: 5);
+
+/// Aviso de aparelho adicionado, com o botao "Ver" (abre Minha casa).
+/// Desde o Flutter 3.29 um SnackBar com botao fica na tela ate alguem tocar (persist);
+/// aqui ele some sozinho depois de [duracaoAviso].
+/// Recebe o navegador e o messenger guardados antes: o aviso pode continuar depois de sair da tela.
+void avisarAdicionado(ScaffoldMessengerState avisos, NavigatorState navegador, String texto) {
+  avisos
+    ..hideCurrentSnackBar() // adicionar varios seguidos nao enfileira avisos
+    ..showSnackBar(
+      SnackBar(
+        content: Text(texto),
+        duration: duracaoAviso,
+        persist: false,
+        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
+      ),
+    );
+}
+
 /// Marca do app: raio amarelo + "iamp".
 class LogoIamp extends StatelessWidget {
   const LogoIamp({super.key});

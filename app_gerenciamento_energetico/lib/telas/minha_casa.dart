@@ -5,6 +5,7 @@ import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'dicas.dart';
+import 'eco_coach.dart';
 import 'sugestoes.dart';
 
 /// "Minha casa": soma os aparelhos calculados, mostra o que mais pesa na conta
@@ -69,7 +70,7 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
     );
   }
 
-  /// Acao principal embaixo: buscar (casa vazia) ou ver o perfil (enquanto nao foi calculado).
+  /// Acao principal embaixo: buscar (casa vazia), ver o perfil e, depois do perfil, o Eco-Coach.
   Widget? _rodape() {
     if (casa.vazia) {
       return FilledButton.icon(
@@ -78,7 +79,13 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
         label: const Text('Buscar um aparelho'),
       );
     }
-    if (casa.perfil != null) return null;
+    if (casa.perfil != null) {
+      return FilledButton.icon(
+        onPressed: _abrirEcoCoach,
+        icon: const Icon(Icons.auto_awesome),
+        label: Text(casa.plano != null ? 'Ver plano do Eco-Coach' : 'Gerar plano do Eco-Coach'),
+      );
+    }
     return FilledButton.icon(
       onPressed: _classificando ? null : _classificar,
       icon: _classificando
@@ -173,10 +180,45 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
             padding: const EdgeInsets.only(top: Espaco.p),
             child: _CartaoPerfil(casa.perfil!, maior: casa.porCusto.first, total: total),
           ),
+        const Titulo('Eco-Coach'),
+        Card(
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: _abrirEcoCoach,
+            child: Padding(
+              padding: const EdgeInsets.all(Espaco.m),
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome, size: 32),
+                  const SizedBox(width: Espaco.m),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          casa.plano != null ? 'Seu plano está pronto' : 'Plano de economia com IA',
+                          style: Estilos.forte,
+                        ),
+                        Text(
+                          'Dicas oficiais do Inmetro e da Cemig para os aparelhos que mais pesam'
+                          '${casa.trocas.isEmpty ? '' : ', incluindo ${casa.trocas.length} troca(s) que você avaliou'}.',
+                          style: Estilos.secundario,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: Espaco.g),
       ],
     );
   }
+
+  void _abrirEcoCoach() => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEcoCoach()));
 }
 
 class _CartaoItem extends StatelessWidget {
