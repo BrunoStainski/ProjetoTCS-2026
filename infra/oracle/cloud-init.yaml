@@ -1,0 +1,10 @@
+#cloud-config
+# Roda uma vez, na criacao da VM: instala o Docker. O deploy do codigo e feito pelo Terraform (SSH).
+package_update: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - unzip
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu
