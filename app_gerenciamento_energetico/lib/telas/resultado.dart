@@ -32,14 +32,7 @@ class _TelaResultadoState extends State<TelaResultado> {
   void _adicionar(Resultado r) {
     casa.adicionar(widget.consulta, r);
     setState(() => _adicionado = true);
-    final navegador = Navigator.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${r.nome} foi para a sua casa.'),
-        // o aviso pode continuar na tela depois de sair daqui: usa o navegador, nao o context
-        action: SnackBarAction(label: 'Ver', onPressed: () => abrirMinhaCasaNo(navegador)),
-      ),
-    );
+    avisarAdicionado(ScaffoldMessenger.of(context), Navigator.of(context), '${r.nome} foi para a sua casa.');
   }
 
   @override

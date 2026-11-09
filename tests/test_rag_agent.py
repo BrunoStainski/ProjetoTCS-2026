@@ -70,6 +70,17 @@ def test_sem_chave_do_gemini_da_erro_claro(monkeypatch):
         rag_agent.chamar_llm("oi")
 
 
+def test_fonte_sem_secao_ou_pagina_vira_none(monkeypatch, llm_falso):
+    """Paginas HTML nao tem secao/pagina: o pandas devolve NaN, que quebrava a resposta (erro 500)."""
+    nan = float("nan")
+    trechos = [{"documento": "Dicas", "orgao": "Inmetro", "url": "https://gov.br/a", "secao": nan, "pagina": nan,
+                "texto": f"dica {i}"} for i in range(3)]
+    monkeypatch.setattr(rag, "base_carregada", lambda con: True)
+    monkeypatch.setattr(rag, "buscar_trechos", lambda con, pergunta, k: trechos)
+    r = rag_agent.gerar_plano(None, CASA)
+    assert r["fontes"] and all(f["secao"] is None and f["pagina"] is None for f in r["fontes"])
+
+
 def test_entrada_invalida_e_rejeitada_antes_de_chamar_o_llm(llm_falso):
     with pytest.raises(ValueError):
         rag_agent.gerar_plano(None, {"moradores": 0, "itens": CASA["itens"]})

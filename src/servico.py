@@ -31,17 +31,26 @@ def _registros(df):
 # 1. Aparelho -------------------------------------------------------------------
 
 def buscar_modelos(con, texto, categoria=None, limite=LIMITE_BUSCA):
-    """Busca por marca e/ou modelo. Todos os termos digitados precisam aparecer."""
+    """Busca por marca e/ou modelo. Todos os termos digitados precisam aparecer.
+
+    O limite vale por tipo de aparelho: antes era no total e, numa marca com varios tipos
+    (ex.: brastemp), so o primeiro tipo em ordem alfabetica aparecia. total_categoria diz
+    quantos modelos o tipo tem ao todo, para o app avisar que ha mais.
+    """
     termos = normalizar(texto).split()
     if not termos:
         return []
-    sql = "SELECT id, categoria, marca, modelo, detalhe FROM aparelhos WHERE "
-    sql += " AND ".join("busca LIKE ?" for _ in termos)
+    filtro = " AND ".join("busca LIKE ?" for _ in termos)
     params = [f"%{t}%" for t in termos]
     if categoria:
-        sql += " AND categoria = ?"
+        filtro += " AND categoria = ?"
         params.append(categoria)
-    sql += " ORDER BY categoria, marca, modelo LIMIT ?"
+    sql = ("SELECT id, categoria, marca, modelo, detalhe, total_categoria FROM ("
+           " SELECT id, categoria, marca, modelo, detalhe,"
+           " ROW_NUMBER() OVER (PARTITION BY categoria ORDER BY marca, modelo) AS ordem,"
+           " COUNT(*) OVER (PARTITION BY categoria) AS total_categoria"
+           f" FROM aparelhos WHERE {filtro}) achados"
+           " WHERE ordem <= ? ORDER BY categoria, marca, modelo")
     params.append(limite)
     return _registros(banco.consulta(con, sql, params))
 

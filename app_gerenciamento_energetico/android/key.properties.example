@@ -1,0 +1,7 @@
+# Copie para android/key.properties (o key.properties NAO vai para o git) e preencha.
+# A chave (.jks) e as senhas sao passadas para a equipe por canal privado, nunca pelo git.
+# Se a chave se perder, nenhum celular aceita mais atualizacao do app: guarde uma copia.
+storeFile=C:/Users/SEU_USUARIO/chaves/iamp.jks
+storePassword=SENHA_DA_CHAVE
+keyAlias=iamp
+keyPassword=SENHA_DA_CHAVE

@@ -62,7 +62,7 @@ def passo_aparelho(con):
     print("\n1) Qual e o aparelho?")
     while True:
         texto = perguntar("   Digite a marca e/ou o modelo (ex.: brastemp brm44): ")
-        modelos = servico.buscar_modelos(con, texto)
+        modelos = servico.buscar_modelos(con, texto, limite=5)  # 5 por tipo: a lista fica curta
         if not modelos:
             print("   Nenhum modelo encontrado. Tente so a marca ou parte do modelo.")
             continue

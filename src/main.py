@@ -76,7 +76,7 @@ async def ciclo_de_vida(app):
 app = FastAPI(
     title="iamp API",
     description="Estima o consumo e o custo mensal de energia de aparelhos eletricos residenciais.",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=ciclo_de_vida,
 )
 
@@ -94,6 +94,10 @@ class AparelhoResumo(BaseModel):
     marca: str
     modelo: str
     detalhe: Optional[str] = None
+
+
+class AparelhoEncontrado(AparelhoResumo):
+    total_categoria: int  # quantos modelos desse tipo batem com a busca (pode passar do limite)
 
 
 class PerguntaDeUso(BaseModel):
@@ -264,11 +268,11 @@ def listar_categorias(con=Depends(conexao)):
     return banco.categorias(con)
 
 
-@app.get("/aparelhos", response_model=list[AparelhoResumo], tags=["Aparelhos"])
+@app.get("/aparelhos", response_model=list[AparelhoEncontrado], tags=["Aparelhos"])
 def buscar_aparelhos(
     busca: str = Query(..., min_length=2, description="Marca e/ou modelo. Ex.: brastemp brm44"),
     categoria: Optional[str] = Query(None, description="Filtra por categoria. Ver GET /categorias."),
-    limite: int = Query(LIMITE_BUSCA, ge=1, le=50),
+    limite: int = Query(LIMITE_BUSCA, ge=1, le=50, description="Maximo de modelos por tipo de aparelho."),
     con=Depends(conexao),
 ):
     return servico.buscar_modelos(con, busca, categoria, limite)

@@ -13,7 +13,7 @@ import pandas as pd
 import config
 
 DIAS_MES = 30
-LIMITE_BUSCA = 15
+LIMITE_BUSCA = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
 
 # Padroes de uso para aparelhos em que o Inmetro so informa potencia ou consumo por ciclo.
 # ATENCAO: valores escolhidos pelo grupo, ainda sem fonte. O app mostra como "estimativa"

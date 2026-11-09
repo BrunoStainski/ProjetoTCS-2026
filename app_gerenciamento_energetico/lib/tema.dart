@@ -178,21 +178,32 @@ ThemeData temaIamp() {
       behavior: SnackBarBehavior.floating,
       shape: cantos,
     ),
+    // secoes que abrem (busca agrupada por tipo de aparelho): sem linhas extras, seta amarela
+    expansionTileTheme: const ExpansionTileThemeData(
+      iconColor: Cores.amarelo,
+      collapsedIconColor: Cores.amarelo,
+      textColor: Cores.branco,
+      collapsedTextColor: Cores.branco,
+      shape: Border(),
+      collapsedShape: Border(),
+      tilePadding: EdgeInsets.symmetric(horizontal: 16),
+    ),
     badgeTheme: const BadgeThemeData(backgroundColor: Cores.amarelo, textColor: Cores.preto),
     popupMenuTheme: const PopupMenuThemeData(color: Cores.superficieAlta, shape: cantos),
     segmentedButtonTheme: SegmentedButtonThemeData(
-      style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: Cores.amarelo,
-        selectedForegroundColor: Cores.preto,
-        foregroundColor: Cores.branco,
-        minimumSize: const Size(0, 48),
-        side: const BorderSide(color: Cores.borda),
-      ).copyWith(
-        // icone amarelo; no segmento selecionado (fundo amarelo) fica preto
-        iconColor: WidgetStateProperty.resolveWith(
-          (estados) => estados.contains(WidgetState.selected) ? Cores.preto : Cores.amarelo,
-        ),
-      ),
+      style:
+          SegmentedButton.styleFrom(
+            selectedBackgroundColor: Cores.amarelo,
+            selectedForegroundColor: Cores.preto,
+            foregroundColor: Cores.branco,
+            minimumSize: const Size(0, 48),
+            side: const BorderSide(color: Cores.borda),
+          ).copyWith(
+            // icone amarelo; no segmento selecionado (fundo amarelo) fica preto
+            iconColor: WidgetStateProperty.resolveWith(
+              (estados) => estados.contains(WidgetState.selected) ? Cores.preto : Cores.amarelo,
+            ),
+          ),
     ),
   );
 }

@@ -151,6 +151,12 @@ def gerar_plano(con, inventario, trocas=None):
         p = f.get("pagina")
         return int(p) if p is not None and p == p else None  # p == p descarta NaN
 
+    def secao(f):
+        # paginas HTML do Inmetro nao tem secao: o pandas devolve NaN, e NaN nao e texto
+        # (a resposta da API quebrava com erro 500 quando o LLM citava uma dessas fontes)
+        s = f.get("secao")
+        return s if isinstance(s, str) and s.strip() else None
+
     return {
         "perfil": perfil["perfil"],
         "kwh_total": perfil["kwh_total"],
@@ -158,7 +164,7 @@ def gerar_plano(con, inventario, trocas=None):
         "maiores_consumos": maiores[:3],
         "plano": texto,
         "fontes": [{"n": n, "documento": fontes[n - 1]["documento"], "orgao": fontes[n - 1]["orgao"],
-                    "url": fontes[n - 1]["url"], "secao": fontes[n - 1].get("secao"),
+                    "url": fontes[n - 1]["url"], "secao": secao(fontes[n - 1]),
                     "pagina": pagina(fontes[n - 1])}
                    for n in citadas],
         "modelo": modelo,
