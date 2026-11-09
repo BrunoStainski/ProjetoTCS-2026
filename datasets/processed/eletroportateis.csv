@@ -1,0 +1,12 @@
+categoria,nome,potencia_w,horas_dia,dias_mes,fonte
+air_fryer,Air fryer,1500,0.5,15,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+secador_cabelo,Secador de cabelo,2000,0.25,20,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+chuveiro,Chuveiro elétrico,5500,0.25,30,premissa do grupo (mesmo exemplo do calculo de referencia do projeto)
+ferro_passar,Ferro de passar,1200,1,8,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+sanduicheira,Sanduicheira,800,0.25,8,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+liquidificador,Liquidificador,400,0.1667,15,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+cafeteira_eletrica,Cafeteira elétrica,800,0.5,30,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+chaleira_eletrica,Chaleira elétrica,1500,0.1667,30,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+forno_eletrico,Forno elétrico de bancada,1500,0.5,8,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+aspirador_po,Aspirador de pó,1200,0.5,4,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)
+torradeira,Torradeira,800,0.1667,10,premissa do grupo (potencia tipica de mercado; confirme na etiqueta do aparelho)

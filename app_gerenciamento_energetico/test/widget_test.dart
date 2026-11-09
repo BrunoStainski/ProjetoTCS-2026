@@ -13,6 +13,7 @@ import 'package:app_gerenciamento_energetico/telas/busca.dart';
 import 'package:app_gerenciamento_energetico/telas/comum.dart';
 import 'package:app_gerenciamento_energetico/telas/dicas.dart';
 import 'package:app_gerenciamento_energetico/telas/estimar.dart';
+import 'package:app_gerenciamento_energetico/telas/gas.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
@@ -492,6 +493,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Foi.'), findsNothing);
   });
+
+  group('Gas de cozinha', () {
+    Future<List<PrecoGlp>> precos() async => [
+      PrecoGlp.fromJson({'uf': 'PR', 'ano': 2025, 'preco_kg': 9.0}),
+      PrecoGlp.fromJson({'uf': 'SP', 'ano': 2025, 'preco_kg': 8.5}),
+    ];
+    Future<List<Fogao>> fogoes(String _) async => [
+      Fogao.fromJson({'id': 7, 'marca': 'ITATIAIA', 'modelo': 'STAR 4Q', 'detalhe': '4 bocas, forno 82 L'}),
+    ];
+    final pedidos = <Map<String, dynamic>>[];
+    Future<ResultadoGas> calcular(Map<String, dynamic> corpo) async {
+      pedidos.add(corpo);
+      return ResultadoGas.fromJson({
+        'marca': 'ITATIAIA', 'modelo': 'STAR 4Q', 'detalhe': '', 'kg_mes': 5.0, 'botijoes_mes': 0.38,
+        'dias_por_botijao': 78, 'preco_botijao': 117.0, 'origem_preco': 'ANP', 'custo_mes': 45.0,
+        'custo_ano': 540.0, 'metodo': 'bocas e forno', 'avisos': ['premissa das bocas'],
+      });
+    }
+
+    Widget tela() => MaterialApp(home: TelaGas(carregarPrecos: precos, buscarFogoes: fogoes, calcular: calcular));
+
+    testWidgets('pede o estado antes de calcular', (tester) async {
+      telaAlta(tester);
+      await tester.pumpWidget(tela());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Calcular o gás'));
+      await tester.pumpAndSettle();
+      expect(find.text('Escolha o estado.'), findsOneWidget);
+    });
+
+    testWidgets('escolhe o fogao e o estado e mostra o gasto com botijoes', (tester) async {
+      telaAlta(tester);
+      pedidos.clear();
+      await tester.pumpWidget(tela());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, 'Marca e/ou modelo do fogão'), 'itatiaia');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ITATIAIA STAR 4Q'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(DropdownButtonFormField<String>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('PR - botijão').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Calcular o gás'));
+      await tester.pumpAndSettle();
+      expect(pedidos.single['fogao_id'], 7);
+      expect(pedidos.single['uf'], 'PR');
+      expect(pedidos.single['horas_bocas_dia'], 1.0);
+      expect(pedidos.single['horas_forno_dia'], 0.25);
+      expect(find.text('Gás por mês'), findsOneWidget);
+      expect(find.textContaining('um botijão dura cerca de 78 dias'), findsOneWidget);
+      expect(find.text('5,00 kg/mês'), findsOneWidget);
+    });
+  });
 }
 
 const planoExemplo = {
@@ -507,4 +563,5 @@ const planoExemplo = {
   ],
   'modelo': 'gemini-3.5-flash',
   'aviso': 'Plano gerado por IA.',
+
 };

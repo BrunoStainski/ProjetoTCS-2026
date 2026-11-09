@@ -86,7 +86,10 @@ no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
 `POST /eco-coach` ({moradores, itens:[{categoria, kwh_mes, custo_mes}], trocas?} -> plano com fontes [n]),
 `POST /comparar` (+ alternativa_id e preco_novo opcional -> economia e payback em meses),
-`POST /calcular/refrigerador-antigo` (geladeira fora do catálogo), `POST /calcular/resistivo`, `GET /resistivos`.
+`POST /calcular/refrigerador-antigo` (geladeira fora do catálogo), `POST /calcular/estimado` (eletro pesado fora do
+catálogo), `GET /estimativa/categorias`, `POST /sugestoes/estimado`, `POST /comparar/estimado`,
+`POST /calcular/resistivo` + `GET /resistivos` (eletroportáteis, tabela `portateis`), `POST /eco-coach/aparelho`
+(dicas para um aparelho), `GET /fogoes`, `GET /gas/precos`, `POST /calcular/gas` (gás de cozinha).
 Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py); os de estimativa, de `Tarifa`.
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
 A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
@@ -112,9 +115,26 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
 - Catálogo: geladeira sem o consumo do padrão 2025 usa o consumo antigo × essa conversão
   (`origem_dado = 'convertido da metodologia antiga do Inmetro'`, 610 modelos): o app avisa e elas não entram
   como sugestão. Antes o catálogo misturava as duas escalas e exagerava a economia.
-- Dados com problema (ainda não corrigidos na limpeza): consumo antigo imputado nas linhas do padrão 2025 sem
-  `consumo_imputado` (ex.: 41,831608 nas Consul CRM); Consul CRM44 com volume total 94 L.
-- Resistivos (`RESISTIVOS`): kWh = W/1000 × h/dia × dias; potência e uso padrão são premissas do grupo.
+- Limpeza das geladeiras: o consumo antigo não é mais imputado nas linhas que têm o consumo do padrão 2025 (antes
+  recebiam a média do grupo, ex.: 41,831608 nas Consul CRM); volume total menor que o do refrigerador é refeito
+  pela soma dos compartimentos (`volume_corrigido`; caso real: Consul CRM44 com 94 L -> 377 L).
+- Eletro pesado fora do catálogo (`servico.estimar_por_equivalentes`, config `ESTIMAVEIS`): com o valor da
+  etiqueta (kWh/mês, kWh/ciclo ou W) o cálculo é exato; sem ele, mediana dos modelos do catálogo com a mesma
+  medida (±10%, ampliando até ±40% para ter 5) e o mesmo tipo onde o tipo é padronizado; faixa = 1º a 3º quartil.
+  Fora a geladeira, não há dado de época: a estimativa usa modelos atuais e o app avisa que pode subestimar.
+- Eletroportáteis: tabela `portateis` (carga de `datasets/processed/eletroportateis.csv`, com fonte por linha;
+  potência e uso típicos são premissas do grupo). kWh = W/1000 × tempo/dia × dias. Sem sugestão de modelos (não têm
+  etiqueta do Inmetro): o app mostra as dicas do Eco-Coach (`POST /eco-coach/aparelho`).
+- Tempo de uso no app em horas e minutos (`ControleTempo`/`CampoTempo`); o `metodo` da API também ("15 min/dia").
+
+## Gás de cozinha (`src/gas.py`)
+
+- Fogões: tabela `fogoes` (Inmetro, `fogoes_fornos_gas_limpo.csv`, 1.259 modelos GLP). Preço: tabela `precos_glp`
+  (ANP, Anuário 2026 tabela 3.22, R$/kg por UF e ano; `scripts/tratar_dados_preco_glp.py`); usa o ano mais recente.
+- kg/mês = bocas (h/dia × 1,75 kW ÷ 12,8 kWh/kg × 63% ÷ rendimento do modelo) + forno (h/dia × kg/h do Inmetro),
+  × dias. A boca de 1,75 kW e o PCI de 12,8 kWh/kg são premissas (o Inmetro só dá o rendimento das bocas); 63% é a
+  mediana do catálogo. Sem modelo: medianas (63%, forno 0,12 kg/h). Preço do estado ou do botijão informado.
+- Histórico em `consultas_gas`. O gás não entra em "Minha casa" (é outra conta).
 `banco_carregado()` compara as colunas de `aparelhos` com `COLUNAS_APARELHOS` (criar_banco.py): ao
 adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
 

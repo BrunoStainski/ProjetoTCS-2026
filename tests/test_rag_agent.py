@@ -139,6 +139,11 @@ def test_prompt_das_dicas_leva_os_numeros_do_aparelho():
     assert "air fryer" in prompt and "37,50 kWh/mês" in prompt and "R$ 28,80/mês" in prompt
     assert "45 min/dia" in prompt and "[1] Cemig - Cartilha (Cozinha)" in prompt
     assert "não invente números" in prompt
+    assert "não tem etiqueta do Inmetro nem Selo Procel" in prompt
+    assert "só vale na tarifa branca" in prompt
+    chuveiro = rag_agent.montar_prompt_dicas({**AIR_FRYER, "categoria": "chuveiro", "nome": "Chuveiro"}, fontes)
+    assert "Etiqueta do Inmetro: este aparelho" in prompt
+    assert "Etiqueta do Inmetro: este aparelho" not in chuveiro
 
 
 @pytest.mark.banco
@@ -162,3 +167,9 @@ def test_api_dicas_sem_llm_da_503(api, base_rag, monkeypatch):
         raise RuntimeError("GEMINI_API_KEY nao configurada no .env")
     monkeypatch.setattr(rag_agent, "chamar_llm", fora)
     assert api.post("/eco-coach/aparelho", json=AIR_FRYER).status_code == 503
+
+
+def test_fonte_sem_secao_vira_none():
+    fontes = [{"documento": "D", "orgao": "O", "url": "u", "secao": float("nan"), "pagina": float("nan")}]
+    citadas = rag_agent._fontes_citadas("dica [1]", fontes)
+    assert citadas == [{"n": 1, "documento": "D", "orgao": "O", "url": "u", "secao": None, "pagina": None}]

@@ -21,6 +21,12 @@ IconData iconeDaCategoria(String categoria) {
     'secador_cabelo' => Icons.air,
     'ferro_passar' => Icons.iron_outlined,
     'sanduicheira' => Icons.breakfast_dining_outlined,
+    'liquidificador' => Icons.blender_outlined,
+    'cafeteira_eletrica' => Icons.coffee_maker_outlined,
+    'chaleira_eletrica' => Icons.emoji_food_beverage_outlined,
+    'forno_eletrico' => Icons.microwave_outlined,
+    'aspirador_po' => Icons.cleaning_services_outlined,
+    'torradeira' => Icons.breakfast_dining_outlined,
     _ => Icons.electrical_services,
   };
 }

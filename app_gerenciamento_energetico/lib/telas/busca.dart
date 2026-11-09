@@ -5,6 +5,7 @@ import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'estimar.dart';
+import 'gas.dart';
 import 'uso.dart';
 
 /// Passo 1: o usuario busca o aparelho pela marca e/ou modelo.
@@ -114,7 +115,9 @@ class _TelaBuscaState extends State<TelaBusca> {
             ],
             onChanged: _trocarTipo,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Espaco.p),
+          const AtalhosDaBusca(),
+          const SizedBox(height: Espaco.p),
           if (_carregando) const Center(child: CircularProgressIndicator()),
           if (_erro != null) MensagemErro(_erro!),
           if (!_carregando && _resultados != null && _resultados!.isEmpty) ...[
@@ -197,6 +200,29 @@ class _SecaoDoTipo extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class AtalhosDaBusca extends StatelessWidget {
+  const AtalhosDaBusca({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: Espaco.p,
+      children: [
+        TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
+          icon: const Icon(Icons.calculate_outlined),
+          label: const Text('Estimar aparelho'),
+        ),
+        TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaGas())),
+          icon: const Icon(Icons.local_fire_department_outlined),
+          label: const Text('Gás de cozinha'),
+        ),
+      ],
     );
   }
 }

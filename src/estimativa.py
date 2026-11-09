@@ -36,14 +36,6 @@ TIPOS = {
     "freezer_horizontal": {"nome": "freezer horizontal", "tipo_inmetro": "Congelador Horizontal", "estrelas": 3, "so_congelador": True},
 }
 
-RESISTIVOS = {
-    "air_fryer": {"nome": "Air fryer", "potencia_w": 1500, "horas_dia": 0.5, "dias_mes": 15},
-    "secador_cabelo": {"nome": "Secador de cabelo", "potencia_w": 2000, "horas_dia": 0.25, "dias_mes": 20},
-    "chuveiro": {"nome": "Chuveiro elétrico", "potencia_w": 5500, "horas_dia": 0.25, "dias_mes": 30},
-    "ferro_passar": {"nome": "Ferro de passar", "potencia_w": 1200, "horas_dia": 1.0, "dias_mes": 8},
-    "sanduicheira": {"nome": "Sanduicheira", "potencia_w": 800, "horas_dia": 0.25, "dias_mes": 8},
-}
-
 AVISO_APROXIMADO = ("Gasto aproximado: o modelo nao esta no catalogo do Inmetro, entao o consumo foi estimado "
                     "pelo tipo, volume e ano de compra. O valor real pode estar em qualquer ponto da faixa.")
 AVISO_ETIQUETA = ("Consumo da etiqueta do aparelho, convertido para a metodologia de ensaio atual e ajustado "
@@ -226,10 +218,8 @@ def consumo_refrigerador_estimado(tipo, frost_free, volume_total_l, ano_compra, 
     }
 
 
-def consumo_resistivo(categoria, potencia_w=None, horas_dia=None, dias_mes=None):
-    if categoria not in RESISTIVOS:
-        raise ValueError(f"categoria precisa ser uma de: {', '.join(RESISTIVOS)}")
-    padrao = RESISTIVOS[categoria]
+def consumo_resistivo(padrao, potencia_w=None, horas_dia=None, dias_mes=None):
+    categoria = padrao["categoria"]
     potencia = padrao["potencia_w"] if potencia_w is None else potencia_w
     horas = padrao["horas_dia"] if horas_dia is None else horas_dia
     dias = padrao["dias_mes"] if dias_mes is None else dias_mes
@@ -251,7 +241,7 @@ def consumo_resistivo(categoria, potencia_w=None, horas_dia=None, dias_mes=None)
         "premissa": horas_dia is None or dias_mes is None,
         "aproximado": None in (potencia_w, horas_dia, dias_mes),
         "avisos": [] if potencia_w is not None else [AVISO_POTENCIA_TIPICA],
-        "fonte": "potencia x tempo de uso" + ("" if potencia_w is not None else "; potencia tipica: premissa do grupo"),
+        "fonte": "potencia x tempo de uso" + ("" if potencia_w is not None else f"; potencia tipica: {padrao['fonte']}"),
     }
 
 

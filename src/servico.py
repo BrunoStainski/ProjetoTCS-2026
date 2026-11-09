@@ -17,6 +17,7 @@ import math
 import pandas as pd
 
 import banco
+import gas
 from calculadora_residencial import (
     AMPLIACOES_ESTIMATIVA, AVISO_EQUIVALENTES, COLUNAS_NUM, ECONOMIA_MINIMA, EQUIVALENCIA, ESTIMAVEIS,
     FRACAO_SUSPEITA, HORAS_OPCIONAIS, LIMITE_BUSCA, MINIMO_EQUIVALENTES, PREMISSAS, SEM_SUGESTAO,
@@ -164,6 +165,66 @@ def calcular_estimado(con, consumo, distribuidora_id=None, tarifa_manual=None, m
         resultado["custo_max_mes"] = round(consumo["kwh_max"] * tarifa, 2)
     if registrar:
         banco.registrar_consulta(con, resultado, horas_dia=consumo.get("horas_dia"))
+    return resultado
+
+
+def listar_portateis(con):
+    return _registros(banco.consulta(
+        con, "SELECT categoria, nome, potencia_w, horas_dia, dias_mes, fonte FROM portateis ORDER BY nome"))
+
+
+def portatil(con, categoria):
+    df = banco.consulta(con, "SELECT categoria, nome, potencia_w, horas_dia, dias_mes, fonte FROM portateis "
+                             "WHERE categoria = ?", (categoria,))
+    if df.empty:
+        raise ValueError(f"eletroportatil {categoria} nao existe")
+    return _registros(df)[0]
+
+
+def buscar_fogoes(con, texto, limite=LIMITE_BUSCA):
+    termos = normalizar(texto).split()
+    if not termos:
+        return []
+    sql = ("SELECT id, marca, modelo, detalhe, bocas, rendimento_pct, consumo_forno_kg_h FROM fogoes WHERE "
+           + " AND ".join("busca LIKE ?" for _ in termos) + " ORDER BY marca, modelo LIMIT ?")
+    return _registros(banco.consulta(con, sql, [*(f"%{t}%" for t in termos), limite]))
+
+
+def fogao_por_id(con, fogao_id):
+    df = banco.consulta(con, "SELECT * FROM fogoes WHERE id = ?", (int(fogao_id),))
+    if df.empty:
+        raise ValueError(f"fogao {fogao_id} nao existe")
+    return _registros(df)[0]
+
+
+def precos_glp(con):
+    return _registros(banco.consulta(
+        con, "SELECT DISTINCT ON (uf) uf, ano, preco_kg, fonte FROM precos_glp ORDER BY uf, ano DESC"))
+
+
+def calcular_gas(con, fogao_id=None, horas_bocas_dia=None, horas_forno_dia=None, dias_mes=None,
+                 uf=None, preco_botijao=None, registrar=True):
+    fogao = fogao_por_id(con, fogao_id) if fogao_id is not None else None
+    consumo = gas.consumo_gas(fogao, horas_bocas_dia, horas_forno_dia, dias_mes)
+    if preco_botijao is not None:
+        if preco_botijao <= 0:
+            raise ValueError("o preco do botijao precisa ser maior que zero")
+        preco_kg, origem = preco_botijao / gas.KG_POR_BOTIJAO, "informado pelo usuario (preco do botijao de 13 kg)"
+        avisos_preco = []
+    elif uf:
+        linha = banco.consulta(con, "SELECT ano, preco_kg, fonte FROM precos_glp WHERE uf = ? ORDER BY ano DESC "
+                                    "LIMIT 1", (uf.strip().upper(),))
+        if linha.empty:
+            raise ValueError(f"estado {uf} sem preco do GLP")
+        preco_kg = float(linha["preco_kg"].iloc[0])
+        origem = f"{linha['fonte'].iloc[0]}, media de {int(linha['ano'].iloc[0])}"
+        avisos_preco = [gas.AVISO_PRECO]
+    else:
+        raise ValueError("escolha o estado ou informe o preco do botijao")
+    resultado = gas.resultado_gas(consumo, preco_kg, origem, fogao, uf.strip().upper() if uf else None)
+    resultado["avisos"] = resultado["avisos"] + avisos_preco
+    if registrar:
+        banco.registrar_consulta_gas(con, resultado)
     return resultado
 
 

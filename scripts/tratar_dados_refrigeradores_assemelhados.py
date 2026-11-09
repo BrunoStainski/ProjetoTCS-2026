@@ -103,7 +103,30 @@ def etapa_4_filtrar_erros_outliers(df: pd.DataFrame) -> pd.DataFrame:
     removidos = qtd_inicial - len(df_clean)
     print(f"✓ Linhas com outliers/erros de cadastro removidas: {removidos}")
     print(f"  Linhas restantes: {len(df_clean)}")
-    return df_clean
+    return corrigir_volume_total(df_clean)
+
+
+def corrigir_volume_total(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    total = "Volume_Total_litros"
+    refrigerador = "Volume_do_Refrigerador_litros"
+    estrelas = [c for c in df.columns if c.startswith("Volume_do_Compartimento_de_Alimentos_Congelados")]
+    df["Volume_Corrigido"] = False
+    if not {total, refrigerador}.issubset(df.columns):
+        return df
+    soma = df[refrigerador] + df[estrelas].fillna(0).sum(axis=1)
+    errado = df[refrigerador].notna() & (df[total] < df[refrigerador])
+    chave = ["Marca", total] + estrelas
+    corrigidos = df.loc[errado, chave].assign(_novo=soma[errado])
+    df.loc[errado, total] = soma[errado]
+    df.loc[errado, "Volume_Corrigido"] = True
+    if len(corrigidos):
+        irmaos = df[df[refrigerador].isna()].reset_index().merge(corrigidos, on=chave, how="inner")
+        for _, linha in irmaos.iterrows():
+            df.loc[linha["index"], total] = linha["_novo"]
+            df.loc[linha["index"], "Volume_Corrigido"] = True
+    print(f"✓ Volume total corrigido (menor que o do refrigerador): {int(df['Volume_Corrigido'].sum())} linha(s)")
+    return df
 
 
 def etapa_5_imputacao(df: pd.DataFrame) -> pd.DataFrame:
@@ -125,8 +148,9 @@ def etapa_5_imputacao(df: pd.DataFrame) -> pd.DataFrame:
     col_2025 = next((c for c in df_clean.columns
                      if c.lower().startswith("consumo_médio_de_energia_mensal")
                      or c.lower().startswith("consumo_medio_de_energia_mensal")), None)
-    if col_2025:
-        consumo &= pd.to_numeric(df_clean[col_2025], errors="coerce").isna()
+    tem_2025 = pd.to_numeric(df_clean[col_2025], errors="coerce").notna() if col_2025 else False
+    so_tem_2025 = consumo & tem_2025
+    consumo &= ~tem_2025
     df_clean["Consumo_Imputado"] = consumo
 
     # 1. Imputação por Marca + Tipo
@@ -141,10 +165,14 @@ def etapa_5_imputacao(df: pd.DataFrame) -> pd.DataFrame:
             lambda group: group.fillna(group.mean())
         )
 
-    # 3. Remoção de registros irrecuperáveis (sem consumo mesmo após imputação)
     col_alvo = "Consumo_de_Energia_Mensal_kWh_mês"
+    df_clean.loc[so_tem_2025, col_alvo] = float("nan")
+
+    # 3. Remoção de registros irrecuperáveis (sem consumo mesmo após imputação)
     if col_alvo in df_clean.columns:
-        df_clean = df_clean.dropna(subset=[col_alvo])
+        tem_consumo = df_clean[col_alvo].notna() | (
+            pd.to_numeric(df_clean[col_2025], errors="coerce").notna() if col_2025 else False)
+        df_clean = df_clean[tem_consumo]
 
     print(f"✓ Imputação concluída. Shape final: {df_clean.shape}")
 

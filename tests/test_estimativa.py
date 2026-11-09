@@ -84,21 +84,26 @@ def test_entradas_invalidas(modelo, mudanca):
         estimativa.consumo_refrigerador_estimado(**{**CRM45, **mudanca}, modelo=modelo)
 
 
+AIR_FRYER_PADRAO = {"categoria": "air_fryer", "nome": "Air fryer", "potencia_w": 1500, "horas_dia": 0.5,
+                    "dias_mes": 15, "fonte": "premissa do grupo"}
+
+
 def test_resistivo_com_valores_padrao():
-    r = estimativa.consumo_resistivo("air_fryer")
+    r = estimativa.consumo_resistivo(AIR_FRYER_PADRAO)
     assert r["kwh_mes"] == pytest.approx(1500 / 1000 * 0.5 * 15)
     assert r["premissa"] and r["aproximado"] and r["avisos"]
 
 
 def test_chuveiro_resistivo_bate_com_o_exemplo_do_projeto():
-    r = estimativa.consumo_resistivo("chuveiro", potencia_w=5500, horas_dia=0.25, dias_mes=30)
+    chuveiro = {**AIR_FRYER_PADRAO, "categoria": "chuveiro", "nome": "Chuveiro elétrico"}
+    r = estimativa.consumo_resistivo(chuveiro, potencia_w=5500, horas_dia=0.25, dias_mes=30)
     assert r["kwh_mes"] == pytest.approx(41.25)
     assert not r["premissa"] and not r["aproximado"] and not r["avisos"]
 
 
 def test_resistivo_invalido():
     with pytest.raises(ValueError):
-        estimativa.consumo_resistivo("torradeira")
+        estimativa.consumo_resistivo(AIR_FRYER_PADRAO, horas_dia=30)
 
 
 def test_catalogo_converte_geladeiras_da_metodologia_antiga(modelo):
@@ -140,8 +145,9 @@ def test_api_refrigerador_antigo(api_sem_banco, modelo):
     assert corpo["custo_min_mes"] <= corpo["custo_mes"] <= corpo["custo_max_mes"]
 
 
-def test_api_resistivo(api_sem_banco):
-    resposta = api_sem_banco.post("/calcular/resistivo", json={
+@pytest.mark.banco
+def test_api_resistivo(api):
+    resposta = api.post("/calcular/resistivo", json={
         "categoria": "chuveiro", "potencia_w": 5500, "horas_dia": 0.25, "dias_mes": 30,
         "tarifa_manual": 0.768, "registrar": False})
     assert resposta.status_code == 200, resposta.text
@@ -149,9 +155,17 @@ def test_api_resistivo(api_sem_banco):
     assert resposta.json()["marca"] == "Chuveiro elétrico" and resposta.json()["modelo"] == "(estimativa)"
 
 
-def test_api_lista_resistivos(api_sem_banco):
-    resposta = api_sem_banco.get("/resistivos")
-    assert {r["categoria"] for r in resposta.json()} == set(estimativa.RESISTIVOS)
+@pytest.mark.banco
+def test_api_lista_portateis_vem_do_banco(api):
+    portateis = {r["categoria"]: r for r in api.get("/resistivos").json()}
+    assert {"air_fryer", "secador_cabelo", "liquidificador", "aspirador_po"} <= set(portateis)
+    assert all(r["fonte"] for r in portateis.values())
+
+
+@pytest.mark.banco
+def test_api_portatil_que_nao_existe_da_404(api):
+    resposta = api.post("/calcular/resistivo", json={"categoria": "teletransporte", **TARIFA})
+    assert resposta.status_code == 404
 
 
 TARIFA = {"tarifa_manual": 0.768, "registrar": False}
