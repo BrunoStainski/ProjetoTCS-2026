@@ -4,6 +4,22 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## App 1.2.0+5 / API 0.3.0
+
+- Gás de cozinha: fogões do Inmetro, preço do GLP por estado (ANP) e tela "Gás de cozinha" no app
+  (`GET /fogoes`, `GET /gas/precos`, `POST /calcular/gas`).
+- Estimar aparelho fora do catálogo: abas "Eletro pesado" (todas as categorias) e "Eletroportáteis"
+  (liquidificador, cafeteira, chaleira, forno elétrico, aspirador, torradeira...), com horas e minutos.
+  Geladeira antiga pela etiqueta ou pela regra do Inmetro de 2006; compra recente pelo Random Forest.
+  (`POST /calcular/estimado`, `/calcular/refrigerador-antigo`, `/calcular/resistivo`,
+  `/sugestoes/estimado`, `/comparar/estimado`, `/eco-coach/aparelho` e listas de apoio.)
+- Geladeiras: consumos da metodologia antiga convertidos para a atual (a economia nas trocas era
+  exagerada); volume errado refeito pela soma (ex.: Consul CRM44, 94 L -> 377 L).
+- Eco-Coach: não recomenda etiqueta/Selo Procel para aparelho sem etiqueta; horário de ponta só na
+  tarifa branca.
+- Atalhos "Estimar aparelho" e "Gás de cozinha" na tela de busca.
+- Banco: tabelas novas `portateis`, `fogoes` e `precos_glp` (a API recarrega sozinha se faltarem).
+
 ## App 1.1.2+4 / API 0.2.0
 
 - Só documentação (README e CLAUDE.md); app e API sem mudanças, o APK 1.1.1 continua valendo.
