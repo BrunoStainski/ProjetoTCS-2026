@@ -101,6 +101,25 @@ def test_resistivo_invalido():
         estimativa.consumo_resistivo("torradeira")
 
 
+def test_catalogo_converte_geladeiras_da_metodologia_antiga(modelo):
+    import calculadora_residencial as calc
+    geladeiras = calc.carregar_catalogo().query("categoria == 'refrigerador'")
+    convertidas = geladeiras[geladeiras["origem_dado"] == calc.ORIGEM_CONVERTIDA]
+    assert len(convertidas) > 0
+    assert geladeiras["kwh_mes"].notna().all()
+    crm50 = geladeiras[geladeiras["modelo"].str.contains("CRM50MBANA", regex=False)].iloc[0]
+    assert crm50["origem_dado"] == "informado" and crm50["kwh_mes"] == pytest.approx(32.1)
+
+
+def test_resultado_avisa_quando_o_consumo_foi_convertido():
+    import calculadora_residencial as calc
+    from conftest import aparelho
+    a = aparelho("refrigerador", kwh_mes=26.6, origem_dado=calc.ORIGEM_CONVERTIDA)
+    consumo = calc.consumo_mensal_kwh(a)
+    r = calc.montar_resultado(a, consumo, 0.8, "COPEL", "ANEEL", "PR")
+    assert calc.AVISO_CONVERTIDO in r["avisos"]
+
+
 @pytest.fixture
 def api_sem_banco(client):
     import main

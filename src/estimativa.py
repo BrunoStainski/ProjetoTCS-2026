@@ -111,6 +111,10 @@ def _conversao(modelo, tipo_inmetro, frost_free):
     return modelo["fator_metodo"].get((tipo_inmetro, frost_free), modelo["fator_metodo_geral"])
 
 
+def fator_metodologia(tipo_inmetro, frost_free, modelo=None):
+    return _conversao(modelo or carregar_modelo(), tipo_inmetro, bool(frost_free))["mediana"]
+
+
 def _mae_2025(modelo, tipo_inmetro, frost_free):
     for linha in modelo["metricas"]["2025"]["por_segmento"]:
         if linha["tipo"] == tipo_inmetro and bool(linha["frost_free"]) == frost_free:

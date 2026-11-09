@@ -108,6 +108,9 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
   de 1 porta manuais no treino e extrapolação para 16 das 27 de 2001.
 - Caso de validação: Consul CRM45 (duplex frost-free 407 L, freezer 90 L, 2014, etiqueta 52,5 kWh/mês):
   Ie = 0,762 (classe A); sem etiqueta a faixa contém a etiqueta (`tests/test_estimativa.py`).
+- Catálogo: geladeira sem o consumo do padrão 2025 usa o consumo antigo × essa conversão
+  (`origem_dado = 'convertido da metodologia antiga do Inmetro'`, 610 modelos): o app avisa e elas não entram
+  como sugestão. Antes o catálogo misturava as duas escalas e exagerava a economia.
 - Dados com problema (ainda não corrigidos na limpeza): consumo antigo imputado nas linhas do padrão 2025 sem
   `consumo_imputado` (ex.: 41,831608 nas Consul CRM); Consul CRM44 com volume total 94 L.
 - Resistivos (`RESISTIVOS`): kWh = W/1000 × h/dia × dias; potência e uso padrão são premissas do grupo.

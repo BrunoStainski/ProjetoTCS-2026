@@ -11,6 +11,7 @@ import unicodedata
 import pandas as pd
 
 import config
+import estimativa
 
 DIAS_MES = 30
 LIMITE_BUSCA = 15
@@ -84,6 +85,10 @@ ECONOMIA_MINIMA = 0.05
 # Inmetro e nao e sugerido (ex.: HISENSE RS3P428NEDA = 28,0 kWh e a versao 127 V = 2,8 kWh).
 FRACAO_SUSPEITA = 0.4
 
+ORIGEM_CONVERTIDA = "convertido da metodologia antiga do Inmetro"
+AVISO_CONVERTIDO = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
+                    "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.")
+
 AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifaria e iluminacao "
                 "publica. O uso real muda o resultado.")
 # Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
@@ -95,8 +100,8 @@ SPECS = [
     {
         "arquivo": "refrigeradores-e-assemelhados_limpo.csv", "categoria": "refrigerador",
         "tipo": "tipo", "capacidade": ("volume_total_litros", "L"),
-        # padrao 2025 do Inmetro primeiro; se faltar, o padrao antigo
-        "kwh_mes": ["consumo_medio_de_energia_mensal_kwh_mes", "consumo_de_energia_mensal_kwh_mes"],
+        "kwh_mes": ["consumo_medio_de_energia_mensal_kwh_mes"],
+        "kwh_mes_metodologia_antiga": {"coluna": "consumo_de_energia_mensal_kwh_mes", "degelo": "sistema_de_degelo"},
     },
     {
         "arquivo": "televisores_limpo.csv", "categoria": "televisor",
@@ -228,6 +233,8 @@ def _construir(df, spec):
         out.loc[com_lm, "detalhe"] = out.loc[com_lm, "detalhe"] + ", " + out.loc[com_lm, "fluxo_lm"].map("{:g} lm".format)
 
     out["origem_dado"] = "informado"
+    if "kwh_mes_metodologia_antiga" in spec:
+        _converter_metodologia_antiga(df, out, spec["kwh_mes_metodologia_antiga"])
     if spec.get("derivado"):
         out.loc[spec["derivado"](df), "origem_dado"] = "derivado ou estimado na limpeza"
     if "consumo_imputado" in df.columns:  # marcado pelos scripts de limpeza
@@ -240,6 +247,24 @@ def _construir(df, spec):
         out.loc[out[coluna] <= 0, coluna] = float("nan")
     tem_dado = out[["kwh_mes", "kwh_ciclo", "potencia_w"]].notna().any(axis=1)
     return out[tem_dado & (out["marca"] != "") & (out["modelo"] != "")]
+
+
+def _converter_metodologia_antiga(df, out, regra):
+    antigo = _num(df, [regra["coluna"]])
+    falta = out["kwh_mes"].isna() & antigo.notna()
+    if not falta.any():
+        return
+    frost_free = df[regra["degelo"]].fillna("").astype(str).str.contains("Frost")
+    try:
+        modelo = estimativa.carregar_modelo()
+    except FileNotFoundError as erro:
+        print(f"[aviso] {erro}; consumo da metodologia antiga usado sem conversao")
+        out.loc[falta, "kwh_mes"] = antigo[falta]
+        return
+    fator = pd.Series([estimativa.fator_metodologia(t, f, modelo) for t, f in zip(out["tipo"], frost_free)],
+                      index=out.index)
+    out.loc[falta, "kwh_mes"] = antigo[falta] * fator[falta]
+    out.loc[falta, "origem_dado"] = ORIGEM_CONVERTIDA
 
 
 def carregar_catalogo(pasta=None):
@@ -330,7 +355,9 @@ def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa
     avisos = [AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO]
     if consumo.get("premissa"):
         avisos.append("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.")
-    if aparelho.get("origem_dado") not in (None, "informado"):
+    if aparelho.get("origem_dado") == ORIGEM_CONVERTIDA:
+        avisos.append(AVISO_CONVERTIDO)
+    elif aparelho.get("origem_dado") not in (None, "informado"):
         avisos.append("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).")
     detalhe = aparelho.get("detalhe")
     return {
