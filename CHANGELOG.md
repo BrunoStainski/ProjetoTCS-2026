@@ -4,6 +4,12 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## App 1.1.1+3 / API 0.2.0
+
+- Busca: trocar o tipo de aparelho atualiza a lista na hora (antes era preciso tocar na lupa de novo).
+  Só vale a resposta da última troca, então trocar rápido não mostra a lista errada.
+- API sem mudanças.
+
 ## App 1.1.0+2 / API 0.2.0
 
 - Busca: os resultados vêm separados por tipo de aparelho (geladeiras, ar-condicionado...) em seções
