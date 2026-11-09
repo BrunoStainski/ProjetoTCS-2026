@@ -341,6 +341,7 @@ Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto
 | Minha casa | Soma os aparelhos (com quantidade), mostra o que mais pesa e o perfil da casa |
 | Modelos mais econômicos | Lista modelos equivalentes que gastam menos |
 | Vale a pena trocar? | Compara os dois modelos e calcula o payback com o preço digitado |
+| Eco-Coach | Plano de economia escrito por IA com dicas oficiais (Inmetro e Cemig) para os aparelhos que mais pesam, com as fontes citadas. Os números são calculados pelo iamp |
 
 O botão de casa no topo de todas as telas abre "Minha casa" e mostra quantos aparelhos já foram adicionados.
 A lista fica só na memória: ao fechar o app, ela recomeça vazia.

@@ -136,11 +136,16 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 - `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
   ChangeNotifier global `casa`; só em memória, sem persistência).
 - Telas (`telas/`): busca -> uso -> distribuidora (oferece a última tarifa) -> resultado ->
-  minha_casa (total, quantidade por item, perfil K-Means) | sugestoes -> comparar (payback, trocar na casa).
+  minha_casa (total, quantidade por item, perfil K-Means) | sugestoes -> comparar (payback, trocar na casa)
+  | minha_casa -> eco_coach (POST /eco-coach; espera com raio pulsando, plano, fontes [n]).
+- Eco-Coach no app: `texto_plano.dart` mostra o markdown do Gemini sem pacote extra (títulos, listas,
+  **negrito**, citações [n] em amarelo). Trocas com payback calculado em `comparar.dart` entram em
+  `casa.trocas` (máx. 5) e vão no corpo. O plano fica em `casa.plano` até a casa mudar (poupa o limite
+  gratuito do Gemini). Timeout do /eco-coach no app: 90 s. Links das fontes são selecionáveis (sem url_launcher).
 - `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, em branco = valor do Inmetro.
 - Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra);
   avisos (SnackBar) que navegam usam o `NavigatorState` guardado antes, não o `context` da tela.
-- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional).
+- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional, Eco-Coach).
 
 ## Machine Learning (Dupla 2)
 
@@ -164,10 +169,11 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 
 ## Próximas etapas
 
-tela do Eco-Coach no app, Terraform (`infra/main.tf`
+Terraform (`infra/main.tf`
 vazio), documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
-No app: salvar "Minha casa" entre sessões e a tela do Eco-Coach.
+No app: salvar "Minha casa" entre sessões; abrir no celular (Android SDK ainda não conferido).
+BPMN também precisa do `/eco-coach`.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
 (ex.: um futuro `POST /simulacao`), atualizar os dois. PENDENTE: incluir `/sugestoes` e `/comparar`.

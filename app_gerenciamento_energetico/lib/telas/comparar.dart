@@ -57,6 +57,15 @@ class _TelaCompararState extends State<TelaComparar> {
     try {
       // o setState nao pode receber um Future: espera a resposta e so depois troca o estado
       final comparacao = await _comparar(preco: preco);
+      // o Eco-Coach usa essa troca com os numeros calculados aqui (economia e payback)
+      casa.registrarTroca(
+        TrocaAvaliada(
+          aparelho: '${legivel(comparacao.atual.categoria)} ${comparacao.atual.nome}',
+          alternativa: comparacao.novo.nome,
+          economiaMes: comparacao.economiaMes,
+          paybackMeses: comparacao.payback?.meses,
+        ),
+      );
       if (!mounted) return;
       setState(() {
         _comparacao = Future.value(comparacao);

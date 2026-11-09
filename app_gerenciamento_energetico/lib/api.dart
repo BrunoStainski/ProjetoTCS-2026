@@ -219,15 +219,25 @@ class Api {
     return _tratar(() => http.get(uri));
   }
 
-  static Future<dynamic> _post(String caminho, Map<String, dynamic> corpo) async {
+  static Future<dynamic> _post(
+    String caminho,
+    Map<String, dynamic> corpo, {
+    Duration limite = const Duration(seconds: 15),
+  }) async {
     final uri = Uri.parse('$apiUrl$caminho');
-    return _tratar(() => http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(corpo)));
+    return _tratar(
+      () => http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(corpo)),
+      limite: limite,
+    );
   }
 
-  static Future<dynamic> _tratar(Future<http.Response> Function() chamada) async {
+  static Future<dynamic> _tratar(
+    Future<http.Response> Function() chamada, {
+    Duration limite = const Duration(seconds: 15),
+  }) async {
     final http.Response resposta;
     try {
-      resposta = await chamada().timeout(const Duration(seconds: 15));
+      resposta = await chamada().timeout(limite);
     } catch (_) {
       throw ApiErro('Nao consegui falar com a API em $apiUrl. Ela esta rodando? (docker compose up -d)');
     }
@@ -284,6 +294,92 @@ class Api {
   /// itens: [{categoria, kwh_mes}] da casa.
   static Future<Classificacao> classificar(int moradores, List<Map<String, dynamic>> itens) async =>
       Classificacao.fromJson(await _post('/classificar', {'moradores': moradores, 'itens': itens}));
+
+  /// Plano do Eco-Coach (RAG + Gemini). O LLM pode levar alguns segundos: limite maior.
+  static Future<EcoCoach> ecoCoach(int moradores, List<Map<String, dynamic>> itens, List<TrocaAvaliada> trocas) async =>
+      EcoCoach.fromJson(
+        await _post('/eco-coach', {
+          'moradores': moradores,
+          'itens': itens,
+          'trocas': [for (final t in trocas) t.paraApi()],
+        }, limite: const Duration(seconds: 90)),
+      );
+}
+
+/// Troca ja calculada em "Vale a pena trocar?" (vai para o Eco-Coach usar os numeros do iamp).
+class TrocaAvaliada {
+  final String aparelho;
+  final String alternativa;
+  final double economiaMes;
+  final double? paybackMeses;
+
+  const TrocaAvaliada({
+    required this.aparelho,
+    required this.alternativa,
+    required this.economiaMes,
+    this.paybackMeses,
+  });
+
+  Map<String, dynamic> paraApi() => {
+    'aparelho': aparelho,
+    'alternativa': alternativa,
+    'economia_mes': economiaMes,
+    'payback_meses': paybackMeses,
+  };
+}
+
+class FonteCitada {
+  final int n;
+  final String documento;
+  final String orgao;
+  final String url;
+  final String? secao;
+  final int? pagina;
+
+  FonteCitada.fromJson(Map<String, dynamic> j)
+    : n = j['n'],
+      documento = j['documento'],
+      orgao = j['orgao'],
+      url = j['url'],
+      secao = j['secao'],
+      pagina = j['pagina'];
+}
+
+class MaiorConsumo {
+  final String categoria;
+  final String nome;
+  final double kwhMes;
+  final double? custoMes;
+  final double percentual;
+
+  MaiorConsumo.fromJson(Map<String, dynamic> j)
+    : categoria = j['categoria'],
+      nome = j['nome'],
+      kwhMes = _real(j['kwh_mes']),
+      custoMes = _realOuNulo(j['custo_mes']),
+      percentual = _real(j['percentual']);
+}
+
+/// Resposta de POST /eco-coach: numeros calculados pelo iamp + plano escrito pelo LLM com fontes [n].
+class EcoCoach {
+  final String perfil;
+  final double kwhTotal;
+  final double? custoTotal;
+  final List<MaiorConsumo> maioresConsumos;
+  final String plano; // markdown
+  final List<FonteCitada> fontes;
+  final String modelo;
+  final String aviso;
+
+  EcoCoach.fromJson(Map<String, dynamic> j)
+    : perfil = j['perfil'],
+      kwhTotal = _real(j['kwh_total']),
+      custoTotal = _realOuNulo(j['custo_total']),
+      maioresConsumos = [for (final m in j['maiores_consumos']) MaiorConsumo.fromJson(m)],
+      plano = j['plano'],
+      fontes = [for (final f in j['fontes']) FonteCitada.fromJson(f)],
+      modelo = j['modelo'],
+      aviso = j['aviso'];
 }
 
 /// 1234.5 -> "R$ 1.234,50"

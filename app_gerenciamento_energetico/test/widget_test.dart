@@ -5,6 +5,7 @@ import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
 import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
+import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
   'categoria': categoria,
@@ -120,4 +121,63 @@ void main() {
     expect(troca.paraApi(), c.paraApi());
     expect(troca.aparelho.id, 5);
   });
+
+  group('Eco-Coach', () {
+    test('plano: citacoes [n] em amarelo e **negrito** sem os asteriscos', () {
+      const base = TextStyle(fontSize: 16);
+      final pedacos = pedacosDoTexto('Desligue o **ar** nas saidas [1] e use o timer [2, 3].', base);
+      expect(pedacos.map((p) => p.text).join(), 'Desligue o ar nas saidas [1] e use o timer [2, 3].');
+      final citacoes = pedacos.where((p) => p.text!.startsWith('['));
+      expect(citacoes.map((p) => p.text), ['[1]', '[2, 3]']);
+      expect(citacoes.every((p) => p.style!.color == Cores.amarelo), isTrue);
+      expect(pedacos.firstWhere((p) => p.text == 'ar').style!.fontWeight, FontWeight.bold);
+    });
+
+    testWidgets('plano: titulos, listas e paragrafos viram widgets', (tester) async {
+      const md = '## Ações recomendadas\n\n1. Banho mais curto [1]\n- Geladeira longe do fogão [2]\nTexto final.';
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(body: TextoPlano(md))));
+      expect(find.text('AÇÕES RECOMENDADAS'), findsOneWidget);
+      expect(find.text('1.'), findsOneWidget);
+      expect(find.byIcon(Icons.bolt), findsOneWidget); // marcador da lista
+      expect(find.textContaining('Texto final.', findRichText: true), findsOneWidget);
+    });
+
+    test('casa manda o custo de cada item e guarda as trocas sem repetir', () {
+      final item = casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
+      casa.mudarQuantidade(item, 2);
+      expect(casa.itensParaEcoCoach().single, {'categoria': 'chuveiro', 'kwh_mes': 82.5, 'custo_mes': 63.36});
+
+      const t1 = TrocaAvaliada(aparelho: 'geladeira A', alternativa: 'B', economiaMes: 7, paybackMeses: 300);
+      casa.registrarTroca(t1);
+      casa.registrarTroca(t1); // a mesma troca de novo nao duplica
+      expect(casa.trocas, hasLength(1));
+      for (var i = 0; i < 6; i++) {
+        casa.registrarTroca(TrocaAvaliada(aparelho: 'tv $i', alternativa: 'x', economiaMes: 1));
+      }
+      expect(casa.trocas, hasLength(5)); // so as 5 mais recentes
+    });
+
+    test('plano guardado some quando a casa muda', () {
+      casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
+      casa.guardarPlano(EcoCoach.fromJson(planoExemplo));
+      expect(casa.plano!.fontes.single.pagina, 7);
+      casa.mudarMoradores(4);
+      expect(casa.plano, isNull);
+    });
+  });
 }
+
+const planoExemplo = {
+  'perfil': 'Moderado',
+  'kwh_total': 10.0,
+  'custo_total': 8.0,
+  'maiores_consumos': [
+    {'categoria': 'televisor', 'nome': 'televisão', 'kwh_mes': 10.0, 'custo_mes': 8.0, 'percentual': 100.0},
+  ],
+  'plano': 'Desligue a TV da tomada [1].',
+  'fontes': [
+    {'n': 1, 'documento': 'Cartilha', 'orgao': 'Cemig', 'url': 'https://x', 'secao': 'Sala', 'pagina': 7},
+  ],
+  'modelo': 'gemini-3.5-flash',
+  'aviso': 'Plano gerado por IA.',
+};

@@ -78,6 +78,13 @@ class Casa extends ChangeNotifier {
   /// Perfil do K-Means. Volta a null quando a casa muda (precisa classificar de novo).
   Classificacao? perfil;
 
+  /// Ultimo plano do Eco-Coach. Fica guardado ate a casa mudar (poupa o limite gratuito do Gemini).
+  EcoCoach? plano;
+
+  /// Trocas com payback calculado em "Vale a pena trocar?" (no maximo 5, as mais recentes).
+  final List<TrocaAvaliada> _trocas = [];
+  List<TrocaAvaliada> get trocas => List.unmodifiable(_trocas);
+
   List<ItemCasa> get itens => List.unmodifiable(_itens);
   bool get vazia => _itens.isEmpty;
   int get totalAparelhos => _itens.fold(0, (soma, i) => soma + i.quantidade);
@@ -93,6 +100,7 @@ class Casa extends ChangeNotifier {
 
   void _mudou() {
     perfil = null;
+    plano = null;
     notifyListeners();
   }
 
@@ -136,17 +144,38 @@ class Casa extends ChangeNotifier {
     notifyListeners();
   }
 
+  void guardarPlano(EcoCoach p) {
+    plano = p;
+    notifyListeners();
+  }
+
+  /// Guarda a troca avaliada (a mesma dupla de aparelhos so aparece uma vez, com o valor mais novo).
+  void registrarTroca(TrocaAvaliada t) {
+    _trocas.removeWhere((x) => x.aparelho == t.aparelho && x.alternativa == t.alternativa);
+    _trocas.add(t);
+    if (_trocas.length > 5) _trocas.removeAt(0);
+    plano = null; // o plano precisa considerar a troca nova; o perfil nao muda
+    notifyListeners();
+  }
+
   /// Formato de POST /classificar.
   List<Map<String, dynamic>> itensParaPerfil() => [
     for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes},
   ];
 
+  /// Formato de POST /eco-coach: igual ao do perfil, com o custo de cada item.
+  List<Map<String, dynamic>> itensParaEcoCoach() => [
+    for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes, 'custo_mes': i.custoMes},
+  ];
+
   @visibleForTesting
   void limpar() {
     _itens.clear();
+    _trocas.clear();
     moradores = 2;
     ultimaTarifa = null;
     perfil = null;
+    plano = null;
     notifyListeners();
   }
 }
