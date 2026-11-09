@@ -98,7 +98,7 @@ iamp/
 ├── src/                  # aplicação: banco, cálculo, API e app de terminal
 ├── app_gerenciamento_energetico/   # app Flutter
 ├── docs/                 # BPMN e documentação
-├── infra/                # Terraform (em construção)
+├── infra/                # Terraform: local/ (Docker, em uso) e oracle/ (nuvem, pronto)
 ├── models/               # modelos treinados (ctgan.pkl e kmeans.pkl)
 ├── prompts/              # registro dos prompts usados com IA
 ├── Dockerfile            # imagem da API
@@ -249,6 +249,22 @@ flutter run -d chrome
 
 Testes do app: `flutter test`.
 
+### Passo 10 (opcional): subir tudo com Terraform
+
+A mesma aplicação, criada como Infraestrutura como Código (passo a passo em [infra/README.md](infra/README.md)).
+Ela usa as portas 8080 (API) e 5435 (banco), então roda junto com o `docker compose`.
+
+```bash
+cd infra/local
+terraform init
+terraform apply     # ~5 min na 1ª vez
+```
+
+- No Windows, com o Docker Desktop aberto, coloque no `terraform.tfvars`:
+  `docker_host = "npipe:////./pipe/dockerDesktopLinuxEngine"`.
+- A `gemini_api_key` do `terraform.tfvars` precisa ser igual à do `.env`, numa linha só. Senão o
+  `/eco-coach` responde 503.
+
 ---
 
 ## 7. API
@@ -377,6 +393,30 @@ Depois copie `android/key.properties.example` para `android/key.properties` e pr
 `key.properties` ficam fora do git e são passados para a equipe por canal privado. Se a chave se
 perder, nenhum celular aceita mais atualizações: guarde uma cópia.
 
+Para conferir um APK: `apksigner verify --print-certs <apk>` deve mostrar `CN=iamp, O=Projeto TCS 2026`.
+O arquivo que vai para os celulares é copiado como `build/app/outputs/flutter-apk/iamp.apk`.
+
+### Instalar no celular
+
+1. Mande o `iamp.apk` para o celular (WhatsApp, Google Drive, e-mail). Não precisa de cabo USB.
+2. Abra o arquivo e permita "instalar apps desta fonte" na primeira vez.
+3. Atualizações instalam por cima. Quem instalou um APK antigo, assinado com a chave de teste
+   (antes da versão 1.1.0), precisa desinstalar uma vez. A mensagem é "o pacote tem um conflito
+   com um pacote já existente".
+
+Para o app falar com a API:
+
+- O endereço da API fica gravado no APK (`API_URL`). Hoje é o IP do computador na rede Wi-Fi, que
+  **muda a cada rede**: trocou de rede, gere o APK de novo com o IP novo.
+- O celular precisa estar na mesma rede que o computador, com o Docker ligado.
+- Algumas redes de instituição bloqueiam a comunicação entre aparelhos. Para testar, abra
+  `http://<ip-do-computador>:8000/saude` no navegador do celular. Se não abrir, use o roteador de um
+  celular ou publique a API (`infra/oracle/`) para ter um endereço fixo.
+
+**iPhone:** o APK não funciona no iPhone. A versão de iOS precisa ser gerada num Mac com Xcode, e para
+instalar sem App Store é preciso uma conta Apple. Sem Mac, a alternativa é a versão web do app
+(`flutter build web`) aberta no Safari.
+
 ---
 
 ## 9. Como o cálculo funciona
@@ -470,10 +510,17 @@ python scripts/treinar_kmeans.py
 - Machine Learning: residências sintéticas (CTGAN) e perfil de consumo (K-Means)
 - App Flutter ligado à API: cálculo, "Minha casa", perfil da casa, sugestão de troca e payback
 - Diagrama BPMN em `docs/`
+- Análise exploratória com gráficos (`notebooks/eda.ipynb`, imagens em `docs/graficos/`)
+- Eco-Coach: plano de economia com RAG (pgvector + Gemini) e tela no app
+- Terraform: infraestrutura local no Docker testada (API, banco, RAG) e a da Oracle Cloud pronta
+- Busca separada por tipo de aparelho, atualizando sozinha ao trocar o tipo
+- Versionamento (`CHANGELOG.md`, tags `v1.1.0` e `v1.1.1`) e APK Android assinado com a chave do projeto
 
 ## 15. Próximas etapas
 
-- Análise exploratória com gráficos (Matplotlib/Seaborn)
-- Assistente com IA generativa "Eco-Coach" (RAG com LangChain)
-- Terraform
-- Documentação de ética e governança
+- Documentação de processo, ética e governança; registro dos prompts
+- Atualizar o BPMN com `/sugestoes`, `/comparar` e `/eco-coach`
+- Endereço fixo da API para o celular (publicar na Oracle Cloud ou usar um túnel), para não depender da rede
+- Salvar "Minha casa" entre uma abertura e outra do app
+- Versão web para quem usa iPhone
+- Deck e vídeo de apresentação
