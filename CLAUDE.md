@@ -231,6 +231,14 @@ rede + volume + postgres (`wait` até healthy) + imagem da API via `terraform_da
 `docker_container.carga_rag` (`attach`, `must_run=false`) que roda `carregar_rag.py` com o script e os
 documentos copiados por `upload` (não estão na imagem). Senha via `random_password`; `cd infra/local;
 terraform init; terraform apply`.
+Testado em 09/11/2026 (Terraform 1.17, winget; o `terraform.exe` não entra no PATH até abrir outro terminal):
+apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e /eco-coach na 8080.
+- Windows: o provider só acha o Docker Desktop com
+  `docker_host = "npipe:////./pipe/dockerDesktopLinuxEngine"` (no tfvars ou `-var`); o padrão
+  `docker_engine` falha. O Docker Desktop precisa estar aberto.
+- `gemini_api_key` no tfvars: idêntica à do `.env`, numa linha só. Chave quebrada em duas linhas ou com
+  caracteres a mais = /eco-coach 503 (`ClientError` nos dois modelos). Saída do terraform pode mostrar a
+  chave em erros: mascarar antes de exibir.
 
 **Pronto para depois: `infra/oracle/`** (sem conta ainda):
 - Oracle Cloud Always Free: 1 VM ARM `VM.Standard.A1.Flex` (Ubuntu 24.04) rodando o próprio
@@ -245,20 +253,36 @@ terraform init; terraform apply`.
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (`1.1.0+2`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.2.0`); histórico em `CHANGELOG.md`. Tag `vX.Y.Z` + Release no GitHub com o APK (nunca no git).
+- Versão do app em `pubspec.yaml` (hoje `1.1.2+4`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.2.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
+  Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
+- Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
+  `terraform apply` + `docker compose up -d --build`) -> APK -> tag -> Release (o usuário faz; `gh` sem login).
+- O APK de arm64 é copiado como `build/app/outputs/flutter-apk/iamp.apk` (é o arquivo que vai para os celulares).
 - Sempre `flutter build apk --release --split-per-abi --dart-define=API_URL=...` (o split soma 1000 × ABI
   ao versionCode; misturar com e sem split parece downgrade). Publicar a API antes do APK; mudanças na
   API só acrescentam campos.
 - Assinatura (`android/app/build.gradle.kts`): com `android/key.properties` usa a chave do projeto;
   sem ele, a chave de teste do PC (aviso no build). Chave e senhas fora do git (`.gitignore` do android/).
+  Chave criada em 09/11/2026 (`C:\Users\mathe\chaves\iamp.jks`, alias `iamp`, `CN=iamp, O=Projeto TCS 2026`;
+  senha aleatória só no `key.properties`, não abrir). Conferir: `apksigner verify --print-certs` e
+  `aapt dump badging` (build-tools 36.0.0 do SDK). Quem instalou o 1º APK (chave de teste) desinstala uma vez.
+- Celular: o `API_URL` fica gravado no APK. Ele aponta para o IP do PC na rede (`ipconfig`/Wi-Fi), que
+  muda a cada rede (FIEP-CONV = 10.164.48.89; outra rede = outro IP) -> trocou de rede, gera o APK de novo.
+  O firewall do Windows já libera o `com.docker.backend.exe`. Redes de instituição (ex.: FIEP-CONV) podem
+  isolar os aparelhos: teste `http://<ip>:8000/saude` no navegador do celular; se não abre, usar o roteador
+  do celular, um túnel (ngrok com domínio fixo, não configurado) ou a API publicada por `infra/oracle/`.
+- iOS: o APK não serve; gerar IPA exige Mac com Xcode (+ conta Apple para instalar) e liberar HTTP no
+  `ios/Runner/Info.plist` (hoje sem exceção do ATS). Sem Mac, a alternativa é a versão web (`flutter build web`,
+  a API já libera CORS) aberta no Safari.
 
 ## Próximas etapas
 
 Documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
-No app: salvar "Minha casa" entre sessões; abrir no celular (Android SDK ainda não conferido; fora da
-rede de casa, apontar o app para a API publicada por `infra/oracle/`).
+No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular (ngrok ou `infra/oracle/`),
+para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
+Nomes dos tipos no filtro da busca ainda usam `legivel` ("refrigerador"); as seções já usam `tituloDaCategoria`.
 BPMN também precisa do `/eco-coach`.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API

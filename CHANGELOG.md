@@ -4,6 +4,14 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## App 1.1.2+4 / API 0.2.0
+
+- Só documentação (README e CLAUDE.md); app e API sem mudanças, o APK 1.1.1 continua valendo.
+- README: passo opcional para subir tudo com Terraform (cuidados no Windows), seção "Instalar no
+  celular" (enviar o APK, atualizar por cima, rede e IP, redes que bloqueiam aparelhos, iPhone) e
+  listas "O que já foi feito" e "Próximas etapas" atualizadas.
+- CLAUDE.md: Terraform testado, roteiro de cada versão, chave do projeto, celular e iOS.
+
 ## App 1.1.1+3 / API 0.2.0
 
 - Busca: trocar o tipo de aparelho atualiza a lista na hora (antes era preciso tocar na lupa de novo).
