@@ -253,8 +253,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (hoje `1.1.2+4`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.2.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
+- Versão do app em `pubspec.yaml` (hoje `1.2.0+5`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.3.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
   Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
   `terraform apply` + `docker compose up -d --build`) -> APK -> tag -> Release (o usuário faz; `gh` sem login).

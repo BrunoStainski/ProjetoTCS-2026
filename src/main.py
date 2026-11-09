@@ -81,7 +81,7 @@ async def ciclo_de_vida(app):
 app = FastAPI(
     title="iamp API",
     description="Estima o consumo e o custo mensal de energia de aparelhos eletricos residenciais.",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=ciclo_de_vida,
 )
 
