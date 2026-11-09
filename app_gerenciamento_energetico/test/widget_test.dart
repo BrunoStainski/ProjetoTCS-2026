@@ -5,6 +5,10 @@ import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
 import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
+import 'package:app_gerenciamento_energetico/telas/busca.dart';
+import 'package:app_gerenciamento_energetico/telas/comum.dart';
+import 'package:app_gerenciamento_energetico/telas/dicas.dart';
+import 'package:app_gerenciamento_energetico/telas/estimar.dart';
 
 Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) => Resultado.fromJson({
   'categoria': categoria,
@@ -119,5 +123,228 @@ void main() {
     );
     expect(troca.paraApi(), c.paraApi());
     expect(troca.aparelho.id, 5);
+  });
+
+  test('resultado aproximado traz a faixa e resultados antigos continuam funcionando', () {
+    final base = resultado('refrigerador', 45.75, 35.14);
+    expect(base.aproximado, isFalse);
+    expect(base.temFaixa, isFalse);
+    final r = Resultado.fromJson({
+      ...{
+        'categoria': 'refrigerador',
+        'marca': 'Consul',
+        'modelo': 'CRM45',
+        'distribuidora': 'COPEL-DIS',
+        'uf': 'PR',
+        'kwh_mes': 45.75,
+        'metodo': 'etiqueta',
+        'tarifa_kwh': 0.768,
+        'origem_tarifa': 'ANEEL',
+        'custo_mes': 35.14,
+        'custo_ano': 421.66,
+        'avisos': <String>[],
+      },
+      'aproximado': true,
+      'kwh_min': 41.55,
+      'kwh_max': 51.92,
+      'custo_min_mes': 31.91,
+      'custo_max_mes': 39.87,
+    });
+    expect(r.aproximado, isTrue);
+    expect(r.temFaixa, isTrue);
+    expect(r.custoMinMes, 31.91);
+  });
+
+  test('consulta estimada manda os dados do aparelho e a tarifa para a rota da estimativa', () {
+    final c = Consulta(
+      const Aparelho(id: 0, categoria: 'refrigerador', marca: 'Consul', modelo: 'CRM45'),
+      estimativa: const Estimativa(rotaGeladeira, {'tipo': 'duplex', 'volume_total_l': 407.0, 'ano_compra': 2014}),
+    )..tarifa = EscolhaTarifa.manual(0.768);
+    expect(c.estimado, isTrue);
+    expect(c.portatil, isFalse);
+    expect(c.corpoDaEstimativa(), {
+      'distribuidora_id': null,
+      'tarifa_manual': 0.768,
+      'horas_dia': null,
+      'ciclos_mes': null,
+      'velocidade': null,
+      'tipo': 'duplex',
+      'volume_total_l': 407.0,
+      'ano_compra': 2014,
+    });
+    expect(c.copiar().estimado, isTrue);
+    expect(c.copiar(aparelho: const Aparelho(id: 3, categoria: 'refrigerador', marca: 'X', modelo: 'Y')).estimado,
+        isFalse);
+  });
+
+  test('total anual da casa usa o valor anual da API (sem diferenca de arredondamento)', () {
+    casa.adicionar(
+      consulta('refrigerador'),
+      Resultado.fromJson({
+        'categoria': 'refrigerador',
+        'marca': 'Consul',
+        'modelo': 'CRM50',
+        'distribuidora': 'COPEL-DIS',
+        'uf': 'PR',
+        'kwh_mes': 32.1,
+        'metodo': 'inmetro',
+        'tarifa_kwh': 0.76802,
+        'origem_tarifa': 'ANEEL',
+        'custo_mes': 24.65,
+        'custo_ano': 295.84,
+        'avisos': <String>[],
+      }),
+    );
+    expect(casa.custoAno, 295.84);
+  });
+
+  Future<List<Resistivo>> resistivosDeTeste() async => [
+    Resistivo.fromJson({'categoria': 'air_fryer', 'nome': 'Air fryer', 'potencia_w': 1500, 'horas_dia': 0.5, 'dias_mes': 15}),
+  ];
+
+  Map<String, dynamic> categoria(String c, String nome, {String? medida, List<String> tipos = const [],
+      bool especial = false, String? etiqueta, bool obrigatoria = false, Map<String, dynamic>? uso}) => {
+    'categoria': c,
+    'nome': nome,
+    'especial': especial,
+    'medida': medida,
+    'tipos': tipos,
+    'etiqueta_rotulo': etiqueta,
+    'etiqueta_obrigatoria': obrigatoria,
+    'uso': uso ?? {'pergunta': null},
+  };
+
+  Future<List<CategoriaEstimavel>> categoriasDeTeste() async => [
+    for (final j in [
+      categoria('refrigerador', 'Geladeira ou freezer', especial: true),
+      categoria('maquina_de_lavar', 'Máquina de lavar', medida: 'Capacidade de lavagem (kg)',
+          tipos: ['Top Load (automatica)'], etiqueta: 'Consumo da etiqueta (kWh por ciclo)',
+          uso: {'pergunta': 'ciclos', 'padrao': 12}),
+      categoria('chuveiro', 'Chuveiro elétrico', etiqueta: 'Potência (W)', obrigatoria: true,
+          uso: {'pergunta': 'horas', 'padrao': null}),
+    ])
+      CategoriaEstimavel.fromJson(j),
+  ];
+
+  Widget telaEstimar() =>
+      MaterialApp(home: TelaEstimar(carregarCategorias: categoriasDeTeste, carregarResistivos: resistivosDeTeste));
+
+  Future<void> escolherAparelho(WidgetTester tester, String nome) async {
+    await tester.tap(find.byType(DropdownButtonFormField<CategoriaEstimavel>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(nome).last);
+    await tester.pumpAndSettle();
+  }
+
+  test('tempo em horas e minutos', () {
+    final t = ControleTempo();
+    expect(t.vazio, isTrue);
+    expect(t.horasDia, isNull);
+    t.definir(0.5);
+    expect(t.horas.text, '0');
+    expect(t.minutos.text, '30');
+    expect(t.horasDia, 0.5);
+    t.minutos.text = '75';
+    expect(t.valido, isFalse);
+    t.horas.text = '1';
+    t.minutos.text = '15';
+    expect(t.horasDia, 1.25);
+    expect(duracao(0.25), '15 min');
+    expect(duracao(4.5), '4 h 30 min');
+    expect(duracao(2), '2 h');
+  });
+
+  void telaAlta(WidgetTester tester) {
+    tester.view.physicalSize = const Size(800, 2000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
+  testWidgets('estimar a geladeira pede a capacidade e o ano antes de continuar', (tester) async {
+    telaAlta(tester);
+    await tester.pumpWidget(telaEstimar());
+    await tester.pumpAndSettle();
+    expect(find.text('Eletro pesado'), findsOneWidget);
+    expect(find.text('Eletroportáteis'), findsOneWidget);
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    expect(find.textContaining('capacidade total em litros'), findsOneWidget);
+
+    await tester.enterText(find.widgetWithText(TextField, 'Capacidade total (litros)'), '407');
+    await tester.enterText(find.widgetWithText(TextField, 'Ano de compra'), '1900');
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    expect(find.textContaining('ano de compra entre 1980'), findsOneWidget);
+  });
+
+  testWidgets('eletroportateis mostram a potencia tipica e o tempo em horas e minutos', (tester) async {
+    telaAlta(tester);
+    await tester.pumpWidget(telaEstimar());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Eletroportáteis'));
+    await tester.pumpAndSettle();
+    expect(find.text('Air fryer'), findsOneWidget);
+    expect(find.text('Típica: 1500 W'), findsOneWidget);
+    expect(find.text('Sugerido: 30 min. Troque pelo seu uso real.'), findsOneWidget);
+    expect(find.text('Minutos'), findsOneWidget);
+  });
+
+  testWidgets('maquina de lavar pede o tipo e a capacidade, ou o valor da etiqueta', (tester) async {
+    telaAlta(tester);
+    await tester.pumpWidget(telaEstimar());
+    await tester.pumpAndSettle();
+    await escolherAparelho(tester, 'Máquina de lavar');
+    expect(find.text('Capacidade de lavagem (kg)'), findsOneWidget);
+    expect(find.text('Lavagens por mês'), findsOneWidget);
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    expect(find.textContaining('ou o valor da etiqueta'), findsWidgets);
+  });
+
+  testWidgets('chuveiro exige a potencia', (tester) async {
+    telaAlta(tester);
+    await tester.pumpWidget(telaEstimar());
+    await tester.pumpAndSettle();
+    await escolherAparelho(tester, 'Chuveiro elétrico');
+    await tester.tap(find.text('Continuar'));
+    await tester.pump();
+    expect(find.text('Preencha o campo "Potência (W)".'), findsOneWidget);
+  });
+
+  testWidgets('chamada da busca abre a tela de estimativa sem preencher a marca', (tester) async {
+    telaAlta(tester);
+    await tester.pumpWidget(const MaterialApp(home: Scaffold(body: ChamadaEstimar())));
+    await tester.tap(find.text('Não achou? Estime o gasto'));
+    await tester.pumpAndSettle();
+    expect(find.text('Estimar o gasto'), findsOneWidget);
+  });
+
+  testWidgets('dicas do eco-coach mostram o texto formatado e as fontes', (tester) async {
+    telaAlta(tester);
+    final r = resultado('air_fryer', 37.5, 28.8);
+    Future<Dicas> falso(Resultado _) async => Dicas.fromJson({
+      'dicas': 'A air fryer custa R\$ 28,80 por mês.\n\n## Como gastar menos\n'
+          '- **Não abra** a cesta toda hora [1].\n2. Use o tempo certo [2].',
+      'fontes': [
+        {'n': 1, 'documento': 'Cartilha', 'orgao': 'Cemig', 'url': 'https://cemig.com.br'},
+        {'n': 2, 'documento': 'Dicas', 'orgao': 'Inmetro', 'url': 'https://gov.br'},
+      ],
+      'aviso': 'Dicas geradas por IA.',
+    });
+    await tester.pumpWidget(MaterialApp(home: TelaDicas(resultado: r, buscarDicas: falso)));
+    await tester.pumpAndSettle();
+    expect(find.text('COMO GASTAR MENOS'), findsOneWidget);
+    expect(find.textContaining('a cesta toda hora [1].', findRichText: true), findsOneWidget);
+    expect(find.textContaining('Use o tempo certo [2].', findRichText: true), findsOneWidget);
+    expect(find.textContaining('[1] Cemig - Cartilha'), findsOneWidget);
+    expect(find.text('Dicas geradas por IA.'), findsOneWidget);
+  });
+
+  testWidgets('dicas mostram o erro quando o eco-coach esta fora do ar', (tester) async {
+    Future<Dicas> fora(Resultado _) async => throw ApiErro('Eco-Coach indisponivel: GEMINI_API_KEY nao configurada');
+    await tester.pumpWidget(MaterialApp(home: TelaDicas(resultado: resultado('air_fryer', 1, 1), buscarDicas: fora)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('GEMINI_API_KEY'), findsOneWidget);
+    expect(find.text('Tentar de novo'), findsOneWidget);
   });
 }

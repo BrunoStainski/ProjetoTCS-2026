@@ -4,6 +4,7 @@ import '../api.dart';
 import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'dicas.dart';
 import 'sugestoes.dart';
 
 /// Passo 4: chama POST /calcular e mostra quanto o aparelho custa.
@@ -27,7 +28,12 @@ class _TelaResultadoState extends State<TelaResultado> {
     _resultado = _calcular();
   }
 
-  Future<Resultado> _calcular() => Api.calcular(widget.consulta.aparelho.id, widget.consulta.paraApi());
+  Future<Resultado> _calcular() {
+    final c = widget.consulta;
+    return c.estimado
+        ? Api.estimar(c.estimativa!.rota, c.corpoDaEstimativa())
+        : Api.calcular(c.aparelho.id, c.paraApi());
+  }
 
   void _adicionar(Resultado r) {
     casa.adicionar(widget.consulta, r);
@@ -84,12 +90,21 @@ class _TelaResultadoState extends State<TelaResultado> {
       children: [
         _DetalhesDoResultado(r),
         const SizedBox(height: Espaco.g),
-        OutlinedButton.icon(
-          onPressed: () =>
-              Navigator.push(context, MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta))),
-          icon: const Icon(Icons.trending_down, color: Cores.verde),
-          label: const Text('Ver modelos mais econômicos'),
-        ),
+        if (!widget.consulta.portatil)
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta, atual: r)),
+            ),
+            icon: const Icon(Icons.trending_down, color: Cores.verde),
+            label: const Text('Ver modelos mais econômicos'),
+          ),
+        if (widget.consulta.portatil)
+          OutlinedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: r))),
+            icon: const Icon(Icons.tips_and_updates_outlined, color: Cores.verde),
+            label: const Text('Como gastar menos (Eco-Coach)'),
+          ),
         const SizedBox(height: Espaco.p),
         TextButton.icon(
           onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
@@ -134,10 +149,13 @@ class _DetalhesDoResultado extends StatelessWidget {
         ),
         const SizedBox(height: Espaco.m),
         CartaoDestaque(
-          titulo: 'Gasto por mês',
+          titulo: r.aproximado ? 'Gasto aproximado por mês' : 'Gasto por mês',
           valor: r.custoMes,
           formatar: reais,
-          rodape: '${reais(r.custoAno)} por ano',
+          rodape: [
+            if (r.temFaixa) 'entre ${reais(r.custoMinMes!)} e ${reais(r.custoMaxMes!)}',
+            '${reais(r.custoAno)} por ano',
+          ].join(' · '),
         ),
         const SizedBox(height: Espaco.p),
         Row(

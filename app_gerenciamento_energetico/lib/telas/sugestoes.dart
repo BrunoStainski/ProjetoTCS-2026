@@ -11,8 +11,9 @@ import 'comum.dart';
 class TelaSugestoes extends StatefulWidget {
   final Consulta consulta;
   final ItemCasa? item;
+  final Resultado? atual;
 
-  const TelaSugestoes({super.key, required this.consulta, this.item});
+  const TelaSugestoes({super.key, required this.consulta, this.item, this.atual});
 
   @override
   State<TelaSugestoes> createState() => _TelaSugestoesState();
@@ -27,11 +28,14 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
     _sugestoes = _buscar();
   }
 
-  Future<Sugestoes> _buscar() => Api.sugestoes(widget.consulta.aparelho.id, widget.consulta.paraApi());
+  Future<Sugestoes> _buscar() => widget.consulta.estimado
+      ? Api.sugestoesEstimado(widget.atual!, widget.consulta.paraApi())
+      : Api.sugestoes(widget.consulta.aparelho.id, widget.consulta.paraApi());
 
   @override
   Widget build(BuildContext context) {
     final aparelho = widget.consulta.aparelho;
+    final nome = widget.atual?.nome ?? aparelho.nome;
     return Pagina(
       titulo: 'Modelos mais econômicos',
       filho: FutureBuilder<Sugestoes>(
@@ -54,7 +58,7 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
               Card(
                 child: ListTile(
                   leading: Icon(iconeDaCategoria(aparelho.categoria)),
-                  title: Text('Seu modelo: ${aparelho.nome}'),
+                  title: Text('Seu aparelho: $nome'),
                   subtitle: Text(
                     '${numero(s.kwhAtual)} kWh/mês - ${reais(s.custoAtual)} por mês',
                     style: Estilos.secundario,
@@ -99,7 +103,8 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => TelaComparar(consulta: widget.consulta, sugerido: sugerido, item: widget.item),
+        builder: (_) =>
+            TelaComparar(consulta: widget.consulta, sugerido: sugerido, item: widget.item, atual: widget.atual),
       ),
     );
   }

@@ -146,11 +146,66 @@ def test_api_resistivo(api_sem_banco):
         "tarifa_manual": 0.768, "registrar": False})
     assert resposta.status_code == 200, resposta.text
     assert resposta.json()["kwh_mes"] == pytest.approx(41.25)
+    assert resposta.json()["marca"] == "Chuveiro elétrico" and resposta.json()["modelo"] == "(estimativa)"
 
 
 def test_api_lista_resistivos(api_sem_banco):
     resposta = api_sem_banco.get("/resistivos")
     assert {r["categoria"] for r in resposta.json()} == set(estimativa.RESISTIVOS)
+
+
+TARIFA = {"tarifa_manual": 0.768, "registrar": False}
+
+
+@pytest.mark.banco
+def test_categorias_estimaveis_cobrem_o_catalogo(api):
+    categorias = {c["categoria"]: c for c in api.get("/estimativa/categorias").json()}
+    assert {"refrigerador", "maquina_de_lavar", "ar_condicionado", "televisor", "chuveiro"} <= set(categorias)
+    assert categorias["maquina_de_lavar"]["tipos"] and categorias["maquina_de_lavar"]["uso"]["pergunta"] == "ciclos"
+    assert categorias["chuveiro"]["etiqueta_obrigatoria"]
+
+
+@pytest.mark.banco
+@pytest.mark.parametrize("corpo", [
+    {"categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)", "medida": 12, "ciclos_mes": 12},
+    {"categoria": "ar_condicionado", "tipo": "Split Hi-Wall", "medida": 12000, "horas_dia": 8},
+    {"categoria": "televisor", "medida": 50},
+    {"categoria": "ventilador_de_teto", "medida": 100, "velocidade": "media"},
+])
+def test_estimativa_por_modelos_parecidos(api, corpo):
+    resposta = api.post("/calcular/estimado", json={**corpo, **TARIFA})
+    assert resposta.status_code == 200, resposta.text
+    r = resposta.json()
+    assert r["aproximado"] and r["kwh_min"] <= r["kwh_mes"] <= r["kwh_max"]
+    assert r["capacidade"] == corpo["medida"]
+
+
+@pytest.mark.banco
+def test_estimativa_com_valor_da_etiqueta_e_exata(api):
+    r = api.post("/calcular/estimado", json={"categoria": "chuveiro", "valor_etiqueta": 5500,
+                                              "horas_dia": 0.25, **TARIFA}).json()
+    assert r["kwh_mes"] == pytest.approx(41.25)
+    assert r["kwh_min"] == r["kwh_max"] and r["detalhe"] == "5500 W"
+
+
+@pytest.mark.banco
+def test_estimativa_sem_medida_nem_etiqueta_e_rejeitada(api):
+    assert api.post("/calcular/estimado", json={"categoria": "televisor", **TARIFA}).status_code == 422
+
+
+@pytest.mark.banco
+def test_geladeira_estimada_recebe_sugestoes_e_compara(api):
+    g = api.post("/calcular/refrigerador-antigo", json={
+        "tipo": "duplex", "frost_free": True, "volume_total_l": 407, "volume_congelador_l": 90,
+        "ano_compra": 2014, "kwh_etiqueta": CRM45_ETIQUETA, **TARIFA}).json()
+    s = api.post("/sugestoes/estimado", json={"categoria": "refrigerador", "capacidade": g["capacidade"],
+                                               "tipo": g["tipo"], "kwh_mes": g["kwh_mes"], "tarifa_manual": 0.768}).json()
+    assert s["sugestoes"] and all(x["kwh_mes"] < g["kwh_mes"] for x in s["sugestoes"])
+    c = api.post("/comparar/estimado", json={"categoria": "refrigerador", "kwh_mes": g["kwh_mes"],
+                                              "alternativa_id": s["sugestoes"][0]["id"], "preco_novo": 3500,
+                                              "tarifa_manual": 0.768}).json()
+    assert c["economia_mes"] == pytest.approx(s["sugestoes"][0]["economia_mes"], abs=0.02)
+    assert c["payback"]["meses"] > 0
 
 
 def test_api_exige_uma_tarifa(api_sem_banco):

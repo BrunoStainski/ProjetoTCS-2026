@@ -12,6 +12,7 @@ import pandas as pd
 
 import config
 import estimativa
+from estimativa import tempo_por_dia
 
 DIAS_MES = 30
 LIMITE_BUSCA = 15
@@ -70,6 +71,33 @@ EQUIVALENCIA = {
     "bomba": {"categorias": ["bomba"], "medida": "capacidade", "tolerancia": 0.0, "mesmo_tipo": False,
               "texto": "motor de mesma potencia (cv); confira vazao e altura com o fabricante"},
 }
+ESTIMAVEIS = {
+    "refrigerador": {"nome": "Geladeira ou freezer", "especial": True},
+    "maquina_de_lavar": {"nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)",
+                         "etiqueta": ("kwh_ciclo", "Consumo da etiqueta (kWh por ciclo)")},
+    "ar_condicionado": {"nome": "Ar-condicionado", "medida": "Capacidade (BTU/h)",
+                        "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "televisor": {"nome": "Televisor", "medida": "Tamanho da tela (polegadas)",
+                  "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "ventilador_de_mesa": {"nome": "Ventilador de mesa, coluna ou parede", "medida": "Diâmetro da hélice (cm)",
+                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "ventilador_de_teto": {"nome": "Ventilador de teto", "medida": "Diâmetro (cm)",
+                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "microondas": {"nome": "Micro-ondas", "medida": "Capacidade (litros)",
+                   "etiqueta": ("potencia_w", "Potência (W)")},
+    "bomba": {"nome": "Bomba d'água", "medida": "Potência do motor (cv)",
+              "etiqueta": ("potencia_w", "Potência elétrica (W)")},
+    "chuveiro": {"nome": "Chuveiro elétrico", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_led": {"nome": "Lâmpada LED", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_fluorescente": {"nome": "Lâmpada fluorescente", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_vapor_sodio": {"nome": "Lâmpada de vapor de sódio", "etiqueta": ("potencia_w", "Potência (W)")},
+}
+TOLERANCIA_ESTIMATIVA = 0.10
+AMPLIACOES_ESTIMATIVA = (1, 2, 4)
+MINIMO_EQUIVALENTES = 5
+AVISO_EQUIVALENTES = ("Gasto aproximado pelos modelos atuais parecidos do catalogo do Inmetro. Aparelhos antigos "
+                      "costumam gastar mais que os atuais; com o valor da etiqueta o calculo fica exato.")
+
 # Onde nao sugerimos troca, e o motivo (aparece no app).
 SEM_SUGESTAO = {
     "chuveiro": ("Chuveiros eletricos tem eficiencia parecida: um modelo de menor potencia so esquenta "
@@ -303,14 +331,14 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
         if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
             return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
                     "metodo": (f"{aparelho['potencia_w']:g} W (potencia do Inmetro a 35 C, carga total) x "
-                               f"{horas_dia:g} h/dia x {dias} dias (informado); valor maximo, "
+                               f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor maximo, "
                                "o compressor nao fica ligado o tempo todo"),
                     "premissa": False}
         referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
         if referencia and pd.notna(aparelho["kwh_mes"]):
             return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
                     "metodo": (f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
-                               f"ajustado para {horas_dia:g} h/dia (informado)"),
+                               f"ajustado para {tempo_por_dia(horas_dia)} (informado)"),
                     "premissa": False}
 
     if pd.notna(aparelho["kwh_mes"]):
@@ -339,7 +367,7 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
         standby = aparelho.get("standby_kwh_mes")
         standby = 0.0 if pd.isna(standby) else float(standby)
         origem = "informado" if horas_dia is not None else "estimativa do grupo"
-        metodo = f"{aparelho['potencia_w']:g} W x {horas:g} h/dia x {dias} dias ({origem})"
+        metodo = f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} dias ({origem})"
         if standby:
             metodo += f" + {standby:.2f} kWh de stand-by"
         return {"kwh_mes": float(aparelho["potencia_w"]) * horas * dias / 1000 + standby,

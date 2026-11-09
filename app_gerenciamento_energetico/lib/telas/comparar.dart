@@ -11,8 +11,9 @@ class TelaComparar extends StatefulWidget {
   final Consulta consulta;
   final AparelhoSugerido sugerido;
   final ItemCasa? item;
+  final Resultado? atual;
 
-  const TelaComparar({super.key, required this.consulta, required this.sugerido, this.item});
+  const TelaComparar({super.key, required this.consulta, required this.sugerido, this.item, this.atual});
 
   @override
   State<TelaComparar> createState() => _TelaCompararState();
@@ -37,12 +38,14 @@ class _TelaCompararState extends State<TelaComparar> {
     super.dispose();
   }
 
-  Future<Comparacao> _comparar({double? preco}) => Api.comparar(
-    widget.consulta.aparelho.id,
-    widget.sugerido.aparelho.id,
-    widget.consulta.paraApi(),
-    precoNovo: preco,
-  );
+  Future<Comparacao> _comparar({double? preco}) => widget.consulta.estimado
+      ? Api.compararEstimado(widget.atual!, widget.sugerido.aparelho.id, widget.consulta.paraApi(), precoNovo: preco)
+      : Api.comparar(
+          widget.consulta.aparelho.id,
+          widget.sugerido.aparelho.id,
+          widget.consulta.paraApi(),
+          precoNovo: preco,
+        );
 
   Future<void> _calcularPayback() async {
     final preco = lerNumero(_preco.text);

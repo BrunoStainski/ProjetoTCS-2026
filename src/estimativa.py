@@ -39,7 +39,7 @@ TIPOS = {
 RESISTIVOS = {
     "air_fryer": {"nome": "Air fryer", "potencia_w": 1500, "horas_dia": 0.5, "dias_mes": 15},
     "secador_cabelo": {"nome": "Secador de cabelo", "potencia_w": 2000, "horas_dia": 0.25, "dias_mes": 20},
-    "chuveiro": {"nome": "Chuveiro eletrico", "potencia_w": 5500, "horas_dia": 0.25, "dias_mes": 30},
+    "chuveiro": {"nome": "Chuveiro elétrico", "potencia_w": 5500, "horas_dia": 0.25, "dias_mes": 30},
     "ferro_passar": {"nome": "Ferro de passar", "potencia_w": 1200, "horas_dia": 1.0, "dias_mes": 8},
     "sanduicheira": {"nome": "Sanduicheira", "potencia_w": 800, "horas_dia": 0.25, "dias_mes": 8},
 }
@@ -78,6 +78,13 @@ def volume_ajustado_2006(volume_refrigerador, congelador_por_estrelas, frost_fre
 def consumo_padrao_2006(categoria, volume_ajustado):
     a, b = RETAS_2006[categoria]
     return a * volume_ajustado + b
+
+
+def tempo_por_dia(horas):
+    total = round(horas * 60)
+    h, m = divmod(total, 60)
+    texto = f"{m} min" if h == 0 else (f"{h} h" if m == 0 else f"{h} h {m} min")
+    return f"{texto}/dia"
 
 
 def fator_idade(idade):
@@ -206,6 +213,9 @@ def consumo_refrigerador_estimado(tipo, frost_free, volume_total_l, ano_compra, 
     return {
         **calculo,
         "categoria": "refrigerador",
+        "nome": info["nome"].capitalize(),
+        "tipo": info["tipo_inmetro"],
+        "capacidade": float(volume_total_l),
         "detalhe": descricao,
         "idade_anos": idade,
         "fator_idade": fi,
@@ -232,9 +242,10 @@ def consumo_resistivo(categoria, potencia_w=None, horas_dia=None, dias_mes=None)
 
     return {
         "kwh_mes": potencia / 1000 * horas * dias,
-        "metodo": (f"{potencia:g} W ({_origem(potencia_w)}) / 1000 x {horas:g} h/dia ({_origem(horas_dia)}) "
+        "metodo": (f"{potencia:g} W ({_origem(potencia_w)}) / 1000 x {tempo_por_dia(horas)} ({_origem(horas_dia)}) "
                    f"x {dias:g} dias ({_origem(dias_mes)})"),
         "categoria": categoria,
+        "nome": padrao["nome"],
         "detalhe": f"{padrao['nome']}, {potencia:g} W",
         "horas_dia": horas,
         "premissa": horas_dia is None or dias_mes is None,

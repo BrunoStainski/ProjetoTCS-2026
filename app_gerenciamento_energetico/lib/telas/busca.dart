@@ -4,6 +4,7 @@ import '../api.dart';
 import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'estimar.dart';
 import 'uso.dart';
 
 /// Passo 1: o usuario busca o aparelho pela marca e/ou modelo.
@@ -107,8 +108,11 @@ class _TelaBuscaState extends State<TelaBusca> {
           const SizedBox(height: 16),
           if (_carregando) const Center(child: CircularProgressIndicator()),
           if (_erro != null) MensagemErro(_erro!),
-          if (!_carregando && _resultados != null && _resultados!.isEmpty)
+          if (!_carregando && _resultados != null && _resultados!.isEmpty) ...[
             const Text('Nenhum aparelho encontrado. Tente só a marca ou parte do modelo.'),
+            const SizedBox(height: Espaco.m),
+            const ChamadaEstimar(),
+          ],
           if (!_carregando && _resultados != null && _resultados!.isNotEmpty)
             Expanded(
               child: ListView.separated(
@@ -130,6 +134,27 @@ class _TelaBuscaState extends State<TelaBusca> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class ChamadaEstimar extends StatelessWidget {
+  const ChamadaEstimar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Cores.amareloEscuro,
+      child: ListTile(
+        leading: const Icon(Icons.calculate_outlined, color: Cores.amarelo),
+        title: const Text('Não achou? Estime o gasto', style: Estilos.forte),
+        subtitle: const Text(
+          'Eletro pesado mais antigo (geladeira, máquina de lavar, ar...) ou eletroportáteis como air fryer e secador.',
+          style: Estilos.secundario,
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
       ),
     );
   }

@@ -4,6 +4,7 @@ import '../api.dart';
 import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'dicas.dart';
 import 'sugestoes.dart';
 
 /// "Minha casa": soma os aparelhos calculados, mostra o que mais pesa na conta
@@ -222,18 +223,24 @@ class _CartaoItem extends StatelessWidget {
                   icon: const Icon(Icons.more_vert, color: Cores.amarelo),
                   onSelected: (opcao) {
                     if (opcao == 'remover') casa.remover(item);
+                    if (opcao == 'dicas') {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: item.resultado)));
+                    }
                     if (opcao == 'economicos') {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => TelaSugestoes(consulta: item.consulta, item: item),
+                          builder: (_) => TelaSugestoes(consulta: item.consulta, item: item, atual: item.resultado),
                         ),
                       );
                     }
                   },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'economicos', child: Text('Ver modelos mais econômicos')),
-                    PopupMenuItem(value: 'remover', child: Text('Remover da casa')),
+                  itemBuilder: (_) => [
+                    if (!item.consulta.portatil)
+                      const PopupMenuItem(value: 'economicos', child: Text('Ver modelos mais econômicos')),
+                    if (item.consulta.portatil)
+                      const PopupMenuItem(value: 'dicas', child: Text('Como gastar menos (Eco-Coach)')),
+                    const PopupMenuItem(value: 'remover', child: Text('Remover da casa')),
                   ],
                 ),
               ],

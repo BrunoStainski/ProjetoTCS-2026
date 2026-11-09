@@ -116,3 +116,38 @@ def test_api_eco_coach_llm_fora_do_ar_da_503(api, base_rag, monkeypatch):
 @pytest.mark.banco
 def test_api_eco_coach_entrada_invalida(api):
     assert api.post("/eco-coach", json={"moradores": 2, "itens": []}).status_code == 422
+
+
+AIR_FRYER = {"categoria": "air_fryer", "nome": "Air fryer", "kwh_mes": 37.5, "custo_mes": 28.8,
+             "metodo": "2000 W (informado) / 1000 x 45 min/dia (informado) x 25 dias (informado)"}
+
+
+def test_prompt_das_dicas_leva_os_numeros_do_aparelho():
+    fontes = [{"orgao": "Cemig", "documento": "Cartilha", "secao": "Cozinha", "texto": "Evite abrir a porta."}]
+    prompt = rag_agent.montar_prompt_dicas(AIR_FRYER, fontes)
+    assert "air fryer" in prompt and "37,50 kWh/mês" in prompt and "R$ 28,80/mês" in prompt
+    assert "45 min/dia" in prompt and "[1] Cemig - Cartilha (Cozinha)" in prompt
+    assert "não invente números" in prompt
+
+
+@pytest.mark.banco
+def test_dicas_do_aparelho_citam_so_fontes_que_existem(base_rag, llm_falso):
+    r = rag_agent.gerar_dicas_do_aparelho(base_rag, AIR_FRYER)
+    assert r["modelo"] == "llm-falso"
+    assert [f["n"] for f in r["fontes"]] == [1, 2, 3]
+    assert "37,50 kWh/mês" in llm_falso[0]
+
+
+@pytest.mark.banco
+def test_api_dicas_do_aparelho(api, base_rag, llm_falso):
+    resposta = api.post("/eco-coach/aparelho", json=AIR_FRYER)
+    assert resposta.status_code == 200, resposta.text
+    assert resposta.json()["dicas"].startswith("Diagnostico")
+
+
+@pytest.mark.banco
+def test_api_dicas_sem_llm_da_503(api, base_rag, monkeypatch):
+    def fora(prompt):
+        raise RuntimeError("GEMINI_API_KEY nao configurada no .env")
+    monkeypatch.setattr(rag_agent, "chamar_llm", fora)
+    assert api.post("/eco-coach/aparelho", json=AIR_FRYER).status_code == 503
