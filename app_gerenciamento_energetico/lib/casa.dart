@@ -27,24 +27,42 @@ class EscolhaTarifa {
   Map<String, dynamic> paraApi() => {'distribuidora_id': distribuidoraId, 'tarifa_manual': tarifaManual};
 }
 
+const rotaGeladeira = '/calcular/refrigerador-antigo';
+const rotaEstimado = '/calcular/estimado';
+const rotaResistivo = '/calcular/resistivo';
+
+class Estimativa {
+  final String rota;
+  final Map<String, dynamic> dados;
+
+  const Estimativa(this.rota, this.dados);
+}
+
 /// O que o usuario ja escolheu ao longo das telas.
 class Consulta {
   final Aparelho aparelho;
+  final Estimativa? estimativa;
   double? horasDia;
   double? ciclosMes;
   String? velocidade;
   EscolhaTarifa? tarifa;
 
-  Consulta(this.aparelho, {this.horasDia, this.ciclosMes, this.velocidade, this.tarifa});
+  Consulta(this.aparelho, {this.estimativa, this.horasDia, this.ciclosMes, this.velocidade, this.tarifa});
+
+  bool get estimado => estimativa != null;
+  bool get portatil => estimativa?.rota == rotaResistivo;
 
   /// Mesmo uso e mesma tarifa, opcionalmente com outro aparelho (troca por um mais economico).
   Consulta copiar({Aparelho? aparelho}) => Consulta(
     aparelho ?? this.aparelho,
+    estimativa: aparelho == null ? estimativa : null,
     horasDia: horasDia,
     ciclosMes: ciclosMes,
     velocidade: velocidade,
     tarifa: tarifa,
   );
+
+  Map<String, dynamic> corpoDaEstimativa() => {...paraApi(), ...estimativa!.dados};
 
   /// Corpo comum de /calcular, /sugestoes e /comparar.
   Map<String, dynamic> paraApi() => {
@@ -65,6 +83,7 @@ class ItemCasa {
 
   double get kwhMes => resultado.kwhMes * quantidade;
   double get custoMes => resultado.custoMes * quantidade;
+  double get custoAno => resultado.custoAno * quantidade;
 }
 
 class Casa extends ChangeNotifier {
@@ -90,7 +109,7 @@ class Casa extends ChangeNotifier {
   int get totalAparelhos => _itens.fold(0, (soma, i) => soma + i.quantidade);
   double get kwhMes => _itens.fold(0.0, (soma, i) => soma + i.kwhMes);
   double get custoMes => _itens.fold(0.0, (soma, i) => soma + i.custoMes);
-  double get custoAno => custoMes * 12;
+  double get custoAno => _itens.fold(0.0, (soma, i) => soma + i.custoAno);
 
   /// Do que mais pesa na conta para o que menos pesa.
   List<ItemCasa> get porCusto => [..._itens]..sort((a, b) => b.custoMes.compareTo(a.custoMes));

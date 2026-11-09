@@ -43,6 +43,58 @@ def carregar_aparelhos(con):
     return len(catalogo)
 
 
+PORTATEIS_CSV = config.DADOS / "eletroportateis.csv"
+FOGOES_CSV = config.DADOS / "fogoes_fornos_gas_limpo.csv"
+PRECO_GLP_CSV = config.DADOS / "preco_glp_uf_limpo.csv"
+COLUNAS_FOGOES = {
+    "marca": "marca", "modelo": "modelo", "tipo_de_produto": "tipo", "numerode_bocas": "bocas",
+    "rendimento_medio_dos_queimadores_pct": "rendimento_pct", "volume_do_forno_litros": "forno_litros",
+    "consumo_do_forno_glpkg_h_gnm3_h": "consumo_forno_kg_h", "classificacao_pbe_mesa_de_coccao": "classe_mesa",
+    "classificacao_pbe_forno": "classe_forno",
+}
+
+
+def _registrar_carga(con, arquivo, linhas):
+    banco.executar(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (arquivo, int(linhas)))
+
+
+def carregar_portateis(con):
+    df = pd.read_csv(PORTATEIS_CSV, encoding="utf-8-sig")
+    df[["categoria", "nome", "potencia_w", "horas_dia", "dias_mes", "fonte"]].to_sql(
+        "portateis", con, if_exists="append", index=False)
+    _registrar_carga(con, PORTATEIS_CSV.name, len(df))
+    return len(df)
+
+
+def carregar_fogoes(con):
+    df = pd.read_csv(FOGOES_CSV, encoding="utf-8-sig")
+    df = df[[c for c in COLUNAS_FOGOES if c in df.columns]].rename(columns=COLUNAS_FOGOES)
+    df["marca"] = df["marca"].astype(str).str.strip()
+    df["modelo"] = df["modelo"].astype(str).str.strip()
+    df = df[(df["marca"] != "") & (df["modelo"] != "")].drop_duplicates(subset=["marca", "modelo"])
+    df["bocas"] = pd.to_numeric(df["bocas"], errors="coerce").round().astype("Int64")
+    df["detalhe"] = [
+        ", ".join(p for p in (f"{b} bocas" if pd.notna(b) else "", f"forno {f:g} L" if pd.notna(f) else "") if p)
+        for b, f in zip(df["bocas"], df["forno_litros"])
+    ]
+    df["busca"] = (df["marca"] + " " + df["modelo"]).map(normalizar)
+    df.to_sql("fogoes", con, if_exists="append", index=False)
+    _registrar_carga(con, FOGOES_CSV.name, len(df))
+    return len(df)
+
+
+def carregar_precos_glp(con):
+    df = pd.read_csv(PRECO_GLP_CSV, encoding="utf-8-sig")
+    df[["uf", "ano", "preco_kg", "fonte"]].to_sql("precos_glp", con, if_exists="append", index=False)
+    _registrar_carga(con, PRECO_GLP_CSV.name, len(df))
+    return len(df)
+
+
+def carregar_dados_extras(con):
+    return {"portateis": carregar_portateis(con), "fogoes": carregar_fogoes(con),
+            "precos_glp": carregar_precos_glp(con)}
+
+
 def _texto(valor):
     return str(valor).strip() if pd.notna(valor) and str(valor).strip() else None
 
@@ -137,6 +189,7 @@ def main():
         con.exec_driver_sql(ESQUEMA)
         n_aparelhos = carregar_aparelhos(con)
         n_dist, n_tarifas = carregar_distribuidoras_e_tarifas(con)
+        extras = carregar_dados_extras(con)
         con.commit()
     except Exception:
         con.rollback()
@@ -153,6 +206,9 @@ def main():
     print(f"  distribuidoras: {n_dist} ({sem_uf} sem UF, {com_tarifa} com tarifa vigente)")
     print(f"  tarifas:        {n_tarifas} (incluindo vigencias antigas)")
     print(f"  consultas:      {n_consultas} (historico mantido)")
+    print(f"  portateis:      {extras['portateis']}")
+    print(f"  fogoes a gas:   {extras['fogoes']}")
+    print(f"  precos do GLP:  {extras['precos_glp']} (UF x ano)")
 
     if args.exemplos:
         rodar_exemplos(con)

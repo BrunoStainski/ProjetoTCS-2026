@@ -8,6 +8,7 @@ app_gerenciamento_energetico
 datasets/raw
 models/*
 !models/kmeans.pkl
+!models/refrigerador.pkl
 docs
 infra
 prompts

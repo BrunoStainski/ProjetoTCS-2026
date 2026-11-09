@@ -109,6 +109,13 @@ class Resultado {
   final double custoMes;
   final double custoAno;
   final List<String> avisos;
+  final bool aproximado;
+  final double? kwhMin;
+  final double? kwhMax;
+  final double? custoMinMes;
+  final double? custoMaxMes;
+  final String? tipo;
+  final double? capacidade;
 
   Resultado.fromJson(Map<String, dynamic> j)
     : categoria = j['categoria'],
@@ -123,9 +130,116 @@ class Resultado {
       origemTarifa = j['origem_tarifa'],
       custoMes = _real(j['custo_mes']),
       custoAno = _real(j['custo_ano']),
-      avisos = List<String>.from(j['avisos'] ?? const []);
+      avisos = List<String>.from(j['avisos'] ?? const []),
+      aproximado = j['aproximado'] ?? false,
+      kwhMin = _realOuNulo(j['kwh_min']),
+      kwhMax = _realOuNulo(j['kwh_max']),
+      custoMinMes = _realOuNulo(j['custo_min_mes']),
+      custoMaxMes = _realOuNulo(j['custo_max_mes']),
+      tipo = j['tipo'],
+      capacidade = _realOuNulo(j['capacidade']);
 
   String get nome => '$marca $modelo';
+  bool get temFaixa => custoMinMes != null && custoMaxMes != null && custoMaxMes! > custoMinMes!;
+}
+
+class CategoriaEstimavel {
+  final String categoria;
+  final String nome;
+  final bool especial;
+  final String? medida;
+  final List<String> tipos;
+  final String? etiquetaRotulo;
+  final bool etiquetaObrigatoria;
+  final PerguntaDeUso uso;
+
+  CategoriaEstimavel.fromJson(Map<String, dynamic> j)
+    : categoria = j['categoria'],
+      nome = j['nome'],
+      especial = j['especial'] ?? false,
+      medida = j['medida'],
+      tipos = List<String>.from(j['tipos'] ?? const []),
+      etiquetaRotulo = j['etiqueta_rotulo'],
+      etiquetaObrigatoria = j['etiqueta_obrigatoria'] ?? false,
+      uso = PerguntaDeUso.fromJson(j['uso']);
+}
+
+class Fogao {
+  final int id;
+  final String marca;
+  final String modelo;
+  final String detalhe;
+
+  Fogao.fromJson(Map<String, dynamic> j)
+    : id = j['id'],
+      marca = j['marca'],
+      modelo = j['modelo'],
+      detalhe = j['detalhe'] ?? '';
+
+  String get nome => '$marca $modelo';
+}
+
+class PrecoGlp {
+  final String uf;
+  final int ano;
+  final double precoKg;
+
+  PrecoGlp.fromJson(Map<String, dynamic> j) : uf = j['uf'], ano = j['ano'], precoKg = _real(j['preco_kg']);
+
+  double get precoBotijao => precoKg * 13;
+}
+
+class ResultadoGas {
+  final String nome;
+  final String detalhe;
+  final double kgMes;
+  final double botijoesMes;
+  final int? diasPorBotijao;
+  final double precoBotijao;
+  final String origemPreco;
+  final double custoMes;
+  final double custoAno;
+  final String metodo;
+  final List<String> avisos;
+
+  ResultadoGas.fromJson(Map<String, dynamic> j)
+    : nome = '${j['marca']} ${j['modelo']}',
+      detalhe = j['detalhe'] ?? '',
+      kgMes = _real(j['kg_mes']),
+      botijoesMes = _real(j['botijoes_mes']),
+      diasPorBotijao = j['dias_por_botijao'],
+      precoBotijao = _real(j['preco_botijao']),
+      origemPreco = j['origem_preco'],
+      custoMes = _real(j['custo_mes']),
+      custoAno = _real(j['custo_ano']),
+      metodo = j['metodo'],
+      avisos = List<String>.from(j['avisos'] ?? const []);
+}
+
+class Dicas {
+  final String texto;
+  final List<FonteCitada> fontes;
+  final String aviso;
+
+  Dicas.fromJson(Map<String, dynamic> j)
+    : texto = j['dicas'],
+      fontes = [for (final f in j['fontes']) FonteCitada.fromJson(f)],
+      aviso = j['aviso'];
+}
+
+class Resistivo {
+  final String categoria;
+  final String nome;
+  final double potenciaW;
+  final double horasDia;
+  final double diasMes;
+
+  Resistivo.fromJson(Map<String, dynamic> j)
+    : categoria = j['categoria'],
+      nome = j['nome'],
+      potenciaW = _real(j['potencia_w']),
+      horasDia = _real(j['horas_dia']),
+      diasMes = _real(j['dias_mes']);
 }
 
 /// Um modelo mais economico que faz o mesmo servico (POST /sugestoes).
@@ -283,6 +397,59 @@ class Api {
   static Future<Resultado> calcular(int aparelhoId, Map<String, dynamic> usoETarifa) async =>
       Resultado.fromJson(await _post('/calcular', {'aparelho_id': aparelhoId, ...usoETarifa}));
 
+  static Future<Resultado> estimar(String rota, Map<String, dynamic> corpo) async =>
+      Resultado.fromJson(await _post(rota, corpo));
+
+  static Future<List<Resistivo>> resistivos() async =>
+      [for (final j in await _get('/resistivos')) Resistivo.fromJson(j)];
+
+  static Future<Dicas> dicas(Resultado r) async => Dicas.fromJson(
+    await _post('/eco-coach/aparelho', {
+      'categoria': r.categoria,
+      'nome': r.nome,
+      'kwh_mes': r.kwhMes,
+      'custo_mes': r.custoMes,
+      'metodo': r.metodo,
+    }, limite: const Duration(seconds: 60)),
+  );
+
+  static Future<List<Fogao>> fogoes(String busca) async =>
+      [for (final j in await _get('/fogoes', {'busca': busca})) Fogao.fromJson(j)];
+
+  static Future<List<PrecoGlp>> precosGlp() async =>
+      [for (final j in await _get('/gas/precos')) PrecoGlp.fromJson(j)];
+
+  static Future<ResultadoGas> calcularGas(Map<String, dynamic> corpo) async =>
+      ResultadoGas.fromJson(await _post('/calcular/gas', corpo));
+
+  static Future<List<CategoriaEstimavel>> categoriasEstimaveis() async =>
+      [for (final j in await _get('/estimativa/categorias')) CategoriaEstimavel.fromJson(j)];
+
+  static Map<String, dynamic> _atualEstimado(Resultado atual) => {
+    'categoria': atual.categoria,
+    'capacidade': atual.capacidade,
+    'tipo': atual.tipo,
+    'kwh_mes': atual.kwhMes,
+    'nome': atual.nome,
+  };
+
+  static Future<Sugestoes> sugestoesEstimado(Resultado atual, Map<String, dynamic> usoETarifa) async =>
+      Sugestoes.fromJson(await _post('/sugestoes/estimado', {..._atualEstimado(atual), ...usoETarifa}));
+
+  static Future<Comparacao> compararEstimado(
+    Resultado atual,
+    int alternativaId,
+    Map<String, dynamic> usoETarifa, {
+    double? precoNovo,
+  }) async => Comparacao.fromJson(
+    await _post('/comparar/estimado', {
+      ..._atualEstimado(atual)..remove('capacidade')..remove('tipo'),
+      'alternativa_id': alternativaId,
+      'preco_novo': precoNovo,
+      ...usoETarifa,
+    }),
+  );
+
   static Future<Sugestoes> sugestoes(int aparelhoId, Map<String, dynamic> usoETarifa) async =>
       Sugestoes.fromJson(await _post('/sugestoes', {'aparelho_id': aparelhoId, ...usoETarifa}));
 
@@ -397,6 +564,14 @@ String reais(double valor, {int casas = 2}) {
   final partes = valor.abs().toStringAsFixed(casas).split('.');
   final inteiro = partes[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
   return '${negativo ? '-' : ''}R\$ $inteiro${casas > 0 ? ',${partes[1]}' : ''}';
+}
+
+String duracao(double horas) {
+  final total = (horas * 60).round();
+  final h = total ~/ 60;
+  final m = total % 60;
+  if (h == 0) return '$m min';
+  return m == 0 ? '$h h' : '$h h $m min';
 }
 
 /// 41.25 -> "41,25"

@@ -20,6 +20,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 
 import banco
+import estimativa
 import ml_pipeline
 import rag_agent
 import servico
@@ -39,7 +40,10 @@ def esperar_banco(tentativas=30, pausa=2):
 
 def banco_carregado(con):
     sql = ("SELECT to_regclass('public.aparelhos') IS NOT NULL "
-           "AND to_regclass('public.vw_tarifa_vigente') IS NOT NULL")
+           "AND to_regclass('public.vw_tarifa_vigente') IS NOT NULL "
+           "AND to_regclass('public.portateis') IS NOT NULL "
+           "AND to_regclass('public.fogoes') IS NOT NULL "
+           "AND to_regclass('public.precos_glp') IS NOT NULL")
     if not banco.executar(con, sql).scalar_one():
         return False
     # banco criado por uma versao antiga do codigo (falta coluna nova): recarrega
@@ -52,11 +56,12 @@ def banco_carregado(con):
 
 
 def carregar_dados(con):
-    from criar_banco import carregar_aparelhos, carregar_distribuidoras_e_tarifas
+    from criar_banco import carregar_aparelhos, carregar_dados_extras, carregar_distribuidoras_e_tarifas
 
     con.exec_driver_sql(banco.ESQUEMA)
     aparelhos = carregar_aparelhos(con)
     distribuidoras, tarifas = carregar_distribuidoras_e_tarifas(con)
+    carregar_dados_extras(con)
     con.commit()
     print(f"dados carregados: {aparelhos} aparelhos, {distribuidoras} distribuidoras, {tarifas} tarifas", flush=True)
 
@@ -118,19 +123,25 @@ class Distribuidora(BaseModel):
     fonte: Optional[str] = None
 
 
-class UsoETarifa(BaseModel):
-    """Campos comuns: como o aparelho e usado e qual tarifa vale."""
+class Tarifa(BaseModel):
     distribuidora_id: Optional[int] = Field(None, description="Id vindo de GET /distribuidoras.")
     tarifa_manual: Optional[float] = Field(None, gt=0, description="R$/kWh da conta de luz do usuario.")
-    horas_dia: Optional[float] = Field(None, ge=0, le=24)
-    ciclos_mes: Optional[float] = Field(None, ge=0)
-    velocidade: Optional[Literal["baixa", "media", "alta"]] = None
 
     @model_validator(mode="after")
     def exigir_uma_tarifa(self):
         if (self.distribuidora_id is None) == (self.tarifa_manual is None):
             raise ValueError("informe distribuidora_id ou tarifa_manual (apenas um dos dois)")
         return self
+
+    def tarifa(self):
+        return self.model_dump(include={"distribuidora_id", "tarifa_manual"})
+
+
+class UsoETarifa(Tarifa):
+    """Campos comuns: como o aparelho e usado e qual tarifa vale."""
+    horas_dia: Optional[float] = Field(None, ge=0, le=24)
+    ciclos_mes: Optional[float] = Field(None, ge=0)
+    velocidade: Optional[Literal["baixa", "media", "alta"]] = None
 
     def uso_e_tarifa(self):
         return self.model_dump(include={"distribuidora_id", "tarifa_manual", "horas_dia", "ciclos_mes", "velocidade"})
@@ -166,6 +177,128 @@ class Resultado(BaseModel):
     origem_tarifa: str
     custo_mes: float
     custo_ano: float
+    avisos: list[str]
+    fonte_dados: str
+    aproximado: bool = Field(False, description="true = gasto aproximado (modelo fora do catalogo ou valor padrao).")
+    kwh_min: Optional[float] = Field(None, description="Faixa da estimativa, quando aproximada.")
+    kwh_max: Optional[float] = None
+    custo_min_mes: Optional[float] = None
+    custo_max_mes: Optional[float] = None
+    tipo: Optional[str] = Field(None, description="Tipo do Inmetro do aparelho estimado (para sugerir equivalentes).")
+    capacidade: Optional[float] = Field(None, description="Medida do aparelho estimado (L, kg, BTU/h, pol, cm, W ou cv).")
+
+
+class EstimadoEntrada(UsoETarifa):
+    categoria: str = Field(..., description="Categoria de GET /estimativa/categorias (menos refrigerador).")
+    tipo: Optional[str] = None
+    medida: Optional[float] = Field(None, gt=0, description="Tamanho do aparelho na unidade da categoria.")
+    valor_etiqueta: Optional[float] = Field(None, gt=0, description="kWh/mes, kWh por ciclo ou W, conforme a categoria.")
+    marca: Optional[str] = Field(None, max_length=60)
+    modelo: Optional[str] = Field(None, max_length=60)
+    registrar: bool = True
+
+
+class CategoriaEstimavel(BaseModel):
+    categoria: str
+    nome: str
+    especial: bool
+    medida: Optional[str] = None
+    tipos: list[str]
+    etiqueta_campo: Optional[str] = None
+    etiqueta_rotulo: Optional[str] = None
+    etiqueta_obrigatoria: bool
+    uso: PerguntaDeUso
+
+
+class SugestaoEstimadaEntrada(UsoETarifa):
+    categoria: str
+    capacidade: Optional[float] = Field(None, gt=0)
+    kwh_mes: float = Field(..., gt=0, description="kwh_mes do resultado da estimativa.")
+    tipo: Optional[str] = None
+    nome: Optional[str] = Field(None, max_length=120)
+    limite: int = Field(5, ge=1, le=10)
+
+
+class ComparacaoEstimadaEntrada(UsoETarifa):
+    categoria: str
+    kwh_mes: float = Field(..., gt=0, description="kwh_mes do resultado da estimativa.")
+    alternativa_id: int
+    nome: Optional[str] = Field(None, max_length=120)
+    preco_novo: Optional[float] = Field(None, gt=0)
+
+
+class RefrigeradorAntigoEntrada(Tarifa):
+    tipo: Literal[tuple(estimativa.TIPOS)] = Field(..., description="1_porta, frigobar, duplex, freezer_vertical ou freezer_horizontal.")
+    frost_free: bool
+    volume_total_l: float = Field(..., gt=0, le=estimativa.VOLUME_MAXIMO_L)
+    volume_congelador_l: Optional[float] = Field(None, ge=0, description="Volume do freezer. Em branco = proporcao tipica do tipo.")
+    ano_compra: int = Field(..., ge=estimativa.ANO_MINIMO)
+    kwh_etiqueta: Optional[float] = Field(None, gt=0, le=300, description="kWh/mes da etiqueta do Inmetro colada no aparelho.")
+    marca: Optional[str] = Field(None, max_length=60)
+    modelo: Optional[str] = Field(None, max_length=60)
+    registrar: bool = True
+
+
+class ResistivoEntrada(Tarifa):
+    categoria: str = Field(..., max_length=40, description="Categoria de GET /resistivos. Ex.: air_fryer")
+    potencia_w: Optional[float] = Field(None, gt=0, le=10000, description="Potencia da etiqueta. Em branco = tipica da categoria.")
+    horas_dia: Optional[float] = Field(None, ge=0, le=24)
+    dias_mes: Optional[float] = Field(None, ge=0, le=31)
+    registrar: bool = True
+
+
+class Resistivo(BaseModel):
+    categoria: str
+    nome: str
+    potencia_w: float
+    horas_dia: float
+    dias_mes: float
+    fonte: str
+
+
+class Fogao(BaseModel):
+    id: int
+    marca: str
+    modelo: str
+    detalhe: str = ""
+    bocas: Optional[int] = None
+    rendimento_pct: Optional[float] = None
+    consumo_forno_kg_h: Optional[float] = None
+
+
+class PrecoGlp(BaseModel):
+    uf: str
+    ano: int
+    preco_kg: float
+    fonte: str
+
+
+class GasEntrada(BaseModel):
+    fogao_id: Optional[int] = Field(None, description="Id de GET /fogoes. Em branco = valores medianos do catalogo.")
+    horas_bocas_dia: Optional[float] = Field(None, ge=0, le=24, description="Tempo com uma boca acesa por dia (somando as bocas).")
+    horas_forno_dia: Optional[float] = Field(None, ge=0, le=24)
+    dias_mes: Optional[float] = Field(None, ge=0, le=31)
+    uf: Optional[str] = Field(None, pattern="^[A-Za-z]{2}$", description="Estado para o preco medio do GLP (ANP).")
+    preco_botijao: Optional[float] = Field(None, gt=0, le=1000, description="Preco do botijao de 13 kg, se souber.")
+    registrar: bool = True
+
+
+class ResultadoGas(BaseModel):
+    marca: str
+    modelo: str
+    detalhe: str = ""
+    uf: str
+    kg_mes: float
+    kg_bocas: float
+    kg_forno: float
+    botijoes_mes: float
+    dias_por_botijao: Optional[int] = None
+    preco_kg: float
+    preco_botijao: float
+    origem_preco: str
+    custo_mes: float
+    custo_ano: float
+    metodo: str
     avisos: list[str]
     fonte_dados: str
 
@@ -308,6 +441,100 @@ def calcular(entrada: CalculoEntrada, con=Depends(conexao)):
         raise erro_do_servico(erro) from erro
 
 
+@app.post("/calcular/refrigerador-antigo", response_model=Resultado, tags=["Calculo"])
+def calcular_refrigerador_antigo(entrada: RefrigeradorAntigoEntrada, con=Depends(conexao)):
+    """Geladeira fora do catalogo: usa a etiqueta, se houver; senao estima por tipo, volume e ano de compra."""
+    try:
+        consumo = estimativa.consumo_refrigerador_estimado(
+            entrada.tipo, entrada.frost_free, entrada.volume_total_l, entrada.ano_compra,
+            volume_congelador_l=entrada.volume_congelador_l, kwh_etiqueta=entrada.kwh_etiqueta)
+        return servico.calcular_estimado(con, consumo, marca=entrada.marca, modelo=entrada.modelo,
+                                         registrar=entrada.registrar, **entrada.tarifa())
+    except FileNotFoundError as erro:
+        raise HTTPException(status_code=503, detail="modelo de estimativa indisponivel") from erro
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.get("/resistivos", response_model=list[Resistivo], tags=["Calculo"])
+def listar_resistivos(con=Depends(conexao)):
+    """Eletroportateis (tabela portateis) e os valores padrao usados quando o usuario nao informa."""
+    return servico.listar_portateis(con)
+
+
+@app.post("/calcular/resistivo", response_model=Resultado, tags=["Calculo"])
+def calcular_resistivo(entrada: ResistivoEntrada, con=Depends(conexao)):
+    """kWh/mes = potencia (W) / 1000 x horas por dia x dias de uso no mes."""
+    try:
+        padrao = servico.portatil(con, entrada.categoria)
+        consumo = estimativa.consumo_resistivo(padrao, entrada.potencia_w, entrada.horas_dia, entrada.dias_mes)
+        return servico.calcular_estimado(con, consumo, registrar=entrada.registrar, **entrada.tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.get("/fogoes", response_model=list[Fogao], tags=["Gas de cozinha"])
+def buscar_fogoes(busca: str = Query(..., min_length=2), con=Depends(conexao)):
+    """Fogoes e fornos a gas do catalogo do Inmetro."""
+    return servico.buscar_fogoes(con, busca)
+
+
+@app.get("/gas/precos", response_model=list[PrecoGlp], tags=["Gas de cozinha"])
+def listar_precos_glp(con=Depends(conexao)):
+    """Preco medio mais recente do GLP por estado (ANP, R$/kg)."""
+    return servico.precos_glp(con)
+
+
+@app.post("/calcular/gas", response_model=ResultadoGas, tags=["Gas de cozinha"])
+def calcular_gas(entrada: GasEntrada, con=Depends(conexao)):
+    """Gas de cozinha (GLP) por mes: bocas e forno x tempo de uso x preco do estado ou do botijao."""
+    try:
+        return servico.calcular_gas(con, **entrada.model_dump())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.get("/estimativa/categorias", response_model=list[CategoriaEstimavel], tags=["Calculo"])
+def listar_categorias_estimaveis(con=Depends(conexao)):
+    """Eletro pesado que da para estimar quando o modelo nao esta no catalogo, e o que perguntar de cada um."""
+    return servico.categorias_estimaveis(con)
+
+
+@app.post("/calcular/estimado", response_model=Resultado, tags=["Calculo"])
+def calcular_estimado(entrada: EstimadoEntrada, con=Depends(conexao)):
+    """Aparelho fora do catalogo: valor da etiqueta, se houver; senao a mediana dos modelos parecidos."""
+    try:
+        consumo = servico.estimar_por_equivalentes(
+            con, entrada.categoria, entrada.tipo, entrada.medida, entrada.valor_etiqueta,
+            entrada.horas_dia, entrada.ciclos_mes, entrada.velocidade)
+        return servico.calcular_estimado(con, consumo, marca=entrada.marca, modelo=entrada.modelo,
+                                         registrar=entrada.registrar, **entrada.tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.post("/sugestoes/estimado", response_model=Sugestoes, tags=["Economia"])
+def sugerir_para_estimado(entrada: SugestaoEstimadaEntrada, con=Depends(conexao)):
+    """Modelos do catalogo que gastam menos que um aparelho estimado (mesmo criterio de POST /sugestoes)."""
+    try:
+        return servico.sugerir_para_estimado(
+            con, entrada.categoria, entrada.capacidade, entrada.kwh_mes, tipo=entrada.tipo, nome=entrada.nome,
+            limite=entrada.limite, **entrada.uso_e_tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
+@app.post("/comparar/estimado", response_model=Comparacao, tags=["Economia"])
+def comparar_estimado(entrada: ComparacaoEstimadaEntrada, con=Depends(conexao)):
+    """Economia e payback de trocar um aparelho estimado por um modelo do catalogo."""
+    try:
+        return servico.comparar_estimado(
+            con, entrada.categoria, entrada.kwh_mes, entrada.alternativa_id, nome=entrada.nome,
+            preco_novo=entrada.preco_novo, **entrada.uso_e_tarifa())
+    except ValueError as erro:
+        raise erro_do_servico(erro) from erro
+
+
 @app.post("/sugestoes", response_model=Sugestoes, tags=["Economia"])
 def sugerir(entrada: SugestaoEntrada, con=Depends(conexao)):
     """Modelos equivalentes (mesmo servico) que gastam pelo menos 5% menos, com o mesmo uso e tarifa."""
@@ -397,5 +624,31 @@ def eco_coach(entrada: EcoCoachEntrada, con=Depends(conexao)):
         raise HTTPException(status_code=422, detail=str(erro)) from erro
     except FileNotFoundError as erro:
         raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
+    except (LookupError, RuntimeError) as erro:
+        raise HTTPException(status_code=503, detail=f"Eco-Coach indisponivel: {erro}") from erro
+
+
+class DicasEntrada(BaseModel):
+    categoria: str = Field(..., max_length=40)
+    nome: str = Field(..., max_length=120)
+    kwh_mes: float = Field(..., ge=0)
+    custo_mes: float = Field(..., ge=0)
+    metodo: Optional[str] = Field(None, max_length=400, description="Texto 'metodo' de POST /calcular.")
+
+
+class DicasDoAparelho(BaseModel):
+    dicas: str = Field(..., description="Texto em markdown; as citacoes [n] apontam para 'fontes'.")
+    fontes: list[FonteCitada]
+    modelo: str
+    aviso: str
+
+
+@app.post("/eco-coach/aparelho", response_model=DicasDoAparelho, tags=["Eco-Coach (RAG)"])
+def eco_coach_aparelho(entrada: DicasEntrada, con=Depends(conexao)):
+    """Dicas personalizadas para gastar menos com um aparelho (usado nos eletroportateis)."""
+    try:
+        return rag_agent.gerar_dicas_do_aparelho(con, entrada.model_dump())
+    except ValueError as erro:
+        raise HTTPException(status_code=422, detail=str(erro)) from erro
     except (LookupError, RuntimeError) as erro:
         raise HTTPException(status_code=503, detail=f"Eco-Coach indisponivel: {erro}") from erro

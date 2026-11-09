@@ -11,6 +11,8 @@ import unicodedata
 import pandas as pd
 
 import config
+import estimativa
+from estimativa import tempo_por_dia
 
 DIAS_MES = 30
 LIMITE_BUSCA = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
@@ -69,6 +71,33 @@ EQUIVALENCIA = {
     "bomba": {"categorias": ["bomba"], "medida": "capacidade", "tolerancia": 0.0, "mesmo_tipo": False,
               "texto": "motor de mesma potencia (cv); confira vazao e altura com o fabricante"},
 }
+ESTIMAVEIS = {
+    "refrigerador": {"nome": "Geladeira ou freezer", "especial": True},
+    "maquina_de_lavar": {"nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)",
+                         "etiqueta": ("kwh_ciclo", "Consumo da etiqueta (kWh por ciclo)")},
+    "ar_condicionado": {"nome": "Ar-condicionado", "medida": "Capacidade (BTU/h)",
+                        "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "televisor": {"nome": "Televisor", "medida": "Tamanho da tela (polegadas)",
+                  "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "ventilador_de_mesa": {"nome": "Ventilador de mesa, coluna ou parede", "medida": "Diâmetro da hélice (cm)",
+                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "ventilador_de_teto": {"nome": "Ventilador de teto", "medida": "Diâmetro (cm)",
+                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
+    "microondas": {"nome": "Micro-ondas", "medida": "Capacidade (litros)",
+                   "etiqueta": ("potencia_w", "Potência (W)")},
+    "bomba": {"nome": "Bomba d'água", "medida": "Potência do motor (cv)",
+              "etiqueta": ("potencia_w", "Potência elétrica (W)")},
+    "chuveiro": {"nome": "Chuveiro elétrico", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_led": {"nome": "Lâmpada LED", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_fluorescente": {"nome": "Lâmpada fluorescente", "etiqueta": ("potencia_w", "Potência (W)")},
+    "lampada_vapor_sodio": {"nome": "Lâmpada de vapor de sódio", "etiqueta": ("potencia_w", "Potência (W)")},
+}
+TOLERANCIA_ESTIMATIVA = 0.10
+AMPLIACOES_ESTIMATIVA = (1, 2, 4)
+MINIMO_EQUIVALENTES = 5
+AVISO_EQUIVALENTES = ("Gasto aproximado pelos modelos atuais parecidos do catalogo do Inmetro. Aparelhos antigos "
+                      "costumam gastar mais que os atuais; com o valor da etiqueta o calculo fica exato.")
+
 # Onde nao sugerimos troca, e o motivo (aparece no app).
 SEM_SUGESTAO = {
     "chuveiro": ("Chuveiros eletricos tem eficiencia parecida: um modelo de menor potencia so esquenta "
@@ -84,6 +113,10 @@ ECONOMIA_MINIMA = 0.05
 # Inmetro e nao e sugerido (ex.: HISENSE RS3P428NEDA = 28,0 kWh e a versao 127 V = 2,8 kWh).
 FRACAO_SUSPEITA = 0.4
 
+ORIGEM_CONVERTIDA = "convertido da metodologia antiga do Inmetro"
+AVISO_CONVERTIDO = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
+                    "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.")
+
 AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifaria e iluminacao "
                 "publica. O uso real muda o resultado.")
 # Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
@@ -95,8 +128,8 @@ SPECS = [
     {
         "arquivo": "refrigeradores-e-assemelhados_limpo.csv", "categoria": "refrigerador",
         "tipo": "tipo", "capacidade": ("volume_total_litros", "L"),
-        # padrao 2025 do Inmetro primeiro; se faltar, o padrao antigo
-        "kwh_mes": ["consumo_medio_de_energia_mensal_kwh_mes", "consumo_de_energia_mensal_kwh_mes"],
+        "kwh_mes": ["consumo_medio_de_energia_mensal_kwh_mes"],
+        "kwh_mes_metodologia_antiga": {"coluna": "consumo_de_energia_mensal_kwh_mes", "degelo": "sistema_de_degelo"},
     },
     {
         "arquivo": "televisores_limpo.csv", "categoria": "televisor",
@@ -228,6 +261,8 @@ def _construir(df, spec):
         out.loc[com_lm, "detalhe"] = out.loc[com_lm, "detalhe"] + ", " + out.loc[com_lm, "fluxo_lm"].map("{:g} lm".format)
 
     out["origem_dado"] = "informado"
+    if "kwh_mes_metodologia_antiga" in spec:
+        _converter_metodologia_antiga(df, out, spec["kwh_mes_metodologia_antiga"])
     if spec.get("derivado"):
         out.loc[spec["derivado"](df), "origem_dado"] = "derivado ou estimado na limpeza"
     if "consumo_imputado" in df.columns:  # marcado pelos scripts de limpeza
@@ -240,6 +275,24 @@ def _construir(df, spec):
         out.loc[out[coluna] <= 0, coluna] = float("nan")
     tem_dado = out[["kwh_mes", "kwh_ciclo", "potencia_w"]].notna().any(axis=1)
     return out[tem_dado & (out["marca"] != "") & (out["modelo"] != "")]
+
+
+def _converter_metodologia_antiga(df, out, regra):
+    antigo = _num(df, [regra["coluna"]])
+    falta = out["kwh_mes"].isna() & antigo.notna()
+    if not falta.any():
+        return
+    frost_free = df[regra["degelo"]].fillna("").astype(str).str.contains("Frost")
+    try:
+        modelo = estimativa.carregar_modelo()
+    except FileNotFoundError as erro:
+        print(f"[aviso] {erro}; consumo da metodologia antiga usado sem conversao")
+        out.loc[falta, "kwh_mes"] = antigo[falta]
+        return
+    fator = pd.Series([estimativa.fator_metodologia(t, f, modelo) for t, f in zip(out["tipo"], frost_free)],
+                      index=out.index)
+    out.loc[falta, "kwh_mes"] = antigo[falta] * fator[falta]
+    out.loc[falta, "origem_dado"] = ORIGEM_CONVERTIDA
 
 
 def carregar_catalogo(pasta=None):
@@ -278,14 +331,14 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
         if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
             return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
                     "metodo": (f"{aparelho['potencia_w']:g} W (potencia do Inmetro a 35 C, carga total) x "
-                               f"{horas_dia:g} h/dia x {dias} dias (informado); valor maximo, "
+                               f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor maximo, "
                                "o compressor nao fica ligado o tempo todo"),
                     "premissa": False}
         referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
         if referencia and pd.notna(aparelho["kwh_mes"]):
             return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
                     "metodo": (f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
-                               f"ajustado para {horas_dia:g} h/dia (informado)"),
+                               f"ajustado para {tempo_por_dia(horas_dia)} (informado)"),
                     "premissa": False}
 
     if pd.notna(aparelho["kwh_mes"]):
@@ -314,7 +367,7 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
         standby = aparelho.get("standby_kwh_mes")
         standby = 0.0 if pd.isna(standby) else float(standby)
         origem = "informado" if horas_dia is not None else "estimativa do grupo"
-        metodo = f"{aparelho['potencia_w']:g} W x {horas:g} h/dia x {dias} dias ({origem})"
+        metodo = f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} dias ({origem})"
         if standby:
             metodo += f" + {standby:.2f} kWh de stand-by"
         return {"kwh_mes": float(aparelho["potencia_w"]) * horas * dias / 1000 + standby,
@@ -330,7 +383,9 @@ def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa
     avisos = [AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO]
     if consumo.get("premissa"):
         avisos.append("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.")
-    if aparelho.get("origem_dado") not in (None, "informado"):
+    if aparelho.get("origem_dado") == ORIGEM_CONVERTIDA:
+        avisos.append(AVISO_CONVERTIDO)
+    elif aparelho.get("origem_dado") not in (None, "informado"):
         avisos.append("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).")
     detalhe = aparelho.get("detalhe")
     return {

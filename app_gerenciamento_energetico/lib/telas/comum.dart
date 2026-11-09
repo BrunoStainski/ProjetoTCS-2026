@@ -17,8 +17,91 @@ IconData iconeDaCategoria(String categoria) {
     'microondas' => Icons.microwave,
     'maquina_de_lavar' => Icons.local_laundry_service,
     'bomba' => Icons.water_drop_outlined,
+    'air_fryer' => Icons.soup_kitchen_outlined,
+    'secador_cabelo' => Icons.air,
+    'ferro_passar' => Icons.iron_outlined,
+    'sanduicheira' => Icons.breakfast_dining_outlined,
+    'liquidificador' => Icons.blender_outlined,
+    'cafeteira_eletrica' => Icons.coffee_maker_outlined,
+    'chaleira_eletrica' => Icons.emoji_food_beverage_outlined,
+    'forno_eletrico' => Icons.microwave_outlined,
+    'aspirador_po' => Icons.cleaning_services_outlined,
+    'torradeira' => Icons.breakfast_dining_outlined,
     _ => Icons.electrical_services,
   };
+}
+
+class ControleTempo {
+  final horas = TextEditingController();
+  final minutos = TextEditingController();
+
+  bool get vazio => horas.text.trim().isEmpty && minutos.text.trim().isEmpty;
+
+  int? _parte(TextEditingController c) => c.text.trim().isEmpty ? 0 : int.tryParse(c.text.trim());
+
+  bool get valido {
+    if (vazio) return true;
+    final h = _parte(horas);
+    final m = _parte(minutos);
+    return h != null && m != null && h >= 0 && m >= 0 && m < 60 && h * 60 + m <= 24 * 60;
+  }
+
+  double? get horasDia => vazio || !valido ? null : (_parte(horas)! * 60 + _parte(minutos)!) / 60;
+
+  void definir(double? horasDia) {
+    if (horasDia == null) {
+      horas.clear();
+      minutos.clear();
+      return;
+    }
+    final total = (horasDia * 60).round();
+    horas.text = '${total ~/ 60}';
+    minutos.text = '${total % 60}';
+  }
+
+  void dispose() {
+    horas.dispose();
+    minutos.dispose();
+  }
+}
+
+class CampoTempo extends StatelessWidget {
+  final ControleTempo controle;
+  final String rotulo;
+  final String? ajuda;
+  final VoidCallback? aoConfirmar;
+
+  const CampoTempo({super.key, required this.controle, required this.rotulo, this.ajuda, this.aoConfirmar});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget parte(TextEditingController c, String nome, String sufixo) => Expanded(
+      child: TextField(
+        controller: c,
+        keyboardType: TextInputType.number,
+        onSubmitted: (_) => aoConfirmar?.call(),
+        decoration: InputDecoration(labelText: nome, suffixText: sufixo),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(rotulo, style: Estilos.forte),
+        const SizedBox(height: Espaco.p),
+        Row(
+          children: [
+            parte(controle.horas, 'Horas', 'h'),
+            const SizedBox(width: Espaco.p),
+            parte(controle.minutos, 'Minutos', 'min'),
+          ],
+        ),
+        if (ajuda != null) ...[
+          const SizedBox(height: 4),
+          Text(ajuda!, style: Estilos.secundario),
+        ],
+      ],
+    );
+  }
 }
 
 /// Nome do tipo de aparelho para titulos (ex.: secoes da busca).

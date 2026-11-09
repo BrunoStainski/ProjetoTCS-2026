@@ -18,6 +18,7 @@ class TelaUso extends StatefulWidget {
 
 class _TelaUsoState extends State<TelaUso> {
   final _valor = TextEditingController();
+  final _tempo = ControleTempo();
   PerguntaDeUso? _pergunta;
   String? _velocidade;
   String? _erro;
@@ -31,6 +32,7 @@ class _TelaUsoState extends State<TelaUso> {
   @override
   void dispose() {
     _valor.dispose();
+    _tempo.dispose();
     super.dispose();
   }
 
@@ -47,8 +49,10 @@ class _TelaUsoState extends State<TelaUso> {
         _pergunta = p;
         if (p.pergunta == 'velocidade') {
           _velocidade = p.padrao as String?;
+        } else if (p.pergunta == 'horas') {
+          _tempo.definir((p.padrao as num?)?.toDouble());
         } else if (p.padrao != null) {
-          _valor.text = numero((p.padrao as num).toDouble(), casas: p.pergunta == 'ciclos' ? 0 : 2);
+          _valor.text = numero((p.padrao as num).toDouble(), casas: 0);
         }
       });
     } on ApiErro catch (e) {
@@ -68,10 +72,10 @@ class _TelaUsoState extends State<TelaUso> {
       case 'velocidade':
         c.velocidade = _velocidade;
       case 'horas':
-        if (_pergunta!.opcional && _valor.text.trim().isEmpty) break; // fica o valor do Inmetro
-        final horas = lerNumero(_valor.text);
-        if (horas == null || horas < 0 || horas > 24) {
-          setState(() => _erro = 'Informe as horas por dia, entre 0 e 24 (ex.: 0,25 = 15 minutos).');
+        if (_pergunta!.opcional && _tempo.vazio) break;
+        final horas = _tempo.horasDia;
+        if (horas == null) {
+          setState(() => _erro = 'Informe o tempo de uso por dia em horas e minutos (ex.: 0 h 15 min).');
           return;
         }
         c.horasDia = horas;
@@ -126,23 +130,26 @@ class _TelaUsoState extends State<TelaUso> {
               onSelectionChanged: (s) => setState(() => _velocidade = s.first),
             ),
           ],
-          if (p?.pergunta == 'horas' || p?.pergunta == 'ciclos')
+          if (p?.pergunta == 'horas')
+            CampoTempo(
+              controle: _tempo,
+              rotulo: p!.opcional ? 'Tempo de uso por dia (opcional)' : 'Tempo de uso por dia',
+              aoConfirmar: _confirmar,
+              ajuda: p.opcional
+                  ? 'Em branco, usamos o consumo medido pelo Inmetro no ensaio. '
+                        'Informe o seu tempo para um valor mais próximo do seu uso.'
+                  : p.padrao != null
+                  ? 'Valor sugerido é uma estimativa. Troque pelo seu uso real.'
+                  : 'Obrigatório para este aparelho. Ex.: 0 h 15 min.',
+            ),
+          if (p?.pergunta == 'ciclos')
             TextField(
               controller: _valor,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.number,
               onSubmitted: (_) => _confirmar(),
-              decoration: InputDecoration(
-                labelText: p!.pergunta == 'horas'
-                    ? (p.opcional ? 'Horas por dia (opcional)' : 'Horas por dia')
-                    : 'Lavagens por mês',
-                hintText: p.pergunta == 'horas' && aparelho.categoria != 'chuveiro' ? 'Ex.: 4' : null,
-                helperMaxLines: 3,
-                helperText: p.opcional
-                    ? 'Em branco, usamos o consumo medido pelo Inmetro no ensaio. '
-                          'Informe suas horas para um valor mais próximo do seu uso.'
-                    : p.padrao != null
-                    ? 'Valor sugerido é uma estimativa. Troque pelo seu uso real.'
-                    : 'Obrigatório para este aparelho. Ex.: 0,25 = 15 minutos.',
+              decoration: const InputDecoration(
+                labelText: 'Lavagens por mês',
+                helperText: 'Valor sugerido é uma estimativa. Troque pelo seu uso real.',
               ),
             ),
           const SizedBox(height: Espaco.m),

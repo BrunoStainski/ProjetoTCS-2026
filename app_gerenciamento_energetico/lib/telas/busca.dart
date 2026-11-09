@@ -4,6 +4,8 @@ import '../api.dart';
 import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'estimar.dart';
+import 'gas.dart';
 import 'uso.dart';
 
 /// Passo 1: o usuario busca o aparelho pela marca e/ou modelo.
@@ -113,11 +115,16 @@ class _TelaBuscaState extends State<TelaBusca> {
             ],
             onChanged: _trocarTipo,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Espaco.p),
+          const AtalhosDaBusca(),
+          const SizedBox(height: Espaco.p),
           if (_carregando) const Center(child: CircularProgressIndicator()),
           if (_erro != null) MensagemErro(_erro!),
-          if (!_carregando && _resultados != null && _resultados!.isEmpty)
+          if (!_carregando && _resultados != null && _resultados!.isEmpty) ...[
             const Text('Nenhum aparelho encontrado. Tente só a marca ou parte do modelo.'),
+            const SizedBox(height: Espaco.m),
+            const ChamadaEstimar(),
+          ],
           if (!_carregando && _resultados != null && _resultados!.isNotEmpty)
             Expanded(
               // a chave muda a cada busca: as secoes voltam a ficar fechadas
@@ -192,6 +199,50 @@ class _SecaoDoTipo extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class AtalhosDaBusca extends StatelessWidget {
+  const AtalhosDaBusca({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: Espaco.p,
+      children: [
+        TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
+          icon: const Icon(Icons.calculate_outlined),
+          label: const Text('Estimar aparelho'),
+        ),
+        TextButton.icon(
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaGas())),
+          icon: const Icon(Icons.local_fire_department_outlined),
+          label: const Text('Gás de cozinha'),
+        ),
+      ],
+    );
+  }
+}
+
+class ChamadaEstimar extends StatelessWidget {
+  const ChamadaEstimar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Cores.amareloEscuro,
+      child: ListTile(
+        leading: const Icon(Icons.calculate_outlined, color: Cores.amarelo),
+        title: const Text('Não achou? Estime o gasto', style: Estilos.forte),
+        subtitle: const Text(
+          'Eletro pesado mais antigo (geladeira, máquina de lavar, ar...) ou eletroportáteis como air fryer e secador.',
+          style: Estilos.secundario,
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Cores.amarelo),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
       ),
     );
   }
