@@ -34,15 +34,16 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final aparelho = widget.consulta.aparelho;
     final nome = widget.atual?.nome ?? aparelho.nome;
     return Pagina(
-      titulo: 'Modelos mais econômicos',
+      titulo: 'Gastar menos',
       filho: FutureBuilder<Sugestoes>(
         future: _sugestoes,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const Carregando(texto: 'Procurando modelos que gastam menos...');
           }
           if (snap.hasError) {
             return MensagemErro(
@@ -55,43 +56,44 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
           final s = snap.data!;
           return ListView(
             children: [
-              Card(
-                child: ListTile(
-                  leading: Icon(iconeDaCategoria(aparelho.categoria)),
-                  title: Text('Seu aparelho: $nome'),
-                  subtitle: Text(
-                    '${numero(s.kwhAtual)} kWh/mês - ${reais(s.custoAtual)} por mês',
-                    style: Estilos.secundario,
+              const CabecalhoPergunta(
+                'Modelos parecidos que gastam menos',
+                ajuda: 'Mesmo tamanho, mesmo uso e a mesma tarifa do seu aparelho. Toque num modelo para comparar.',
+              ),
+              MergeSemantics(
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(iconeDaCategoria(aparelho.categoria)),
+                    title: Text('Seu aparelho: $nome'),
+                    subtitle: Text('${reais(s.custoAtual)} por mês · ${numero(s.kwhAtual)} kWh'),
                   ),
                 ),
               ),
-              if (s.criterio != null) ...[const Titulo('Comparando com modelos de'), Text(s.criterio!)],
-              const SizedBox(height: 12),
+              if (s.criterio != null) ...[const Titulo('Comparando com modelos de'), Text(s.criterio!, style: t.corpo)],
+              const SizedBox(height: Espaco.pm),
               if (s.mensagem != null)
                 Card(
-                  color: Cores.amareloEscuro,
+                  color: t.fundoDestaque,
                   child: Padding(
                     padding: const EdgeInsets.all(Espaco.m),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.tips_and_updates_outlined, color: Cores.amarelo),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(s.mensagem!)),
+                        const Icon(Icons.tips_and_updates_outlined),
+                        const SizedBox(width: Espaco.pm),
+                        Expanded(child: Text(s.mensagem!, style: t.corpo)),
                       ],
                     ),
                   ),
                 ),
               for (final sugerido in s.sugestoes) _CartaoSugestao(sugerido, onTap: () => _abrir(sugerido)),
               if (s.suspeitosDescartados > 0) ...[
-                const SizedBox(height: 8),
+                const SizedBox(height: Espaco.p),
                 ListaAvisos([
                   '${s.suspeitosDescartados} modelo(s) com consumo baixo demais para ser real '
                       '(provável erro no dado do Inmetro) ficaram de fora.',
                 ]),
               ],
-              if (s.sugestoes.isNotEmpty)
-                const ListaAvisos(['Mesmo uso e mesma tarifa do seu aparelho. Toque num modelo para ver o payback.']),
             ],
           );
         },
@@ -118,53 +120,54 @@ class _CartaoSugestao extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final a = s.aparelho;
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(Espaco.m),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(a.nome, style: Estilos.forte),
-                    Text(
-                      [if (a.detalhe.isNotEmpty) a.detalhe, if (s.tipo.isNotEmpty) s.tipo].join(' - '),
-                      style: Estilos.secundario,
-                    ),
-                    const SizedBox(height: Espaco.p),
-                    Text('${numero(s.kwhMes)} kWh/mês · ${reais(s.custoMes)}/mês', style: Estilos.secundario),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              // economia em verde: o valor e maior que o rotulo
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('-${reais(s.economiaMes)}', style: Estilos.valorMedio.copyWith(color: Cores.verde)),
-                  const Text('por mês', style: Estilos.secundario),
-                  Container(
-                    margin: const EdgeInsets.only(top: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: Espaco.p, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Cores.verde.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${numero(s.economiaPercentual, casas: 0)}% menos',
-                      style: Estilos.rotulo.copyWith(color: Cores.verde),
-                    ),
+    final economia = '${reais(s.economiaMes)} a menos por mês';
+    return MergeSemantics(
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(Espaco.m),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(a.nome, style: t.forte),
+                      if (a.detalhe.isNotEmpty || s.tipo.isNotEmpty)
+                        Text([if (a.detalhe.isNotEmpty) a.detalhe, if (s.tipo.isNotEmpty) s.tipo].join(' · '),
+                            style: t.secundario),
+                      const SizedBox(height: Espaco.p),
+                      // economia em verde e escrita por extenso ("a menos"), nao so pela cor
+                      Text(economia, style: t.valorMedio.copyWith(color: t.economia)),
+                      const SizedBox(height: Espaco.pp),
+                      Wrap(
+                        spacing: Espaco.p,
+                        runSpacing: Espaco.pp,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: Espaco.p, vertical: 2),
+                            decoration: t.selo(t.economia),
+                            child: Text(
+                              '${numero(s.economiaPercentual, casas: 0)}% menos',
+                              style: t.rotulo.copyWith(color: t.economia),
+                            ),
+                          ),
+                          Text('Gasta ${reais(s.custoMes)} por mês', style: t.secundario),
+                        ],
+                      ),
+                      Text('${numero(s.kwhMes)} kWh por mês', style: t.secundario),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: Cores.amarelo),
-            ],
+                ),
+                const SizedBox(width: Espaco.p),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
       ),

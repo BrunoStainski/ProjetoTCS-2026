@@ -5,8 +5,8 @@ import '../casa.dart';
 import '../tema.dart';
 import 'comum.dart';
 
-/// Aparelho atual x modelo sugerido (POST /comparar). Com o preco digitado, mostra o payback.
-/// O payback e calculado na API (Python); o app so mostra.
+/// Aparelho atual x modelo sugerido (POST /comparar). Com o preco digitado, mostra em quanto
+/// tempo a troca se paga (payback, calculado na API; o app so mostra).
 class TelaComparar extends StatefulWidget {
   final Consulta consulta;
   final AparelhoSugerido sugerido;
@@ -50,9 +50,10 @@ class _TelaCompararState extends State<TelaComparar> {
   Future<void> _calcularPayback() async {
     final preco = lerNumero(_preco.text);
     if (preco == null || preco <= 0) {
-      setState(() => _erroPreco = 'Informe o preço em reais (ex.: 2.499,90).');
+      setState(() => _erroPreco = 'Digite o preço em reais. Ex.: 2.499,90.');
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() {
       _erroPreco = null;
       _calculandoPayback = true;
@@ -86,35 +87,32 @@ class _TelaCompararState extends State<TelaComparar> {
     final avisos = ScaffoldMessenger.of(context);
     if (widget.item != null) {
       casa.trocar(widget.item!, nova, c.novo);
-      navegador.popUntil(ModalRoute.withName(rotaMinhaCasa));
-      avisos.showSnackBar(SnackBar(content: Text('Trocado por ${c.novo.nome}.')));
+      navegador.popUntil((rota) => rota.isFirst); // volta para Minha casa
+      avisos.showSnackBar(SnackBar(content: Text('Trocado por ${c.novo.nome}.'), duration: duracaoAviso));
       return;
     }
     casa.adicionar(nova, c.novo);
     setState(() => _feito = true);
-    avisarAdicionado(avisos, navegador, '${c.novo.nome} foi para a sua casa.');
+    avisarAdicionado(avisos, '${c.novo.nome} foi para a sua casa.');
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     return Pagina(
       titulo: 'Vale a pena trocar?',
       rodape: FilledButton.icon(
         onPressed: _calculandoPayback ? null : _calcularPayback,
         icon: _calculandoPayback
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Cores.preto),
-              )
+            ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.timer_outlined),
-        label: const Text('Calcular payback'),
+        label: Text(_calculandoPayback ? 'Calculando...' : 'Ver em quanto tempo se paga'),
       ),
       filho: FutureBuilder<Comparacao>(
         future: _comparacao,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Carregando(texto: 'Comparando...');
           }
           if (snap.hasError && !snap.hasData) {
             return MensagemErro(
@@ -125,44 +123,44 @@ class _TelaCompararState extends State<TelaComparar> {
             );
           }
           final c = snap.data!;
+          final economiza = c.economiaMes > 0;
           return ListView(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _Coluna('Seu modelo', c.atual, destaque: false)),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 56, left: 4, right: 4),
-                    child: Icon(Icons.arrow_forward, color: Cores.amarelo),
-                  ),
-                  Expanded(child: _Coluna('Modelo novo', c.novo, destaque: true)),
-                ],
+              LadoALado(
+                _Coluna('Seu modelo', c.atual, destaque: false),
+                _Coluna('Modelo novo', c.novo, destaque: true),
+                meio: Padding(
+                  padding: const EdgeInsets.all(Espaco.pp),
+                  child: Icon(Icons.arrow_forward, color: t.destaque, semanticLabel: 'trocar por'),
+                ),
               ),
               const SizedBox(height: Espaco.p),
               CartaoDestaque(
-                titulo: 'Economia por mês',
+                titulo: economiza ? 'Você economiza por mês' : 'Não há economia por mês',
                 valor: c.economiaMes,
                 formatar: reais,
-                cor: c.economiaMes > 0 ? Cores.verde : Cores.vermelho,
-                rodape: '${reais(c.economiaAno)} por ano · ${numero(c.economiaKwhMes)} kWh/mês a menos',
+                cor: economiza ? t.economia : t.alerta,
+                rodape: '${reais(c.economiaAno)} por ano · ${numero(c.economiaKwhMes)} kWh a menos por mês',
               ),
               const Titulo('Em quanto tempo a troca se paga?'),
-              const Text(
-                'O catálogo do Inmetro não tem preços. Digite o preço que você encontrou na loja.',
-                style: Estilos.secundario,
+              Text(
+                'Digite o preço do modelo novo que você encontrou na loja. '
+                'Calculamos em quantos meses a economia na conta paga a compra.',
+                style: t.secundario,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: Espaco.pm),
               TextField(
                 controller: _preco,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onSubmitted: (_) => _calcularPayback(),
                 decoration: InputDecoration(
-                  labelText: 'Preço do modelo novo (R\$)',
+                  labelText: 'Preço do modelo novo',
                   hintText: 'Ex.: 2.499,90',
+                  prefixText: 'R\$ ',
                   errorText: _erroPreco,
                 ),
               ),
-              // momento de pico: o payback aparece com animacao e os meses "contam" ate o valor
+              // o resultado aparece com animacao e os meses "contam" ate o valor
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 transitionBuilder: (filho, animacao) => SizeTransition(
@@ -174,14 +172,14 @@ class _TelaCompararState extends State<TelaComparar> {
                     : Padding(
                         key: ValueKey(c.payback!.precoNovo),
                         padding: const EdgeInsets.only(top: Espaco.m),
-                        child: _CartaoPayback(c.payback!),
+                        child: CartaoPayback(c.payback!),
                       ),
               ),
               const SizedBox(height: Espaco.g),
               if (!_feito)
                 OutlinedButton.icon(
                   onPressed: () => _levarParaCasa(c),
-                  icon: Icon(widget.item != null ? Icons.swap_horiz : Icons.add_home_outlined, color: Cores.amarelo),
+                  icon: Icon(widget.item != null ? Icons.swap_horiz : Icons.add_home_outlined),
                   label: Text(widget.item != null ? 'Trocar na minha casa' : 'Adicionar este modelo à minha casa'),
                 ),
               const SizedBox(height: Espaco.m),
@@ -203,73 +201,77 @@ class _Coluna extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: destaque ? Cores.verde : Cores.borda),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(titulo, style: Estilos.rotulo.copyWith(color: destaque ? Cores.verde : Cores.cinza)),
-            const SizedBox(height: 4),
-            Text(r.nome, style: Estilos.forte, maxLines: 3, overflow: TextOverflow.ellipsis),
-            if (r.detalhe.isNotEmpty) Text(r.detalhe, style: Estilos.secundario),
-            const SizedBox(height: Espaco.p),
-            Text(reais(r.custoMes), style: Estilos.valorMedio.copyWith(color: Cores.branco)),
-            Text('por mês · ${numero(r.kwhMes)} kWh', style: Estilos.secundario),
-          ],
+    final t = Iamp.de(context);
+    return MergeSemantics(
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(t.raio),
+          side: BorderSide(color: destaque ? t.economia : t.borda, width: destaque ? 2 : 1),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Espaco.pm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(titulo, style: t.rotulo.copyWith(color: destaque ? t.economia : t.textoSecundario)),
+              const SizedBox(height: Espaco.pp),
+              Text(r.nome, style: t.forte, maxLines: 3, overflow: TextOverflow.ellipsis),
+              if (r.detalhe.isNotEmpty) Text(r.detalhe, style: t.secundario),
+              const SizedBox(height: Espaco.p),
+              Text(reais(r.custoMes), style: t.valorMedio),
+              Text('por mês · ${numero(r.kwhMes)} kWh', style: t.secundario),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Payback: verde quando se paga em ate 5 anos, amarelo quando demora mais, vermelho quando nao se paga.
-/// (5 anos e um corte do grupo para a cor, nao uma regra oficial.)
-class _CartaoPayback extends StatelessWidget {
+/// Em quanto tempo a troca se paga. A cor (verde ate 5 anos, amarelo acima, vermelho se nao se paga)
+/// sempre vem com uma frase que diz a mesma coisa. 5 anos e um corte do grupo, nao uma regra oficial.
+class CartaoPayback extends StatelessWidget {
   final Payback p;
 
-  const _CartaoPayback(this.p);
+  const CartaoPayback(this.p, {super.key});
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final meses = p.meses;
-    final cor = meses == null
-        ? Cores.vermelho
+    final (cor, veredito, icone) = meses == null
+        ? (t.alerta, 'Não se paga', Icons.money_off)
         : meses <= 60
-        ? Cores.verde
-        : Cores.amarelo;
-    return Container(
-      padding: const EdgeInsets.all(Espaco.g),
-      decoration: BoxDecoration(
-        color: Cores.superficie,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cor.withValues(alpha: 0.7), width: 1.5),
-        boxShadow: [BoxShadow(color: cor.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: -4)],
-      ),
-      child: Column(
-        children: [
-          Icon(meses == null ? Icons.money_off : Icons.savings_outlined, color: cor, size: 32),
-          const SizedBox(height: Espaco.p),
-          if (meses != null) ...[
-            if (meses < 1)
-              Text('menos de 1 mês', style: Estilos.valor.copyWith(color: cor))
-            else
-              ValorAnimado(
-                meses,
-                formatar: (v) => '${numero(v, casas: 0)} meses',
-                estilo: Estilos.valor.copyWith(color: cor),
-              ),
-            if (p.anos != null && meses >= 12) Text('cerca de ${numero(p.anos!, casas: 1)} anos', style: Estilos.forte),
+        ? (t.economia, 'Se paga rápido', Icons.savings_outlined)
+        : (t.destaque, 'Demora para se pagar', Icons.hourglass_bottom);
+    return MergeSemantics(
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(Espaco.g),
+        decoration: t.cartaoDestaque(cor),
+        child: Column(
+          children: [
+            Icon(icone, color: cor, size: t.iconeGrande),
             const SizedBox(height: Espaco.p),
+            Text(veredito, style: t.titulo.copyWith(color: cor), textAlign: TextAlign.center),
+            const SizedBox(height: Espaco.pp),
+            if (meses != null) ...[
+              if (meses < 1)
+                Text('em menos de 1 mês', style: t.valor.copyWith(color: cor), textAlign: TextAlign.center)
+              else
+                ValorAnimado(
+                  meses,
+                  formatar: (v) => 'em ${numero(v, casas: 0)} meses',
+                  estilo: t.valor.copyWith(color: cor),
+                ),
+              if (p.anos != null && meses >= 12) Text('cerca de ${numero(p.anos!, casas: 1)} anos', style: t.forte),
+              const SizedBox(height: Espaco.p),
+            ],
+            Text(p.texto, textAlign: TextAlign.center, style: t.corpo),
+            const SizedBox(height: Espaco.pp),
+            Text('Preço considerado: ${reais(p.precoNovo)}', style: t.secundario, textAlign: TextAlign.center),
           ],
-          Text(p.texto, textAlign: TextAlign.center),
-          const SizedBox(height: 4),
-          Text('Preço considerado: ${reais(p.precoNovo)}', style: Estilos.secundario),
-        ],
+        ),
       ),
     );
   }

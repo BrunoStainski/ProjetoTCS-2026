@@ -97,7 +97,7 @@ class Casa extends ChangeNotifier {
   /// Perfil do K-Means. Volta a null quando a casa muda (precisa classificar de novo).
   Classificacao? perfil;
 
-  /// Ultimo plano do Eco-Coach. Fica guardado ate a casa mudar (poupa o limite gratuito do Gemini).
+  /// Ultimo plano do Eco-Coach (aba Economizar). Fica guardado ate a casa mudar (poupa o limite gratuito do Gemini).
   EcoCoach? plano;
 
   /// Trocas com payback calculado em "Vale a pena trocar?" (no maximo 5, as mais recentes).
@@ -130,8 +130,18 @@ class Casa extends ChangeNotifier {
     return item;
   }
 
-  void remover(ItemCasa item) {
+  /// Tira o item da casa e devolve a posicao dele (para o "Desfazer").
+  int remover(ItemCasa item) {
+    final posicao = _itens.indexOf(item);
     _itens.remove(item);
+    _mudou();
+    return posicao;
+  }
+
+  /// Desfaz uma remocao: o item volta para a mesma posicao.
+  void reinserir(ItemCasa item, int posicao) {
+    if (_itens.contains(item)) return;
+    _itens.insert(posicao.clamp(0, _itens.length), item);
     _mudou();
   }
 

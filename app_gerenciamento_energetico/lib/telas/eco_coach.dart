@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'texto_plano.dart';
 
-/// Eco-Coach (POST /eco-coach): plano de economia escrito por IA a partir de dicas oficiais
-/// (Inmetro e Cemig). Os numeros sao calculados pelo iamp; o LLM so escreve e cita as fontes [n].
+/// Aba "Economizar" (POST /eco-coach): plano de economia escrito por IA a partir de dicas oficiais
+/// (Inmetro e Cemig). Os numeros sao calculados pelo Iamp; a IA so escreve e cita as fontes [n].
+/// O plano so e pedido quando a pessoa toca no botao (o plano gratuito do Gemini tem limite de uso)
+/// e fica guardado ate a casa mudar.
 class TelaEcoCoach extends StatefulWidget {
   const TelaEcoCoach({super.key});
 
@@ -16,54 +19,134 @@ class TelaEcoCoach extends StatefulWidget {
 }
 
 class _TelaEcoCoachState extends State<TelaEcoCoach> {
-  late Future<EcoCoach> _plano;
+  bool _gerando = false;
+  String? _erro;
 
-  @override
-  void initState() {
-    super.initState();
-    // usa o plano guardado se a casa nao mudou (o plano gratuito do Gemini tem limite de uso)
-    _plano = casa.plano != null ? Future.value(casa.plano!) : _gerar();
-  }
-
-  Future<EcoCoach> _gerar() async {
-    final plano = await Api.ecoCoach(casa.moradores, casa.itensParaEcoCoach(), casa.trocas);
-    casa.guardarPlano(plano);
-    return plano;
-  }
-
-  void _gerarDeNovo() {
+  Future<void> _gerar() async {
     setState(() {
-      _plano = _gerar();
+      _gerando = true;
+      _erro = null;
     });
+    try {
+      casa.guardarPlano(await Api.ecoCoach(casa.moradores, casa.itensParaEcoCoach(), casa.trocas));
+    } on ApiErro catch (e) {
+      if (mounted) setState(() => _erro = e.mensagem);
+    } finally {
+      if (mounted) setState(() => _gerando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<EcoCoach>(
-      future: _plano,
-      builder: (context, snap) {
-        final carregando = snap.connectionState != ConnectionState.done;
-        return Pagina(
-          titulo: 'Eco-Coach',
-          rodape: carregando
-              ? null
-              : OutlinedButton.icon(
-                  onPressed: _gerarDeNovo,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Gerar outro plano'),
-                ),
-          filho: carregando
-              ? const _Pensando()
-              : snap.hasError
-              ? MensagemErro(snap.error.toString(), tentarDeNovo: _gerarDeNovo)
-              : _Conteudo(snap.data!),
-        );
+    return ListenableBuilder(
+      listenable: casa,
+      builder: (context, _) {
+        final plano = casa.plano;
+        return Pagina(titulo: 'Economizar', rodape: _rodape(plano), filho: _corpo(plano));
       },
+    );
+  }
+
+  Widget? _rodape(EcoCoach? plano) {
+    if (_gerando) return null;
+    if (casa.vazia) {
+      return FilledButton.icon(
+        onPressed: () => irPara(Aba.calcular, recomecar: true),
+        icon: const Icon(Icons.calculate_outlined),
+        label: const Text('Calcular um aparelho'),
+      );
+    }
+    if (plano != null) {
+      return OutlinedButton.icon(onPressed: _gerar, icon: const Icon(Icons.refresh), label: const Text('Montar outro plano'));
+    }
+    return FilledButton.icon(
+      onPressed: _gerar,
+      icon: const Icon(Icons.auto_awesome),
+      label: const Text('Montar meu plano'),
+    );
+  }
+
+  Widget _corpo(EcoCoach? plano) {
+    if (_gerando) return const _Pensando();
+    if (casa.vazia) return const _SemAparelhos();
+    return ListView(
+      children: [
+        if (_erro != null) ...[MensagemErro(_erro!, tentarDeNovo: _gerar), const SizedBox(height: Espaco.m)],
+        if (plano != null) _Conteudo(plano) else const _Apresentacao(),
+      ],
     );
   }
 }
 
-/// Espera do LLM: raio pulsando e o que esta acontecendo (pode levar alguns segundos).
+class _SemAparelhos extends StatelessWidget {
+  const _SemAparelhos();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    return Center(
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.savings_outlined, size: t.iconeEnorme),
+            const SizedBox(height: Espaco.m),
+            Semantics(
+              header: true,
+              child: Text('Primeiro, calcule seus aparelhos', style: t.titulo, textAlign: TextAlign.center),
+            ),
+            const SizedBox(height: Espaco.p),
+            Text(
+              'Com os aparelhos da sua casa, o Eco-Coach monta um plano para gastar menos, '
+              'com dicas oficiais do Inmetro e da Cemig.',
+              style: t.corpo,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Apresentacao extends StatelessWidget {
+  const _Apresentacao();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    final n = casa.totalAparelhos;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const CabecalhoPergunta(
+          'Seu plano para gastar menos',
+          ajuda: 'O Eco-Coach lê as dicas oficiais do Inmetro e da Cemig e monta um plano '
+              'para os aparelhos que mais pesam na sua conta.',
+        ),
+        CartaoDestaque(
+          titulo: 'Sua conta com estes aparelhos',
+          valor: casa.custoMes,
+          formatar: (v) => '${reais(v)} por mês',
+          rodape: '$n ${n == 1 ? 'aparelho' : 'aparelhos'} · ${casa.moradores} '
+              '${casa.moradores == 1 ? 'morador' : 'moradores'}',
+        ),
+        if (casa.trocas.isNotEmpty) ...[
+          const SizedBox(height: Espaco.p),
+          Text(
+            'O plano também considera ${casa.trocas.length == 1 ? 'a troca' : 'as ${casa.trocas.length} trocas'} '
+            'de aparelho que você avaliou.',
+            style: t.secundario,
+          ),
+        ],
+        const SizedBox(height: Espaco.m),
+        const ListaAvisos(['O texto é escrito por inteligência artificial e pode levar alguns segundos.']),
+      ],
+    );
+  }
+}
+
+/// Espera da IA: raio pulsando e o que esta acontecendo (pode levar alguns segundos).
 class _Pensando extends StatefulWidget {
   const _Pensando();
 
@@ -83,33 +166,31 @@ class _PensandoState extends State<_Pensando> with SingleTickerProviderStateMixi
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ScaleTransition(
-            scale: Tween(begin: 0.85, end: 1.15).animate(CurvedAnimation(parent: _pulso, curve: Curves.easeInOut)),
-            child: Container(
-              padding: const EdgeInsets.all(Espaco.g),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Cores.superficie,
-                border: Border.all(color: Cores.borda, width: 1.5),
-                boxShadow: [BoxShadow(color: Cores.amarelo.withValues(alpha: 0.25), blurRadius: 40)],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ScaleTransition(
+              scale: Tween(begin: 0.85, end: 1.15).animate(CurvedAnimation(parent: _pulso, curve: Curves.easeInOut)),
+              child: Container(
+                padding: const EdgeInsets.all(Espaco.g),
+                decoration: t.cartaoDestaque(t.destaque, circulo: true),
+                child: Icon(Icons.bolt, size: t.iconeGrande + 16, color: t.destaque),
               ),
-              child: const Icon(Icons.bolt, size: 48, color: Cores.amarelo),
             ),
-          ),
-          const SizedBox(height: Espaco.g),
-          const Text('Montando seu plano', style: Estilos.titulo),
-          const SizedBox(height: Espaco.p),
-          const Text(
-            'O Eco-Coach está lendo as dicas oficiais do Inmetro e da Cemig para os aparelhos que mais pesam na '
-            'sua conta. Pode levar alguns segundos.',
-            textAlign: TextAlign.center,
-            style: Estilos.corpo,
-          ),
-        ],
+            const SizedBox(height: Espaco.g),
+            Semantics(liveRegion: true, child: Text('Montando seu plano', style: t.titulo)),
+            const SizedBox(height: Espaco.p),
+            Text(
+              'O Eco-Coach está lendo as dicas oficiais do Inmetro e da Cemig para os aparelhos que mais pesam na '
+              'sua conta. Pode levar alguns segundos.',
+              textAlign: TextAlign.center,
+              style: t.corpo,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -120,48 +201,45 @@ class _Conteudo extends StatelessWidget {
 
   const _Conteudo(this.p);
 
-  static const _cores = {'Consciente': Cores.verde, 'Moderado': Cores.amarelo, 'Ineficiente': Cores.vermelho};
-
   @override
   Widget build(BuildContext context) {
-    final cor = _cores[p.perfil] ?? Cores.amarelo;
-    return ListView(
+    final t = Iamp.de(context);
+    final cor = switch (p.perfil) {
+      'Consciente' => t.economia,
+      'Ineficiente' => t.alerta,
+      _ => t.destaque,
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // resumo calculado pelo iamp (nao pela IA)
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: cor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: cor.withValues(alpha: 0.6)),
-              ),
-              child: Text('Perfil ${p.perfil}', style: Estilos.rotulo.copyWith(color: cor)),
-            ),
-            const Spacer(),
-            Text(
-              p.custoTotal != null ? '${reais(p.custoTotal!)}/mês' : '${numero(p.kwhTotal)} kWh/mês',
-              style: Estilos.numero.copyWith(color: Cores.branco),
-            ),
-          ],
+        // resumo calculado pelo Iamp (nao pela IA)
+        if (p.custoTotal != null)
+          CartaoDestaque(
+            titulo: 'Sua conta com estes aparelhos',
+            valor: p.custoTotal!,
+            formatar: (v) => '${reais(v)} por mês',
+            rodape: '${numero(p.kwhTotal)} kWh por mês',
+          ),
+        const SizedBox(height: Espaco.p),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: Espaco.pm, vertical: Espaco.pp),
+            decoration: t.selo(cor),
+            child: Text('Perfil da casa: ${p.perfil}', style: t.rotulo.copyWith(color: cor)),
+          ),
         ),
         const Titulo('O que mais pesa'),
         for (final m in p.maioresConsumos) _LinhaConsumo(m),
         const Titulo('Seu plano de economia'),
         Container(
           padding: const EdgeInsets.all(Espaco.m),
-          decoration: BoxDecoration(
-            color: Cores.superficie,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Cores.borda),
-            boxShadow: [BoxShadow(color: Cores.amarelo.withValues(alpha: 0.10), blurRadius: 32, spreadRadius: -4)],
-          ),
+          decoration: t.cartaoDestaque(t.destaque),
           child: TextoPlano(p.plano),
         ),
-        if (p.fontes.isNotEmpty) ...[const Titulo('Fontes citadas'), for (final f in p.fontes) _CartaoFonte(f)],
+        if (p.fontes.isNotEmpty) ...[const Titulo('Fontes citadas'), for (final f in p.fontes) CartaoFonte(f)],
         const SizedBox(height: Espaco.m),
-        ListaAvisos([p.aviso, 'Texto escrito por IA (${p.modelo}). Ela pode errar: confira nas fontes.']),
+        ListaAvisos([p.aviso, 'Texto escrito por inteligência artificial (${p.modelo}). Ela pode errar: confira nas fontes.']),
       ],
     );
   }
@@ -174,35 +252,27 @@ class _LinhaConsumo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    final parte = '${numero(m.percentual, casas: 0)}%';
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(iconeDaCategoria(m.categoria), size: 20),
-              const SizedBox(width: Espaco.p),
-              Expanded(child: Text(_maiuscula(m.nome), style: Estilos.forte)),
-              Text('${numero(m.percentual, casas: 0)}%', style: Estilos.numero.copyWith(color: Cores.branco)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: m.percentual / 100),
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOutCubic,
-            builder: (_, v, _) => ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: v, minHeight: 8),
+      padding: const EdgeInsets.only(bottom: Espaco.pm),
+      child: MergeSemantics(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(iconeDaCategoria(m.categoria)),
+                const SizedBox(width: Espaco.p),
+                Expanded(child: Text(_maiuscula(m.nome), style: t.forte)),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            ['${numero(m.kwhMes)} kWh/mês', if (m.custoMes != null) '${reais(m.custoMes!)}/mês'].join(' · '),
-            style: Estilos.secundario,
-          ),
-        ],
+            if (m.custoMes != null) Text('${reais(m.custoMes!)} por mês', style: t.numero),
+            Text('$parte do consumo · ${numero(m.kwhMes)} kWh', style: t.secundario),
+            const SizedBox(height: Espaco.pp),
+            ExcludeSemantics(child: BarraParte(m.percentual / 100, descricao: '$parte do consumo')),
+          ],
+        ),
       ),
     );
   }
@@ -210,44 +280,42 @@ class _LinhaConsumo extends StatelessWidget {
   static String _maiuscula(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
-class _CartaoFonte extends StatelessWidget {
+/// Fonte citada no texto: o numero [n], o documento e o endereco (pode ser selecionado e copiado).
+class CartaoFonte extends StatelessWidget {
   final FonteCitada f;
 
-  const _CartaoFonte(this.f);
+  const CartaoFonte(this.f, {super.key});
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final onde = [
       if (f.secao != null && f.secao!.isNotEmpty) f.secao!,
-      if (f.pagina != null) 'p. ${f.pagina}',
+      if (f.pagina != null) 'página ${f.pagina}',
     ].join(' · ');
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(Espaco.pm),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 32,
-              height: 32,
+              constraints: BoxConstraints(minWidth: t.iconeGrande, minHeight: t.iconeGrande),
+              padding: const EdgeInsets.symmetric(horizontal: Espaco.p),
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Cores.amareloEscuro,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Cores.borda),
-              ),
-              child: Text('${f.n}', style: Estilos.forte.copyWith(color: Cores.amarelo)),
+              decoration: t.selo(t.destaque),
+              child: Text('${f.n}', style: t.forte.copyWith(color: t.destaque), semanticsLabel: 'Fonte ${f.n}'),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: Espaco.pm),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${f.orgao} · ${f.documento}', style: Estilos.forte),
-                  if (onde.isNotEmpty) Text(onde, style: Estilos.secundario),
-                  const SizedBox(height: 4),
+                  Text('${f.orgao} · ${f.documento}', style: t.forte),
+                  if (onde.isNotEmpty) Text(onde, style: t.secundario),
+                  const SizedBox(height: Espaco.pp),
                   // sem pacote para abrir links: o endereco pode ser selecionado e copiado
-                  SelectableText(f.url, style: Estilos.secundario.copyWith(color: Cores.amarelo)),
+                  SelectableText(f.url, style: t.secundario.copyWith(color: t.destaque)),
                 ],
               ),
             ),

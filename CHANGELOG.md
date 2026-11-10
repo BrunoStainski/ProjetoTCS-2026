@@ -4,6 +4,21 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## Próxima versão (ainda sem número)
+
+- App redesenhado para o cliente final (público geral, incluindo pessoas mais velhas), mantendo a
+  paleta preto e amarelo: texto base 18 (nada abaixo de 16), contraste AA, toque mínimo de 48dp,
+  respeita a fonte do sistema até 2x sem quebrar, leitor de tela (TalkBack/VoiceOver) com descrições.
+- Navegação inferior com 3 abas: Calcular, Minha casa e Economizar.
+- Uma decisão por tela: tipo -> marca/modelo -> uso -> estado -> distribuidora -> resultado
+  ("Etapa n de 6"); a estimativa fora do catálogo pergunta uma coisa por vez.
+- Valores em R$ como informação principal; kWh e fórmula como secundários.
+- Nome exibido "Iamp" (I maiúsculo) no app, na web, no Android e no iOS.
+- Remover aparelho da casa tem "Desfazer".
+- Removido o cálculo de gás de cozinha (app, API, banco, scripts, dados e testes): o projeto foca só em
+  energia elétrica. **Mudança que quebra a API:** `GET /fogoes`, `GET /gas/precos` e
+  `POST /calcular/gas` não existem mais.
+
 ## App 1.2.0+5 / API 0.3.0
 
 - Gás de cozinha: fogões do Inmetro, preço do GLP por estado (ANP) e tela "Gás de cozinha" no app

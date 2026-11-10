@@ -1,11 +1,11 @@
 {
-    "name": "iamp",
-    "short_name": "iamp",
+    "name": "Iamp",
+    "short_name": "Iamp",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#FFD000",
-    "description": "iamp: quanto cada aparelho pesa na sua conta de luz (Inmetro + ANEEL)",
+    "description": "Iamp: quanto cada aparelho pesa na sua conta de luz (Inmetro + ANEEL)",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

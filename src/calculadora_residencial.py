@@ -204,7 +204,6 @@ SPECS = [
 
 ARQUIVOS_FORA_DO_ESCOPO = {
     "aquecedores-de-agua-e-gas_limpo.csv": "consome gas, nao energia eletrica",
-    "fogoes_fornos_gas_limpo.csv": "consome gas, nao energia eletrica",
     "fornos-eletricos-comerciais_limpo.csv": "uso comercial e unidade do consumo nao confirmada",
     "sistemas-acoplados-equipamentos-solar-de-agua_limpo.csv": "gera economia de energia, nao consome",
 }

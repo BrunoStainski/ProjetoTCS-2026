@@ -39,11 +39,11 @@ def esperar_banco(tentativas=30, pausa=2):
 
 
 def banco_carregado(con):
+    # banco com a tabela fogoes e de antes da saida do gas de cozinha: recarrega para apagar
     sql = ("SELECT to_regclass('public.aparelhos') IS NOT NULL "
            "AND to_regclass('public.vw_tarifa_vigente') IS NOT NULL "
            "AND to_regclass('public.portateis') IS NOT NULL "
-           "AND to_regclass('public.fogoes') IS NOT NULL "
-           "AND to_regclass('public.precos_glp') IS NOT NULL")
+           "AND to_regclass('public.fogoes') IS NULL")
     if not banco.executar(con, sql).scalar_one():
         return False
     # banco criado por uma versao antiga do codigo (falta coluna nova): recarrega
@@ -256,53 +256,6 @@ class Resistivo(BaseModel):
     fonte: str
 
 
-class Fogao(BaseModel):
-    id: int
-    marca: str
-    modelo: str
-    detalhe: str = ""
-    bocas: Optional[int] = None
-    rendimento_pct: Optional[float] = None
-    consumo_forno_kg_h: Optional[float] = None
-
-
-class PrecoGlp(BaseModel):
-    uf: str
-    ano: int
-    preco_kg: float
-    fonte: str
-
-
-class GasEntrada(BaseModel):
-    fogao_id: Optional[int] = Field(None, description="Id de GET /fogoes. Em branco = valores medianos do catalogo.")
-    horas_bocas_dia: Optional[float] = Field(None, ge=0, le=24, description="Tempo com uma boca acesa por dia (somando as bocas).")
-    horas_forno_dia: Optional[float] = Field(None, ge=0, le=24)
-    dias_mes: Optional[float] = Field(None, ge=0, le=31)
-    uf: Optional[str] = Field(None, pattern="^[A-Za-z]{2}$", description="Estado para o preco medio do GLP (ANP).")
-    preco_botijao: Optional[float] = Field(None, gt=0, le=1000, description="Preco do botijao de 13 kg, se souber.")
-    registrar: bool = True
-
-
-class ResultadoGas(BaseModel):
-    marca: str
-    modelo: str
-    detalhe: str = ""
-    uf: str
-    kg_mes: float
-    kg_bocas: float
-    kg_forno: float
-    botijoes_mes: float
-    dias_por_botijao: Optional[int] = None
-    preco_kg: float
-    preco_botijao: float
-    origem_preco: str
-    custo_mes: float
-    custo_ano: float
-    metodo: str
-    avisos: list[str]
-    fonte_dados: str
-
-
 class ItemConsumo(BaseModel):
     categoria: str = Field(..., description="Categoria do aparelho (GET /categorias). Ex.: chuveiro")
     kwh_mes: float = Field(..., ge=0, description="Consumo mensal, normalmente o kwh_mes de POST /calcular.")
@@ -469,27 +422,6 @@ def calcular_resistivo(entrada: ResistivoEntrada, con=Depends(conexao)):
         padrao = servico.portatil(con, entrada.categoria)
         consumo = estimativa.consumo_resistivo(padrao, entrada.potencia_w, entrada.horas_dia, entrada.dias_mes)
         return servico.calcular_estimado(con, consumo, registrar=entrada.registrar, **entrada.tarifa())
-    except ValueError as erro:
-        raise erro_do_servico(erro) from erro
-
-
-@app.get("/fogoes", response_model=list[Fogao], tags=["Gas de cozinha"])
-def buscar_fogoes(busca: str = Query(..., min_length=2), con=Depends(conexao)):
-    """Fogoes e fornos a gas do catalogo do Inmetro."""
-    return servico.buscar_fogoes(con, busca)
-
-
-@app.get("/gas/precos", response_model=list[PrecoGlp], tags=["Gas de cozinha"])
-def listar_precos_glp(con=Depends(conexao)):
-    """Preco medio mais recente do GLP por estado (ANP, R$/kg)."""
-    return servico.precos_glp(con)
-
-
-@app.post("/calcular/gas", response_model=ResultadoGas, tags=["Gas de cozinha"])
-def calcular_gas(entrada: GasEntrada, con=Depends(conexao)):
-    """Gas de cozinha (GLP) por mes: bocas e forno x tempo de uso x preco do estado ou do botijao."""
-    try:
-        return servico.calcular_gas(con, **entrada.model_dump())
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
 

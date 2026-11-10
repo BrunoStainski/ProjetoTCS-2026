@@ -5,8 +5,8 @@ import '../tema.dart';
 import 'comum.dart';
 import 'distribuidora.dart';
 
-/// Passo 2: pergunta como o aparelho e usado, so quando a API pede.
-/// Se o Inmetro ja informa o consumo mensal, pula direto para a distribuidora.
+/// Etapa 3: pergunta como o aparelho e usado, so quando a API pede.
+/// Se o Inmetro ja informa o consumo mensal, pula direto para o estado.
 class TelaUso extends StatefulWidget {
   final Consulta consulta;
 
@@ -56,33 +56,42 @@ class _TelaUsoState extends State<TelaUso> {
         }
       });
     } on ApiErro catch (e) {
-      setState(() => _erro = e.mensagem);
+      if (mounted) setState(() => _erro = e.mensagem);
     }
   }
 
   void _seguir({bool substituir = false}) {
-    final rota = MaterialPageRoute(builder: (_) => TelaDistribuidora(consulta: widget.consulta));
+    final rota = MaterialPageRoute(builder: (_) => TelaEstado(consulta: widget.consulta));
     substituir ? Navigator.pushReplacement(context, rota) : Navigator.push(context, rota);
   }
 
-  void _confirmar() {
+  void _escolherVelocidade(String velocidade) {
+    setState(() => _velocidade = velocidade);
+    _confirmar();
+  }
+
+  void _confirmar({bool pular = false}) {
     final c = widget.consulta;
     c.horasDia = c.ciclosMes = c.velocidade = null;
     switch (_pergunta!.pergunta) {
       case 'velocidade':
         c.velocidade = _velocidade;
       case 'horas':
+        if (pular) {
+          _tempo.limpar();
+          break;
+        }
         if (_pergunta!.opcional && _tempo.vazio) break;
         final horas = _tempo.horasDia;
         if (horas == null) {
-          setState(() => _erro = 'Informe o tempo de uso por dia em horas e minutos (ex.: 0 h 15 min).');
+          setState(() => _erro = 'Informe quanto tempo por dia, em horas e minutos. Ex.: 0 h e 15 min.');
           return;
         }
         c.horasDia = horas;
       case 'ciclos':
         final ciclos = lerNumero(_valor.text);
         if (ciclos == null || ciclos < 0) {
-          setState(() => _erro = 'Informe quantas vezes por mês.');
+          setState(() => _erro = 'Informe quantas vezes por mês. Ex.: 12.');
           return;
         }
         c.ciclosMes = ciclos;
@@ -91,67 +100,82 @@ class _TelaUsoState extends State<TelaUso> {
     _seguir();
   }
 
+  Widget? _rodape(PerguntaDeUso? p) {
+    if (p == null || p.pergunta == 'velocidade') return null;
+    final continuar = FilledButton(onPressed: _confirmar, child: const Text('Continuar'));
+    if (!(p.pergunta == 'horas' && p.opcional)) return continuar;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        continuar,
+        const SizedBox(height: Espaco.p),
+        TextButton(onPressed: () => _confirmar(pular: true), child: const Text('Não sei, usar o valor do Inmetro')),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final p = _pergunta;
     final aparelho = widget.consulta.aparelho;
     return Pagina(
-      titulo: 'Como você usa?',
-      passo: 2,
-      rodape: p == null ? null : FilledButton(onPressed: _confirmar, child: const Text('Continuar')),
+      titulo: 'Como você usa',
+      etapa: etapaDoCalculo(widget.consulta, 3),
+      rodape: _rodape(p),
       filho: ListView(
         children: [
-          Row(
-            children: [
-              Icon(iconeDaCategoria(aparelho.categoria), color: Cores.amarelo, size: 32),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(aparelho.nome, style: Estilos.titulo),
-                    Text(
-                      [aparelho.categoriaLegivel, if (aparelho.detalhe.isNotEmpty) aparelho.detalhe].join(' - '),
-                      style: Estilos.secundario,
-                    ),
-                  ],
+          MergeSemantics(
+            child: Row(
+              children: [
+                Icon(iconeDaCategoria(aparelho.categoria), size: t.iconeGrande),
+                const SizedBox(width: Espaco.pm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(aparelho.nome, style: t.forte),
+                      Text(
+                        [nomeDaCategoria(aparelho.categoria), if (aparelho.detalhe.isNotEmpty) aparelho.detalhe].join(' · '),
+                        style: t.secundario,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: Espaco.gg),
-          if (p == null && _erro == null) const Center(child: CircularProgressIndicator()),
+          const SizedBox(height: Espaco.g),
+          if (p == null && _erro == null) const Carregando(),
           if (p?.pergunta == 'velocidade') ...[
-            const Text('Em qual velocidade você costuma usar?', style: Estilos.forte),
-            const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: [for (final o in p!.opcoes) ButtonSegment(value: o, label: Text(o))],
-              selected: {?_velocidade},
-              onSelectionChanged: (s) => setState(() => _velocidade = s.first),
-            ),
+            const CabecalhoPergunta('Em qual velocidade você costuma usar?', ajuda: 'Toque na opção.'),
+            for (final o in p!.opcoes)
+              CartaoOpcao(titulo: o, selecionada: o == _velocidade, onTap: () => _escolherVelocidade(o)),
           ],
-          if (p?.pergunta == 'horas')
-            CampoTempo(
-              controle: _tempo,
-              rotulo: p!.opcional ? 'Tempo de uso por dia (opcional)' : 'Tempo de uso por dia',
-              aoConfirmar: _confirmar,
-              ajuda: p.opcional
-                  ? 'Em branco, usamos o consumo medido pelo Inmetro no ensaio. '
-                        'Informe o seu tempo para um valor mais próximo do seu uso.'
+          if (p?.pergunta == 'horas') ...[
+            CabecalhoPergunta(
+              'Quanto tempo por dia ele fica ligado?',
+              ajuda: p!.opcional
+                  ? 'Se não souber, toque em "Não sei" embaixo: usamos o consumo medido pelo Inmetro.'
                   : p.padrao != null
-                  ? 'Valor sugerido é uma estimativa. Troque pelo seu uso real.'
-                  : 'Obrigatório para este aparelho. Ex.: 0 h 15 min.',
+                  ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
+                  : 'Some o tempo de todos os usos do dia. Ex.: dois banhos de 10 min = 0 h e 20 min.',
             ),
-          if (p?.pergunta == 'ciclos')
+            CampoTempo(controle: _tempo, aoConfirmar: _confirmar),
+          ],
+          if (p?.pergunta == 'ciclos') ...[
+            const CabecalhoPergunta(
+              'Quantas vezes por mês você lava roupa?',
+              ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+            ),
             TextField(
               controller: _valor,
               keyboardType: TextInputType.number,
               onSubmitted: (_) => _confirmar(),
-              decoration: const InputDecoration(
-                labelText: 'Lavagens por mês',
-                helperText: 'Valor sugerido é uma estimativa. Troque pelo seu uso real.',
-              ),
+              decoration: const InputDecoration(labelText: 'Lavagens por mês', suffixText: 'vezes'),
             ),
+          ],
           const SizedBox(height: Espaco.m),
           if (_erro != null) MensagemErro(_erro!, tentarDeNovo: p == null ? _carregar : null),
         ],
