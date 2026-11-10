@@ -19,8 +19,9 @@ import pandas as pd
 import banco
 from calculadora_residencial import (
     AMPLIACOES_ESTIMATIVA, AVISO_EQUIVALENTES, COLUNAS_NUM, ECONOMIA_MINIMA, EQUIVALENCIA, ESTIMAVEIS,
-    FRACAO_SUSPEITA, HORAS_OPCIONAIS, LIMITE_BUSCA, LIMITE_MODELOS_MARCA, MINIMO_EQUIVALENTES, PREMISSAS, SEM_SUGESTAO,
-    TOLERANCIA_ESTIMATIVA, consumo_mensal_kwh, montar_resultado, normalizar,
+    FRACAO_SUSPEITA, HORAS_OPCIONAIS, HORAS_REFERENCIA_INMETRO, LIMITE_BUSCA, LIMITE_MODELOS_MARCA,
+    MINIMO_EQUIVALENTES, MINIMO_QUARTIS, NOMES_DOS_TIPOS, PREMISSAS, SEM_SUGESTAO, TOLERANCIA_ESTIMATIVA,
+    consumo_mensal_kwh, montar_resultado, normalizar,
 )
 
 VELOCIDADES = ("baixa", "media", "alta")
@@ -88,12 +89,17 @@ def aparelho_por_id(con, aparelho_id):
 def dados_de_uso(con, aparelho_id):
     """Diz o que a tela precisa perguntar antes de calcular.
     pergunta: None, "velocidade", "ciclos" ou "horas"; padrao: valor sugerido (estimativa do grupo);
-    opcional: True quando o usuario pode deixar em branco e ficar com o valor do Inmetro."""
+    opcional: True quando o usuario pode deixar em branco e ficar com o valor do Inmetro;
+    perguntar_horas: True quando, depois da velocidade, tambem precisa das horas (ventiladores)."""
     a = aparelho_por_id(con, aparelho_id)
+    horas_obrigatorias = a["categoria"] in HORAS_REFERENCIA_INMETRO and a["categoria"] not in HORAS_OPCIONAIS
     velocidades = [v for v in VELOCIDADES if pd.notna(a[f"kwh_mes_{v}"])]
     if velocidades:
         return {"pergunta": "velocidade", "opcoes": velocidades,
-                "padrao": "media" if "media" in velocidades else velocidades[-1]}
+                "padrao": "media" if "media" in velocidades else velocidades[-1],
+                "perguntar_horas": horas_obrigatorias}
+    if horas_obrigatorias and pd.notna(a["kwh_mes"]):
+        return {"pergunta": "horas", "padrao": None, "opcional": False}
     if a["categoria"] in HORAS_OPCIONAIS and (pd.notna(a["kwh_mes"]) or pd.notna(a["potencia_w"])):
         return {"pergunta": "horas", "padrao": None, "opcional": True}
     if pd.notna(a["kwh_mes"]):
@@ -177,6 +183,7 @@ def calcular_estimado(con, consumo, distribuidora_id=None, tarifa_manual=None, m
     resultado["fonte_dados"] = consumo["fonte"]
     resultado["tipo"] = consumo.get("tipo")
     resultado["capacidade"] = consumo.get("capacidade")
+    resultado["pelos_parecidos"] = consumo.get("pelos_parecidos", False)
     if "kwh_min" in consumo:
         resultado["kwh_min"] = round(consumo["kwh_min"], 2)
         resultado["kwh_max"] = round(consumo["kwh_max"], 2)
@@ -201,17 +208,22 @@ def portatil(con, categoria):
 
 
 def pergunta_de_uso_da_categoria(categoria):
-    if categoria.startswith("ventilador"):
-        return {"pergunta": "velocidade", "opcoes": list(VELOCIDADES), "padrao": "media"}
+    if categoria in HORAS_REFERENCIA_INMETRO and categoria not in HORAS_OPCIONAIS:
+        return {"pergunta": "velocidade", "opcoes": list(VELOCIDADES), "padrao": "media", "perguntar_horas": True}
     if categoria in HORAS_OPCIONAIS:
         return {"pergunta": "horas", "padrao": None, "opcional": True}
-    campo = ESTIMAVEIS.get(categoria, {}).get("etiqueta", (None,))[0]
     premissa = PREMISSAS.get(categoria, {})
-    if campo == "kwh_ciclo":
-        return {"pergunta": "ciclos", "padrao": premissa.get("ciclos_mes")}
-    if campo == "potencia_w":
-        return {"pergunta": "horas", "padrao": premissa.get("horas_dia")}
-    return {"pergunta": None}
+    if "ciclos_mes" in premissa:
+        return {"pergunta": "ciclos", "padrao": premissa["ciclos_mes"]}
+    return {"pergunta": "horas", "padrao": premissa.get("horas_dia")}
+
+
+def _nome_do_tipo(tipo):
+    return NOMES_DOS_TIPOS.get(tipo, (tipo, None))[0] if tipo else tipo
+
+
+def _unidade(config):
+    return config["medida"].split("(")[-1].rstrip(")") if config.get("medida") else None
 
 
 def categorias_estimaveis(con):
@@ -223,16 +235,19 @@ def categorias_estimaveis(con):
             tipos = banco.consulta(
                 con, "SELECT DISTINCT tipo FROM aparelhos WHERE categoria = ? AND origem_dado = 'informado' "
                      "AND tipo IS NOT NULL AND tipo <> '' ORDER BY tipo", (categoria,))["tipo"].tolist()
-        campo, rotulo = config.get("etiqueta", (None, None))
+            ordem = list(NOMES_DOS_TIPOS)
+            tipos.sort(key=lambda t: ordem.index(t) if t in ordem else len(ordem))
         lista.append({
             "categoria": categoria,
             "nome": config["nome"],
             "especial": bool(config.get("especial")),
             "medida": config.get("medida"),
-            "tipos": tipos,
-            "etiqueta_campo": campo,
-            "etiqueta_rotulo": rotulo,
-            "etiqueta_obrigatoria": campo is not None and not config.get("medida"),
+            "unidade_medida": _unidade(config),
+            "tamanhos": config.get("tamanhos", []),
+            "tipos": [{"valor": t, "nome": _nome_do_tipo(t), "descricao": NOMES_DOS_TIPOS.get(t, (t, None))[1]}
+                      for t in tipos],
+            "formas": config.get("formas", []),
+            "valor_obrigatorio": bool(config.get("obrigatorio")),
             "uso": pergunta_de_uso_da_categoria(categoria),
         })
     return lista
@@ -242,75 +257,104 @@ def _equivalentes(con, categoria, tipo, medida):
     regra = EQUIVALENCIA.get(categoria, {})
     tolerancia = max(regra.get("tolerancia", TOLERANCIA_ESTIMATIVA), TOLERANCIA_ESTIMATIVA)
     filtro_tipo = bool(regra.get("mesmo_tipo") and tipo)
+    sql_tipo = " AND tipo = ?" if filtro_tipo else ""
+    params_tipo = [tipo] if filtro_tipo else []
+    if medida is None:
+        sql = "SELECT * FROM aparelhos WHERE categoria = ? AND origem_dado = 'informado'" + sql_tipo
+        return banco.consulta(con, sql, [categoria, *params_tipo]), None, filtro_tipo
     candidatos = pd.DataFrame()
     for fator in AMPLIACOES_ESTIMATIVA:
         margem = float(medida) * tolerancia * fator
         sql = ("SELECT * FROM aparelhos WHERE categoria = ? AND origem_dado = 'informado' "
-               "AND capacidade BETWEEN ? AND ?")
-        params = [categoria, float(medida) - margem, float(medida) + margem]
-        if filtro_tipo:
-            sql += " AND tipo = ?"
-            params.append(tipo)
-        candidatos = banco.consulta(con, sql, params)
+               "AND capacidade BETWEEN ? AND ?" + sql_tipo)
+        candidatos = banco.consulta(con, sql, [categoria, float(medida) - margem, float(medida) + margem, *params_tipo])
         if len(candidatos) >= MINIMO_EQUIVALENTES:
             return candidatos, tolerancia * fator, filtro_tipo
     return candidatos, tolerancia * AMPLIACOES_ESTIMATIVA[-1], filtro_tipo
 
 
 def estimar_por_equivalentes(con, categoria, tipo=None, medida=None, valor_etiqueta=None,
-                             horas_dia=None, ciclos_mes=None, velocidade=None):
+                             horas_dia=None, ciclos_mes=None, velocidade=None, campo_etiqueta=None):
     config = ESTIMAVEIS.get(categoria)
     if config is None or config.get("especial"):
         raise ValueError(f"categoria {categoria} nao tem esta estimativa")
     uso = {"horas_dia": horas_dia, "ciclos_mes": ciclos_mes, "velocidade": velocidade}
-    campo, rotulo = config["etiqueta"]
     base = {"categoria": categoria, "nome": config["nome"], "tipo": tipo or None}
 
     if valor_etiqueta is not None:
-        if valor_etiqueta <= 0:
-            raise ValueError("o valor da etiqueta precisa ser maior que zero")
-        aparelho = {**{c: math.nan for c in COLUNAS_NUM}, "categoria": categoria, campo: float(valor_etiqueta)}
+        formas = {f["campo"]: f for f in config["formas"]}
+        forma = formas.get(campo_etiqueta or config["formas"][0]["campo"])
+        if forma is None:
+            raise ValueError(f"para {config['nome']} informe: {', '.join(f['nome'] for f in formas.values())}")
+        if not 0 < valor_etiqueta <= forma["maximo"]:
+            raise ValueError(f"{forma['rotulo']} precisa estar entre 0 e {forma['maximo']:g} {forma['unidade']}")
+        aparelho = {**{c: math.nan for c in COLUNAS_NUM}, "categoria": categoria, forma["campo"]: float(valor_etiqueta)}
+        if forma["campo"] == "potencia_w":
+            uso["velocidade"] = None
         consumo = consumo_mensal_kwh(aparelho, **uso)
-        medida_final = float(valor_etiqueta) if not config.get("medida") else medida
         return {**base, **consumo, "kwh_min": consumo["kwh_mes"], "kwh_max": consumo["kwh_mes"],
-                "metodo": f"valor informado ({rotulo}: {valor_etiqueta:g}); {consumo['metodo']}",
-                "capacidade": medida_final, "detalhe": _detalhe_estimado(config, tipo, medida_final),
-                "aproximado": consumo["premissa"], "avisos": [], "fonte": "valor informado pelo usuario"}
+                "metodo": f"{forma['nome']}: {valor_etiqueta:g} {forma['unidade']}; {consumo['metodo']}",
+                "capacidade": medida if config.get("medida") else float(valor_etiqueta),
+                "detalhe": _detalhe_estimado(config, tipo, medida) or f"{valor_etiqueta:g} {forma['unidade']}",
+                "pelos_parecidos": False,
+                "aproximado": consumo["premissa"], "avisos": [], "fonte": "valor informado pelo usuário"}
 
-    if medida is None or medida <= 0:
-        raise ValueError(f"informe {config.get('medida') or rotulo} ou o valor da etiqueta")
-    candidatos, tolerancia, filtrou_tipo = _equivalentes(con, categoria, tipo, medida)
-    calculos = []
+    if config.get("obrigatorio"):
+        raise ValueError(f"informe a {config['formas'][0]['rotulo'].lower()} do aparelho")
+    if config.get("medida") and (medida is None or medida <= 0):
+        raise ValueError(f"informe {config['medida'].lower()} ou o valor escrito no aparelho")
+    candidatos, tolerancia, filtrou_tipo = _equivalentes(con, categoria, tipo, medida if config.get("medida") else None)
+    validos = []
     for _, c in candidatos.iterrows():
         try:
-            calculos.append(consumo_mensal_kwh(c, **uso))
+            consumo_mensal_kwh(c, **uso)
         except ValueError:
             continue
-    if not calculos:
-        raise ValueError("nao ha modelos parecidos no catalogo para estimar; informe o valor da etiqueta")
-    kwh = pd.Series([c["kwh_mes"] for c in calculos])
-    criterio = f"medida a ate {tolerancia:.0%}" + (" e mesmo tipo" if filtrou_tipo else "")
+        validos.append(c)
+    if not validos:
+        raise ValueError("nao ha modelos parecidos no catalogo para estimar; informe o valor escrito no aparelho")
+    numeros = pd.DataFrame(validos)[COLUNAS_NUM].astype(float)
+
+    def referencia(q):
+        return consumo_mensal_kwh({**numeros.quantile(q).to_dict(), "categoria": categoria}, **uso)
+
+    poucos = len(numeros) < MINIMO_QUARTIS
+    central = referencia(0.5)
+    menor, maior = (referencia(0), referencia(1)) if poucos else (referencia(0.25), referencia(0.75))
+    partes = []
+    if tolerancia is not None:
+        nome_medida = config["medida"].split(" (")[0].lower()
+        partes.append(f"{nome_medida} até {tolerancia:.0%} acima ou abaixo de {_detalhe_estimado(config, None, medida)}")
+    if filtrou_tipo:
+        partes.append(f"do tipo {_nome_do_tipo(tipo).lower()}")
+    criterio = " e ".join(partes) or "todos os modelos do catálogo"
+    if len(numeros) == 1:
+        faixa = "só 1 modelo parecido, sem faixa"
+    elif poucos:
+        faixa = "faixa entre o menor e o maior valor"
+    else:
+        faixa = "faixa entre o 1º e o 3º quartil"
     return {
         **base,
-        "kwh_mes": float(kwh.median()),
-        "kwh_min": float(kwh.quantile(0.25)),
-        "kwh_max": float(kwh.quantile(0.75)),
-        "metodo": (f"mediana de {len(kwh)} modelos atuais parecidos do Inmetro ({criterio}); "
-                   f"faixa entre o 1o e o 3o quartil. Uso: {calculos[0]['metodo']}"),
-        "capacidade": float(medida),
-        "detalhe": _detalhe_estimado(config, tipo, medida),
-        "premissa": calculos[0]["premissa"],
+        "kwh_mes": central["kwh_mes"],
+        "kwh_min": menor["kwh_mes"],
+        "kwh_max": maior["kwh_mes"],
+        "metodo": (f"mediana de {len(numeros)} modelos atuais parecidos do Inmetro ({criterio}); "
+                   f"{faixa}. Uso: {central['metodo']}"),
+        "capacidade": float(medida) if tolerancia is not None else None,
+        "detalhe": _detalhe_estimado(config, tipo, medida if tolerancia is not None else None),
+        "premissa": central["premissa"],
         "aproximado": True,
         "avisos": [AVISO_EQUIVALENTES],
-        "fonte": "catalogo do Inmetro (modelos equivalentes)",
+        "fonte": "catálogo do Inmetro (modelos equivalentes)",
+        "pelos_parecidos": True,
     }
 
 
 def _detalhe_estimado(config, tipo, medida):
-    partes = [tipo] if tipo else []
+    partes = [_nome_do_tipo(tipo)] if tipo else []
     if medida is not None:
-        unidade = config["medida"].split("(")[-1].rstrip(")") if config.get("medida") else "W"
-        partes.append(f"{medida:g} {unidade}")
+        partes.append(f"{medida:g} {_unidade(config)}")
     return ", ".join(partes)
 
 
@@ -356,7 +400,10 @@ def sugerir_alternativas(con, aparelho_id, distribuidora_id=None, tarifa_manual=
 
 
 def sugerir_para_estimado(con, categoria, capacidade, kwh_mes, tipo=None, nome=None, distribuidora_id=None,
-                          tarifa_manual=None, horas_dia=None, ciclos_mes=None, velocidade=None, limite=5):
+                          tarifa_manual=None, horas_dia=None, ciclos_mes=None, velocidade=None, limite=5,
+                          pelos_parecidos=False):
+    """pelos_parecidos: o kwh_mes saiu da mediana dos modelos parecidos (sem o numero do aparelho), entao
+    comparar com esses mesmos modelos e circular e a mensagem precisa dizer isso."""
     if kwh_mes <= 0:
         raise ValueError("o consumo do aparelho precisa ser maior que zero")
     atual = {"id": 0, "categoria": categoria, "marca": nome or ESTIMAVEIS.get(categoria, {}).get("nome", categoria),
@@ -366,7 +413,7 @@ def sugerir_para_estimado(con, categoria, capacidade, kwh_mes, tipo=None, nome=N
     if regra.get("medida") == "fluxo_lm" and capacidade:
         atual["fluxo_lm"] = float(capacidade) * _eficiencia_luminosa(con, categoria)
     uso = {"horas_dia": horas_dia, "ciclos_mes": ciclos_mes, "velocidade": velocidade}
-    return _sugerir(con, atual, float(kwh_mes), uso, distribuidora_id, tarifa_manual, limite)
+    return _sugerir(con, atual, float(kwh_mes), uso, distribuidora_id, tarifa_manual, limite, pelos_parecidos)
 
 
 def _eficiencia_luminosa(con, categoria):
@@ -375,7 +422,7 @@ def _eficiencia_luminosa(con, categoria):
     return float(df["lm_por_w"].median()) if len(df) else math.nan
 
 
-def _sugerir(con, atual, kwh_atual, uso, distribuidora_id, tarifa_manual, limite):
+def _sugerir(con, atual, kwh_atual, uso, distribuidora_id, tarifa_manual, limite, pelos_parecidos=False):
     velocidade = uso.get("velocidade")
     tarifa, _, _, _ = escolher_tarifa(con, distribuidora_id, tarifa_manual)
     resposta = {
@@ -390,12 +437,13 @@ def _sugerir(con, atual, kwh_atual, uso, distribuidora_id, tarifa_manual, limite
     regra = EQUIVALENCIA.get(atual["categoria"])
     if regra is None:
         resposta["mensagem"] = SEM_SUGESTAO.get(
-            atual["categoria"], "Ainda nao sugerimos trocas para este tipo de aparelho.")
+            atual["categoria"], "Ainda não sugerimos trocas para este tipo de aparelho.")
         return resposta
     resposta["criterio"] = regra["texto"]
     candidatos = _candidatos(con, atual, regra, velocidade)
     if candidatos is None:
-        resposta["mensagem"] = "Este modelo nao tem a medida usada na comparacao, entao nao da para achar um equivalente."
+        resposta["mensagem"] = ("Para achar modelos parecidos precisamos do tamanho do aparelho. "
+                                "Calcule de novo informando o tamanho.")
         return resposta
 
     consumos = []
@@ -431,8 +479,13 @@ def _sugerir(con, atual, kwh_atual, uso, distribuidora_id, tarifa_manual, limite
             vistos.add(chave)
             unicas.append(s)
     resposta["sugestoes"] = unicas[:limite]
-    if not sugestoes:
-        resposta["mensagem"] = "Este modelo ja esta entre os mais economicos do catalogo do Inmetro."
+    if not sugestoes and pelos_parecidos:
+        resposta["mensagem"] = (
+            "O gasto do seu aparelho foi calculado pelos modelos atuais parecidos, então ele sai igual a eles e "
+            "nenhum aparece como mais econômico. Se o seu for antigo, pode gastar mais. Para comparar de verdade, "
+            "calcule de novo com o número da etiqueta ou a potência escrita no aparelho.")
+    elif not sugestoes:
+        resposta["mensagem"] = "Este aparelho já está entre os mais econômicos do catálogo do Inmetro."
     return resposta
 
 
@@ -492,6 +545,6 @@ def _comparacao(atual, novo, preco_novo):
         "avisos": [
             ("Payback simples: preco do modelo novo dividido pela economia mensal, sem juros, "
              "sem a venda do aparelho antigo e sem reajuste da tarifa."),
-            "O catalogo do Inmetro nao tem precos: o valor usado e o que voce digitou.",
+            "O catálogo do Inmetro não tem preços: o valor usado é o que você digitou.",
         ],
     }

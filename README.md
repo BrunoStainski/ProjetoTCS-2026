@@ -432,7 +432,7 @@ instalar sem App Store é preciso uma conta Apple. Sem Mac, a alternativa é a v
 | Caso | Como calcula |
 |---|---|
 | O Inmetro informa o consumo mensal (geladeira, TV, ar-condicionado) | Usa o número da tabela |
-| O ventilador tem consumo por velocidade | Pergunta a velocidade (baixa, média ou alta) |
+| O ventilador tem consumo por velocidade | Pergunta a velocidade (baixa, média ou alta) e as horas por dia: o consumo do Inmetro é de 1 hora por dia |
 | O Inmetro informa o consumo por ciclo (máquina de lavar) | kWh por ciclo x ciclos por mês |
 | O Inmetro só informa a potência (lâmpada, micro-ondas, chuveiro, bomba) | Potência x horas por dia x 30 dias |
 

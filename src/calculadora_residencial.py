@@ -38,8 +38,11 @@ PREMISSAS = {
 #    6,59 h ligada + 17,41 h em stand-by por dia = padrao de ensaio levantado pelo grupo.
 #    LIMITACAO: ainda sem o documento oficial (regulamento do PBE de televisores) e sem saber se
 #    o kWh/mes do Inmetro inclui o stand-by; por isso o consumo inteiro e reescalado.
-HORAS_REFERENCIA_INMETRO = {"televisor": 6.59}
-HORAS_OPCIONAIS = {"ar_condicionado"} | {c for c, h in HORAS_REFERENCIA_INMETRO.items() if h}
+#  - ventiladores: o kWh/mes do Inmetro e de 1 h por dia (potencia x 30 h, conferido nos CSVs brutos).
+#    Sem as horas, o ventilador sairia como se ficasse ligado 1 h por dia, entao a resposta e obrigatoria.
+HORAS_REFERENCIA_INMETRO = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
+HORAS_OPCIONAIS = {"ar_condicionado", "televisor"}
+NOMES_VELOCIDADES = {"baixa": "baixa", "media": "média", "alta": "alta"}
 
 COLUNAS_NUM = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
@@ -53,60 +56,123 @@ COLUNAS_NUM = [
 #  - mesmo_tipo: exige o mesmo tipo (so onde o tipo vem padronizado no Inmetro)
 EQUIVALENCIA = {
     "refrigerador": {"categorias": ["refrigerador"], "medida": "capacidade", "tolerancia": 0.15,
-                     "mesmo_tipo": True, "texto": "mesmo tipo e volume parecido (15% para mais ou para menos)"},
+                     "mesmo_tipo": True, "texto": "mesmo tipo e volume parecido (até 15% de diferença)"},
     "televisor": {"categorias": ["televisor"], "medida": "capacidade", "tolerancia": 0.05,
-                  "mesmo_tipo": False, "texto": "tela do mesmo tamanho (5% para mais ou para menos)"},
+                  "mesmo_tipo": False, "texto": "tela do mesmo tamanho (até 5% de diferença)"},
     "ar_condicionado": {"categorias": ["ar_condicionado"], "medida": "capacidade", "tolerancia": 0.05,
-                        "mesmo_tipo": True, "texto": "mesmo tipo e mesma capacidade em BTU/h (5%)"},
+                        "mesmo_tipo": True, "texto": "mesmo tipo e mesma capacidade em BTU/h (até 5% de diferença)"},
     "ventilador_de_mesa": {"categorias": ["ventilador_de_mesa"], "medida": "capacidade", "tolerancia": 0.10,
-                           "mesmo_tipo": False, "texto": "helice de diametro parecido (10%)"},
+                           "mesmo_tipo": False, "texto": "hélice de diâmetro parecido (até 10% de diferença)"},
     "ventilador_de_teto": {"categorias": ["ventilador_de_teto"], "medida": "capacidade", "tolerancia": 0.10,
-                           "mesmo_tipo": False, "texto": "diametro parecido (10%)"},
+                           "mesmo_tipo": False, "texto": "diâmetro parecido (até 10% de diferença)"},
     "maquina_de_lavar": {"categorias": ["maquina_de_lavar"], "medida": "capacidade", "tolerancia": 0.15,
-                         "mesmo_tipo": True, "texto": "mesmo tipo e capacidade parecida em kg (15%)"},
+                         "mesmo_tipo": True, "texto": "mesmo tipo e capacidade parecida em kg (até 15% de diferença)"},
     "lampada_led": {"categorias": ["lampada_led"], "medida": "fluxo_lm", "tolerancia": 0.10,
-                    "mesmo_tipo": False, "texto": "mesma luminosidade em lumens (10%)"},
+                    "mesmo_tipo": False, "texto": "mesma luminosidade em lumens (até 10% de diferença)"},
     "lampada_fluorescente": {"categorias": ["lampada_led", "lampada_fluorescente"], "medida": "fluxo_lm",
                              "tolerancia": 0.10, "mesmo_tipo": False,
-                             "texto": "mesma luminosidade em lumens (10%), incluindo lampadas LED"},
+                             "texto": "mesma luminosidade em lumens (até 10% de diferença), incluindo lâmpadas LED"},
     "bomba": {"categorias": ["bomba"], "medida": "capacidade", "tolerancia": 0.0, "mesmo_tipo": False,
-              "texto": "motor de mesma potencia (cv); confira vazao e altura com o fabricante"},
+              "texto": "motor de mesma potência (cv); confira vazão e altura com o fabricante"},
 }
+
+
+def _etiqueta(campo, unidade, onde, exemplo, maximo):
+    return {"campo": campo, "nome": "Etiqueta amarela do Inmetro", "rotulo": "Consumo de energia",
+            "unidade": unidade, "onde": onde, "dica": None, "exemplo": exemplo, "maximo": maximo}
+
+
+def _plaqueta(onde, exemplo, maximo, dica=None):
+    return {"campo": "potencia_w", "nome": "Potência escrita no aparelho", "rotulo": "Potência",
+            "unidade": "W", "onde": onde, "dica": dica, "exemplo": exemplo, "maximo": maximo}
+
+
+def _tamanhos(unidade, *valores):
+    return [{"valor": v, "nome": f"{v:,} {unidade}".replace(",", ".")} for v in valores]
+
+
+# Aparelho fora do catalogo (antigo ou sem modelo). O usuario informa o numero do proprio aparelho
+# (formas: etiqueta do Inmetro ou potencia da plaqueta, que vale tambem para aparelho antigo) ou,
+# sem ele, o tipo e o tamanho, e o gasto sai da mediana dos modelos parecidos do catalogo.
+#  - ar-condicionado e ventiladores: sem etiqueta. A do ar mudou de kWh/mes para kWh/ano em 2023 e a do
+#    ventilador e de 1 h por dia; a potencia da plaqueta x horas evita essa confusao.
+#  - ventilador de teto: sem tamanho (o diametro do catalogo tem erros e ninguem sabe o seu de cabeca).
+#  - obrigatorio: sem catalogo para comparar, o usuario precisa informar a potencia.
 ESTIMAVEIS = {
     "refrigerador": {"nome": "Geladeira ou freezer", "especial": True},
-    "maquina_de_lavar": {"nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)",
-                         "etiqueta": ("kwh_ciclo", "Consumo da etiqueta (kWh por ciclo)")},
-    "ar_condicionado": {"nome": "Ar-condicionado", "medida": "Capacidade (BTU/h)",
-                        "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
-    "televisor": {"nome": "Televisor", "medida": "Tamanho da tela (polegadas)",
-                  "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
-    "ventilador_de_mesa": {"nome": "Ventilador de mesa, coluna ou parede", "medida": "Diâmetro da hélice (cm)",
-                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
-    "ventilador_de_teto": {"nome": "Ventilador de teto", "medida": "Diâmetro (cm)",
-                           "etiqueta": ("kwh_mes", "Consumo da etiqueta (kWh/mês)")},
-    "microondas": {"nome": "Micro-ondas", "medida": "Capacidade (litros)",
-                   "etiqueta": ("potencia_w", "Potência (W)")},
-    "bomba": {"nome": "Bomba d'água", "medida": "Potência do motor (cv)",
-              "etiqueta": ("potencia_w", "Potência elétrica (W)")},
-    "chuveiro": {"nome": "Chuveiro elétrico", "etiqueta": ("potencia_w", "Potência (W)")},
-    "lampada_led": {"nome": "Lâmpada LED", "etiqueta": ("potencia_w", "Potência (W)")},
-    "lampada_fluorescente": {"nome": "Lâmpada fluorescente", "etiqueta": ("potencia_w", "Potência (W)")},
-    "lampada_vapor_sodio": {"nome": "Lâmpada de vapor de sódio", "etiqueta": ("potencia_w", "Potência (W)")},
+    "maquina_de_lavar": {
+        "nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)", "tamanhos": _tamanhos("kg", 6, 8, 10, 12, 15),
+        "formas": [_etiqueta("kwh_ciclo", "kWh/ciclo", "Adesivo amarelo colado na máquina, na linha \"Consumo de energia\".",
+                             "Ex.: 0,25", 5)]},
+    "ar_condicionado": {
+        "nome": "Ar-condicionado", "medida": "Capacidade (BTU/h)",
+        "tamanhos": _tamanhos("BTU/h", 7500, 9000, 12000, 18000, 24000),
+        "formas": [_plaqueta("Etiqueta branca com o modelo, na lateral do aparelho (no split, na parte de dentro).",
+                             "Ex.: 1100", 10000,
+                             dica="Use a potência elétrica (consumida). Não use a capacidade de refrigeração, "
+                                  "que é um número bem maior.")]},
+    "televisor": {
+        "nome": "Televisor", "medida": "Tamanho da tela (polegadas)",
+        "tamanhos": _tamanhos("polegadas", 24, 32, 43, 50, 55, 65),
+        "formas": [_plaqueta("Etiqueta atrás da TV, com o modelo e a voltagem. Toda TV tem, até as antigas.",
+                             "Ex.: 120", 1500),
+                   _etiqueta("kwh_mes", "kWh/mês", "Adesivo amarelo, só nas TVs mais novas.", "Ex.: 9,9", 300)]},
+    "ventilador_de_mesa": {
+        "nome": "Ventilador de mesa, coluna ou parede", "medida": "Diâmetro da hélice (cm)",
+        "tamanhos": _tamanhos("cm", 30, 40, 50),
+        "formas": [_plaqueta("Etiqueta embaixo da base ou atrás do motor, com a voltagem e a potência.",
+                             "Ex.: 120", 500)]},
+    "ventilador_de_teto": {
+        "nome": "Ventilador de teto",
+        "formas": [_plaqueta("Etiqueta em cima do motor ou na caixa, com a voltagem e a potência.", "Ex.: 130", 500)]},
+    "microondas": {
+        "nome": "Micro-ondas", "medida": "Capacidade (litros)", "tamanhos": _tamanhos("litros", 20, 25, 30, 35),
+        "formas": [_plaqueta("Etiqueta atrás do aparelho ou na parte de dentro da porta.", "Ex.: 1300", 5000,
+                             dica="Use a potência consumida (de entrada), que é a maior. A potência de saída, "
+                                  "de cozimento, é menor.")]},
+    "bomba": {
+        "nome": "Bomba d'água", "medida": "Potência do motor (cv)",
+        "tamanhos": [{"valor": v, "nome": n} for v, n in
+                     ((0.25, "1/4 cv"), (0.33, "1/3 cv"), (0.5, "1/2 cv"), (0.75, "3/4 cv"), (1, "1 cv"), (1.5, "1,5 cv"))],
+        "formas": [_plaqueta("Placa de metal presa no motor.", "Ex.: 750", 20000,
+                             dica="Se estiver em kW, multiplique por 1.000 (0,75 kW = 750 W).")]},
+    "chuveiro": {
+        "nome": "Chuveiro elétrico", "obrigatorio": True,
+        "formas": [_plaqueta("Na embalagem ou gravada no próprio chuveiro.", "Ex.: 5500", 12000,
+                             dica="Use a potência da posição que você mais usa. A de inverno é a maior.")]},
+    "lampada_led": {"nome": "Lâmpada LED", "obrigatorio": True,
+                    "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 9", 1000)]},
+    "lampada_fluorescente": {"nome": "Lâmpada fluorescente", "obrigatorio": True,
+                             "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 20", 1000)]},
+    "lampada_vapor_sodio": {"nome": "Lâmpada de vapor de sódio", "obrigatorio": True,
+                            "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 70", 1000)]},
+}
+# Nomes do Inmetro trocados por uma descricao que o usuario reconhece olhando o aparelho (na ordem da tela).
+NOMES_DOS_TIPOS = {
+    "Top Load (automatica)": ("Automática que abre por cima", "Tampa em cima. Lava, enxágua e centrifuga sozinha."),
+    "Semiautomaticas": ("Tanquinho ou semiautomática", "Lava, mas você tira a água ou muda a roupa de lugar."),
+    "Front Load (automatica)": ("Automática que abre na frente", "Porta redonda na frente."),
+    "Front Load (lava e seca)": ("Lava e seca", "Porta na frente. Também seca a roupa."),
+    "Split Hi-Wall": ("Split de parede", "Aparelho comprido no alto da parede e uma caixa do lado de fora."),
+    "Janela": ("De janela", "Uma caixa só, encaixada na parede ou na janela."),
+    "Split Piso-teto": ("Split de piso-teto", "Aparelho grande preso no teto ou embaixo, na parede."),
+    "Split Cassete": ("Split cassete", "Embutido no forro do teto, solta ar para os quatro lados."),
 }
 TOLERANCIA_ESTIMATIVA = 0.10
 AMPLIACOES_ESTIMATIVA = (1, 2, 4)
 MINIMO_EQUIVALENTES = 5
-AVISO_EQUIVALENTES = ("Gasto aproximado pelos modelos atuais parecidos do catalogo do Inmetro. Aparelhos antigos "
-                      "costumam gastar mais que os atuais; com o valor da etiqueta o calculo fica exato.")
+MINIMO_QUARTIS = 4
+AVISO_EQUIVALENTES = ("Gasto aproximado pelos modelos atuais parecidos do catálogo do Inmetro. Aparelhos antigos "
+                      "costumam gastar mais que os atuais; com o valor da etiqueta o cálculo fica exato.")
 
 # Onde nao sugerimos troca, e o motivo (aparece no app).
 SEM_SUGESTAO = {
-    "chuveiro": ("Chuveiros eletricos tem eficiencia parecida: um modelo de menor potencia so esquenta "
-                 "menos a agua. Para economizar, reduza o tempo de banho ou use a posicao verao."),
-    "microondas": ("O Inmetro informa so a potencia do micro-ondas. Um modelo de menor potencia demora mais "
-                   "para aquecer, entao a economia nao pode ser estimada so com esses dados."),
-    "lampada_vapor_sodio": ("O dataset de vapor de sodio nao traz a luminosidade (lumens), entao nao da "
-                            "para achar uma lampada equivalente."),
+    "chuveiro": ("Chuveiros elétricos têm eficiência parecida: um modelo de menor potência só esquenta "
+                 "menos a água. Para economizar, reduza o tempo de banho ou use a posição verão."),
+    "microondas": ("O Inmetro informa só a potência do micro-ondas. Um modelo de menor potência demora mais "
+                   "para aquecer, então a economia não pode ser estimada só com esses dados."),
+    "lampada_vapor_sodio": ("O catálogo de vapor de sódio não traz a luminosidade (lumens), então não dá "
+                            "para achar uma lâmpada equivalente."),
 }
 # Uma sugestao precisa gastar pelo menos 5% menos que o aparelho atual.
 ECONOMIA_MINIMA = 0.05
@@ -118,8 +184,8 @@ ORIGEM_CONVERTIDA = "convertido da metodologia antiga do Inmetro"
 AVISO_CONVERTIDO = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
                     "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.")
 
-AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifaria e iluminacao "
-                "publica. O uso real muda o resultado.")
+AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifária e iluminação "
+                "pública. O uso real muda o resultado.")
 # Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
 AVISO_TARIFA_USUARIO = ("Calculado com a tarifa que voce informou. O uso real muda o resultado.")
 
@@ -320,21 +386,30 @@ def carregar_catalogo(pasta=None):
 def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=None, dias=DIAS_MES):
     """Consumo em kWh/mes e como foi calculado. Ordem: tabela > ciclos > potencia x horas."""
     premissa = PREMISSAS.get(aparelho["categoria"], {})
+    referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
+    if horas_dia is not None and not 0 <= horas_dia <= 24:
+        raise ValueError("horas por dia precisa estar entre 0 e 24")
 
     if velocidade and pd.notna(aparelho.get(f"kwh_mes_{velocidade}")):
-        return {"kwh_mes": float(aparelho[f"kwh_mes_{velocidade}"]),
-                "metodo": f"consumo mensal do Inmetro, velocidade {velocidade}", "premissa": False}
+        kwh = float(aparelho[f"kwh_mes_{velocidade}"])
+        nome = NOMES_VELOCIDADES.get(velocidade, velocidade)
+        if horas_dia is not None and referencia:
+            return {"kwh_mes": kwh * horas_dia / referencia,
+                    "metodo": (f"consumo do Inmetro na velocidade {nome} ({kwh:g} kWh/mês para "
+                               f"{tempo_por_dia(referencia)}) ajustado para {tempo_por_dia(horas_dia)} (informado)"),
+                    "premissa": False}
+        metodo = f"consumo mensal do Inmetro, velocidade {nome}"
+        if referencia:
+            metodo += f" ({tempo_por_dia(referencia)} no ensaio; informe as horas de uso para ajustar)"
+        return {"kwh_mes": kwh, "metodo": metodo, "premissa": False}
 
-    if horas_dia is not None and aparelho["categoria"] in HORAS_OPCIONAIS:
-        if not 0 <= horas_dia <= 24:
-            raise ValueError("horas por dia precisa estar entre 0 e 24")
+    if horas_dia is not None and (aparelho["categoria"] in HORAS_OPCIONAIS or referencia):
         if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
             return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
-                    "metodo": (f"{aparelho['potencia_w']:g} W (potencia do Inmetro a 35 C, carga total) x "
-                               f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor maximo, "
-                               "o compressor nao fica ligado o tempo todo"),
+                    "metodo": (f"{aparelho['potencia_w']:g} W (potência em carga total) x "
+                               f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor máximo, "
+                               "o compressor não fica ligado o tempo todo"),
                     "premissa": False}
-        referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
         if referencia and pd.notna(aparelho["kwh_mes"]):
             return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
                     "metodo": (f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
@@ -343,8 +418,10 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
 
     if pd.notna(aparelho["kwh_mes"]):
         metodo = "consumo mensal do Inmetro"
-        if aparelho["categoria"] in HORAS_OPCIONAIS:
-            metodo += " (uso padrao do ensaio; informe as horas de uso para ajustar)"
+        if referencia:
+            metodo += f" ({tempo_por_dia(referencia)} no ensaio; informe as horas de uso para ajustar)"
+        elif aparelho["categoria"] in HORAS_OPCIONAIS:
+            metodo += " (uso padrão do ensaio; informe as horas de uso para ajustar)"
         return {"kwh_mes": float(aparelho["kwh_mes"]), "metodo": metodo, "premissa": False}
 
     if pd.notna(aparelho["kwh_ciclo"]):
@@ -355,7 +432,7 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
             raise ValueError("ciclos por mes nao pode ser negativo")
         origem = "informado" if ciclos_mes is not None else "estimativa do grupo"
         return {"kwh_mes": float(aparelho["kwh_ciclo"]) * ciclos,
-                "metodo": f"{aparelho['kwh_ciclo']:g} kWh por ciclo x {ciclos:g} ciclos por mes ({origem})",
+                "metodo": f"{aparelho['kwh_ciclo']:g} kWh por ciclo x {ciclos:g} ciclos por mês ({origem})",
                 "premissa": ciclos_mes is None}
 
     if pd.notna(aparelho["potencia_w"]):

@@ -128,7 +128,7 @@ def ler_tarifas_residenciais(caminho=None, mostrar=False):
         "nome": df[col["nome"]].astype(str).str.strip(),
         "tarifa_kwh": tarifa.round(5),
         "vigencia_inicio": vigencia,
-        "fonte": f"ANEEL tarifas homologadas, B1 residencial ({caminho.name})",
+        "fonte": "ANEEL – tarifas homologadas, B1 residencial",
     })
     saida = saida[saida["tarifa_kwh"] > 0]
     saida = saida.drop_duplicates(subset=["nome", "vigencia_inicio"], keep="first")

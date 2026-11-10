@@ -117,6 +117,7 @@ class PerguntaDeUso(BaseModel):
     opcoes: Optional[list[str]] = Field(None, description="Opcoes de velocidade, quando a pergunta e velocidade.")
     padrao: Union[float, str, None] = Field(None, description="Valor sugerido. null = o usuario precisa informar.")
     opcional: bool = Field(False, description="true = o usuario pode deixar em branco e fica o valor do Inmetro.")
+    perguntar_horas: bool = Field(False, description="true = depois da velocidade, pergunta as horas por dia.")
 
 
 class Distribuidora(BaseModel):
@@ -191,16 +192,41 @@ class Resultado(BaseModel):
     custo_max_mes: Optional[float] = None
     tipo: Optional[str] = Field(None, description="Tipo do Inmetro do aparelho estimado (para sugerir equivalentes).")
     capacidade: Optional[float] = Field(None, description="Medida do aparelho estimado (L, kg, BTU/h, pol, cm, W ou cv).")
+    pelos_parecidos: bool = Field(False, description="true = gasto da mediana dos modelos parecidos (sem numero do aparelho).")
 
 
 class EstimadoEntrada(UsoETarifa):
     categoria: str = Field(..., description="Categoria de GET /estimativa/categorias (menos refrigerador).")
     tipo: Optional[str] = None
     medida: Optional[float] = Field(None, gt=0, description="Tamanho do aparelho na unidade da categoria.")
-    valor_etiqueta: Optional[float] = Field(None, gt=0, description="kWh/mes, kWh por ciclo ou W, conforme a categoria.")
+    valor_etiqueta: Optional[float] = Field(None, gt=0, description="Numero escrito no aparelho, na unidade da forma.")
+    campo_etiqueta: Optional[Literal["kwh_mes", "kwh_ciclo", "potencia_w"]] = Field(
+        None, description="Qual das 'formas' da categoria e o valor_etiqueta. null = a primeira.")
     marca: Optional[str] = Field(None, max_length=60)
     modelo: Optional[str] = Field(None, max_length=60)
     registrar: bool = True
+
+
+class TipoEstimavel(BaseModel):
+    valor: str = Field(..., description="Tipo do Inmetro (vai em EstimadoEntrada.tipo).")
+    nome: str
+    descricao: Optional[str] = None
+
+
+class TamanhoComum(BaseModel):
+    valor: float
+    nome: str
+
+
+class FormaDeInformar(BaseModel):
+    campo: Literal["kwh_mes", "kwh_ciclo", "potencia_w"]
+    nome: str
+    rotulo: str
+    unidade: str
+    onde: str
+    dica: Optional[str] = None
+    exemplo: str
+    maximo: float
 
 
 class CategoriaEstimavel(BaseModel):
@@ -208,10 +234,11 @@ class CategoriaEstimavel(BaseModel):
     nome: str
     especial: bool
     medida: Optional[str] = None
-    tipos: list[str]
-    etiqueta_campo: Optional[str] = None
-    etiqueta_rotulo: Optional[str] = None
-    etiqueta_obrigatoria: bool
+    unidade_medida: Optional[str] = None
+    tamanhos: list[TamanhoComum]
+    tipos: list[TipoEstimavel]
+    formas: list[FormaDeInformar] = Field(..., description="Numeros do proprio aparelho que o usuario pode informar.")
+    valor_obrigatorio: bool = Field(..., description="true = sem catalogo para comparar; precisa de uma das formas.")
     uso: PerguntaDeUso
 
 
@@ -222,6 +249,7 @@ class SugestaoEstimadaEntrada(UsoETarifa):
     tipo: Optional[str] = None
     nome: Optional[str] = Field(None, max_length=120)
     limite: int = Field(5, ge=1, le=10)
+    pelos_parecidos: bool = Field(False, description="Copie de Resultado.pelos_parecidos.")
 
 
 class ComparacaoEstimadaEntrada(UsoETarifa):
@@ -463,7 +491,7 @@ def calcular_estimado(entrada: EstimadoEntrada, con=Depends(conexao)):
     try:
         consumo = servico.estimar_por_equivalentes(
             con, entrada.categoria, entrada.tipo, entrada.medida, entrada.valor_etiqueta,
-            entrada.horas_dia, entrada.ciclos_mes, entrada.velocidade)
+            entrada.horas_dia, entrada.ciclos_mes, entrada.velocidade, entrada.campo_etiqueta)
         return servico.calcular_estimado(con, consumo, marca=entrada.marca, modelo=entrada.modelo,
                                          registrar=entrada.registrar, **entrada.tarifa())
     except ValueError as erro:
@@ -476,7 +504,7 @@ def sugerir_para_estimado(entrada: SugestaoEstimadaEntrada, con=Depends(conexao)
     try:
         return servico.sugerir_para_estimado(
             con, entrada.categoria, entrada.capacidade, entrada.kwh_mes, tipo=entrada.tipo, nome=entrada.nome,
-            limite=entrada.limite, **entrada.uso_e_tarifa())
+            limite=entrada.limite, pelos_parecidos=entrada.pelos_parecidos, **entrada.uso_e_tarifa())
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
 

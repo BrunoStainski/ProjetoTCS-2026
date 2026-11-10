@@ -19,6 +19,7 @@ import 'package:app_gerenciamento_energetico/telas/estimar.dart';
 import 'package:app_gerenciamento_energetico/telas/minha_casa.dart';
 import 'package:app_gerenciamento_energetico/telas/resultado.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
+import 'package:app_gerenciamento_energetico/telas/uso.dart';
 
 Map<String, dynamic> resultadoJson(String categoria, double kwh, double custo, {double tarifa = 0.8}) => {
   'categoria': categoria,
@@ -69,6 +70,12 @@ MockClient apiFalsa({List<Uri>? pedidos}) => MockClient((r) async {
             {'id': 2, 'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'modelo': 'GELA', 'total_categoria': 1},
           ],
     '/aparelhos/2/uso' => {'pergunta': null},
+    '/aparelhos/3/uso' => {
+      'pergunta': 'velocidade',
+      'opcoes': ['baixa', 'media', 'alta'],
+      'padrao': 'media',
+      'perguntar_horas': true,
+    },
     '/ufs' => ['PR', 'SP'],
     '/distribuidoras' => [
       {'id': 7, 'nome': 'COPEL-DIS', 'uf': 'PR', 'tarifa_kwh': 0.768},
@@ -651,29 +658,99 @@ void main() {
       expect(find.text('Minutos'), findsOneWidget);
     });
 
-    testWidgets('maquina de lavar sem etiqueta pergunta o tipo e o tamanho', (tester) async {
+    testWidgets('maquina de lavar sem numero pergunta o tipo pelo nome conhecido e o tamanho', (tester) async {
       telaAlta(tester);
       await tester.pumpWidget(telaEstimar());
       await tester.pumpAndSettle();
       await tocar(tester, 'Eletrodoméstico grande');
       await tocar(tester, 'Máquina de lavar');
-      expect(find.text('Tem a etiqueta do Inmetro?'), findsOneWidget);
-      await tocar(tester, 'Não tenho a etiqueta');
-      await tocar(tester, 'Top Load (automatica)');
-      expect(find.text('Capacidade de lavagem (kg)'), findsOneWidget);
+      expect(find.text('Top Load (automatica)'), findsNothing);
+      expect(find.text('Tampa em cima.'), findsOneWidget);
+      await tocar(tester, 'Automática que abre por cima');
+      expect(find.text('Qual é o tamanho?'), findsOneWidget);
+      await tocar(tester, 'Outro tamanho');
       await tocar(tester, 'Continuar');
-      expect(find.textContaining('ou volte e informe o valor da etiqueta'), findsOneWidget);
+      expect(find.textContaining('Se não souber, volte e escolha um dos tamanhos'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tocar(tester, '8 kg');
+      expect(find.text('Você consegue ver algum destes no aparelho?'), findsOneWidget);
+      expect(find.text('Etiqueta amarela do Inmetro'), findsOneWidget);
+      await tocar(tester, 'Não consigo ver nenhum');
+      expect(find.text('Quantas vezes por mês você lava roupa?'), findsOneWidget);
     });
 
-    testWidgets('chuveiro exige a potencia', (tester) async {
+    testWidgets('televisao antiga usa a potencia escrita nela e as horas viram obrigatorias', (tester) async {
+      telaAlta(tester);
+      await tester.pumpWidget(telaEstimar());
+      await tester.pumpAndSettle();
+      await tocar(tester, 'Eletrodoméstico grande');
+      await tocar(tester, 'Televisor');
+      await tocar(tester, '32 polegadas');
+      await tocar(tester, 'Potência escrita no aparelho');
+      expect(find.text('Qual é a potência?'), findsOneWidget);
+      await tocar(tester, 'Continuar');
+      expect(find.text('Digite o número em W, como está escrito. Ex.: 120.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '2000');
+      await tocar(tester, 'Continuar');
+      expect(find.text('Digite o número em W, como está escrito. Ex.: 120.'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '120');
+      await tocar(tester, 'Continuar');
+      expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
+      expect(find.text('Não sei, usar o valor do Inmetro'), findsNothing);
+      await tocar(tester, 'Continuar');
+      expect(find.text('Digite o tempo de uso por dia.'), findsOneWidget);
+    });
+
+    testWidgets('ventilador pergunta a velocidade e as horas; com a potencia, so as horas', (tester) async {
+      telaAlta(tester);
+      await tester.pumpWidget(telaEstimar());
+      await tester.pumpAndSettle();
+      await tocar(tester, 'Eletrodoméstico grande');
+      await tocar(tester, 'Ventilador de teto');
+      await tocar(tester, 'Não consigo ver nenhum');
+      expect(find.text('Qual é o tamanho?'), findsNothing);
+      await tocar(tester, 'Média');
+      expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
+      expect(find.text('Não sei, usar o valor do Inmetro'), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tocar(tester, 'Potência escrita no aparelho');
+      await tester.enterText(find.byType(TextField), '130');
+      await tocar(tester, 'Continuar');
+      expect(find.text('Em qual velocidade você costuma usar?'), findsNothing);
+      expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
+    });
+
+    testWidgets('chuveiro vai direto para a potencia', (tester) async {
       telaAlta(tester);
       await tester.pumpWidget(telaEstimar());
       await tester.pumpAndSettle();
       await tocar(tester, 'Eletrodoméstico grande');
       await tocar(tester, 'Chuveiro elétrico');
-      expect(find.text('Não tenho a etiqueta'), findsNothing);
+      expect(find.text('Qual é a potência?'), findsOneWidget);
+      expect(find.text('Não consigo ver nenhum'), findsNothing);
       await tocar(tester, 'Continuar');
-      expect(find.textContaining('Digite o valor de "Potência (W)"'), findsOneWidget);
+      expect(find.text('Digite o número em W, como está escrito. Ex.: 5500.'), findsOneWidget);
+    });
+
+    testWidgets('ventilador do catalogo pergunta a velocidade e depois as horas', (tester) async {
+      telaAlta(tester);
+      final c = consulta('ventilador_de_mesa', id: 3);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: TelaUso(consulta: c)));
+        await tester.pumpAndSettle();
+        await tocar(tester, 'Média');
+        expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
+        await tocar(tester, 'Continuar');
+        expect(find.textContaining('Informe quanto tempo por dia'), findsOneWidget);
+        await tester.enterText(find.widgetWithText(TextField, 'Horas'), '8');
+        await tocar(tester, 'Continuar');
+      }, apiFalsa);
+      expect(c.velocidade, 'media');
+      expect(c.horasDia, 8);
     });
 
     testWidgets('chamada da busca abre a estimativa', (tester) async {
@@ -940,23 +1017,38 @@ Future<List<Resistivo>> resistivosDeTeste() async => [
   Resistivo.fromJson({'categoria': 'air_fryer', 'nome': 'Air fryer', 'potencia_w': 1500, 'horas_dia': 0.5, 'dias_mes': 15}),
 ];
 
+Map<String, dynamic> _forma(String campo, String unidade, String exemplo, double maximo) => {
+  'campo': campo,
+  'nome': campo == 'potencia_w' ? 'Potência escrita no aparelho' : 'Etiqueta amarela do Inmetro',
+  'rotulo': campo == 'potencia_w' ? 'Potência' : 'Consumo de energia',
+  'unidade': unidade,
+  'onde': 'Escrito no aparelho.',
+  'dica': null,
+  'exemplo': exemplo,
+  'maximo': maximo,
+};
+
 Map<String, dynamic> _categoria(
   String c,
   String nome, {
   String? medida,
-  List<String> tipos = const [],
+  String? unidade,
+  List<Map<String, dynamic>> tamanhos = const [],
+  List<Map<String, dynamic>> tipos = const [],
   bool especial = false,
-  String? etiqueta,
-  bool obrigatoria = false,
+  List<Map<String, dynamic>> formas = const [],
+  bool obrigatorio = false,
   Map<String, dynamic>? uso,
 }) => {
   'categoria': c,
   'nome': nome,
   'especial': especial,
   'medida': medida,
+  'unidade_medida': unidade,
+  'tamanhos': tamanhos,
   'tipos': tipos,
-  'etiqueta_rotulo': etiqueta,
-  'etiqueta_obrigatoria': obrigatoria,
+  'formas': formas,
+  'valor_obrigatorio': obrigatorio,
   'uso': uso ?? {'pergunta': null},
 };
 
@@ -967,15 +1059,43 @@ Future<List<CategoriaEstimavel>> categoriasDeTeste() async => [
       'maquina_de_lavar',
       'Máquina de lavar',
       medida: 'Capacidade de lavagem (kg)',
-      tipos: ['Top Load (automatica)'],
-      etiqueta: 'Consumo da etiqueta (kWh por ciclo)',
+      unidade: 'kg',
+      tamanhos: [
+        {'valor': 8, 'nome': '8 kg'},
+      ],
+      tipos: [
+        {'valor': 'Top Load (automatica)', 'nome': 'Automática que abre por cima', 'descricao': 'Tampa em cima.'},
+      ],
+      formas: [_forma('kwh_ciclo', 'kWh/ciclo', 'Ex.: 0,25', 5)],
       uso: {'pergunta': 'ciclos', 'padrao': 12},
+    ),
+    _categoria(
+      'televisor',
+      'Televisor',
+      medida: 'Tamanho da tela (polegadas)',
+      unidade: 'polegadas',
+      tamanhos: [
+        {'valor': 32, 'nome': '32 polegadas'},
+      ],
+      formas: [_forma('potencia_w', 'W', 'Ex.: 120', 1500), _forma('kwh_mes', 'kWh/mês', 'Ex.: 9,9', 300)],
+      uso: {'pergunta': 'horas', 'padrao': null, 'opcional': true},
+    ),
+    _categoria(
+      'ventilador_de_teto',
+      'Ventilador de teto',
+      formas: [_forma('potencia_w', 'W', 'Ex.: 130', 500)],
+      uso: {
+        'pergunta': 'velocidade',
+        'opcoes': ['baixa', 'media', 'alta'],
+        'padrao': 'media',
+        'perguntar_horas': true,
+      },
     ),
     _categoria(
       'chuveiro',
       'Chuveiro elétrico',
-      etiqueta: 'Potência (W)',
-      obrigatoria: true,
+      obrigatorio: true,
+      formas: [_forma('potencia_w', 'W', 'Ex.: 5500', 12000)],
       uso: {'pergunta': 'horas', 'padrao': null},
     ),
   ])

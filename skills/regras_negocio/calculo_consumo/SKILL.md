@@ -14,7 +14,7 @@ Use esta skill ao implementar, alterar ou revisar o cálculo do iamp. A regra vi
 
 ## Ordem das regras de cálculo (`consumo_mensal_kwh`)
 
-1. **Velocidade informada** e o Inmetro tem kWh/mês por velocidade (ventiladores): usa a coluna `kwh_mes_<velocidade>`.
+1. **Velocidade informada** e o Inmetro tem kWh/mês por velocidade (ventiladores): usa a coluna `kwh_mes_<velocidade>`, que é de 1 h por dia; com as horas informadas, multiplica por elas (`HORAS_REFERENCIA_INMETRO`).
 2. **Horas opcionais** (`HORAS_OPCIONAIS`: ar-condicionado e TV) com horas informadas: ar usa `potencia_w × horas × dias / 1000` (potência a 35 °C em carga total, é um teto e o `metodo` diz isso); TV reescala o kWh/mês do Inmetro por regra de três com 6,59 h/dia (`HORAS_REFERENCIA_INMETRO`, premissa do grupo sem documento oficial).
 3. **kWh/mês do Inmetro** (geladeira, TV, ar sem horas): usa o valor da tabela.
 4. **kWh por ciclo** (máquina de lavar): `kwh_ciclo × ciclos_mes`; sem ciclos, usa `PREMISSAS` (12 ciclos).
@@ -42,7 +42,7 @@ Use esta skill ao implementar, alterar ou revisar o cálculo do iamp. A regra vi
 ## Estimativa fora do catálogo (`src/estimativa.py`, `servico.estimar_por_equivalentes`)
 
 - Geladeira, nesta ordem: modelo no catálogo -> consumo do Inmetro; etiqueta informada -> kWh da etiqueta (antes de 2023 convertido para a metodologia atual) × Fi; sem etiqueta e compra antes de 2023 -> regra da Portaria Inmetro 20/2006 com faixa; compra a partir de 2023 -> grade do Random Forest (`refrigerador.pkl`). Resultado marcado como `aproximado` com faixa.
-- Outros eletros pesados: com valor da etiqueta (kWh/mês, kWh/ciclo ou W) o cálculo é exato; sem ele, mediana dos modelos do catálogo com medida parecida (±10%, ampliando até ±40% para ter pelo menos 5), faixa do 1º ao 3º quartil, e `AVISO_EQUIVALENTES`.
+- Outros eletros pesados: com o número escrito no aparelho (`formas`: etiqueta do Inmetro ou potência da plaqueta × horas) o cálculo é exato, inclusive para aparelho antigo; sem ele, aparelho de referência com a mediana das colunas de consumo dos modelos do catálogo com medida parecida (±10%, ampliando até ±40% para ter pelo menos 5), faixa do 1º ao 3º quartil (menor e maior com menos de 4 modelos), e `AVISO_EQUIVALENTES`.
 - Eletroportáteis (tabela `portateis`): `W/1000 × tempo/dia × dias`; potência e uso típicos são premissas com fonte por linha. Sem sugestão de troca: o app oferece as dicas do Eco-Coach.
 - Gás de cozinha (`src/gas.py`) é outra conta: kg/mês de GLP com rendimento do fogão (Inmetro) e preço por UF (ANP). Não entra em "Minha casa".
 
