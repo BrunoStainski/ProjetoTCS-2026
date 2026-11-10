@@ -1,0 +1,142 @@
+%% DER do banco do iamp (PostgreSQL 15 + pgvector). Fonte: src/banco.py (ESQUEMA) e src/rag.py (ESQUEMA_RAG).
+%% Linha cheia = chave estrangeira no banco. Linha tracejada = ligação lógica (mesmo valor, sem FK).
+%% Gerar a imagem: npx -p @mermaid-js/mermaid-cli mmdc -i docs/der.mmd -o docs/der.png -b white -s 2
+erDiagram
+    distribuidoras ||--o{ tarifas : "tem (FK distribuidora_id)"
+    distribuidoras ||..o| vw_tarifa_vigente : "view: tarifa válida hoje"
+    tarifas ||..o| vw_tarifa_vigente : "vigência mais recente"
+    aparelhos ||..o{ consultas : "copia categoria, marca, modelo"
+    distribuidoras ||..o{ consultas : "copia nome e UF"
+    fogoes ||..o{ consultas_gas : "copia marca e modelo"
+    precos_glp ||..o{ consultas_gas : "preço por UF"
+    cargas ||..o{ aparelhos : "arquivo_origem"
+
+    aparelhos {
+        serial id PK
+        text categoria "UK com marca e modelo"
+        text marca
+        text modelo
+        text tipo
+        float capacidade "L, pol, BTU/h, W, kg ou cv"
+        text unidade
+        text detalhe
+        float kwh_mes
+        float kwh_mes_baixa "ventilador"
+        float kwh_mes_media "ventilador"
+        float kwh_mes_alta "ventilador"
+        float kwh_ciclo "máquina de lavar"
+        float potencia_w
+        float standby_kwh_mes
+        float fluxo_lm "lâmpadas"
+        text origem_dado
+        text arquivo_origem
+        text busca
+    }
+
+    distribuidoras {
+        serial id PK
+        text nome UK
+        char2 uf
+        text fonte_uf
+    }
+
+    tarifas {
+        serial id PK
+        int distribuidora_id FK
+        text classe "residencial_b1"
+        float tarifa_kwh "TUSD + TE"
+        date vigencia_inicio
+        text fonte
+    }
+
+    vw_tarifa_vigente {
+        int distribuidora_id
+        text distribuidora
+        char2 uf
+        float tarifa_kwh
+        date vigencia_inicio
+        text fonte
+    }
+
+    cargas {
+        serial id PK
+        text arquivo
+        int linhas
+        timestamp carregado_em
+    }
+
+    consultas {
+        serial id PK
+        timestamp criado_em
+        text categoria
+        text marca
+        text modelo
+        text uf
+        text distribuidora
+        float horas_dia
+        float ciclos_mes
+        text velocidade
+        float kwh_mes
+        text metodo
+        float tarifa_kwh
+        text origem_tarifa "ANEEL ou manual"
+        float custo_mes
+    }
+
+    portateis {
+        text categoria PK
+        text nome
+        float potencia_w
+        float horas_dia
+        float dias_mes
+        text fonte
+    }
+
+    fogoes {
+        serial id PK
+        text marca "UK com modelo"
+        text modelo
+        text tipo
+        int bocas
+        float rendimento_pct
+        float forno_litros
+        float consumo_forno_kg_h
+        text classe_mesa
+        text classe_forno
+        text detalhe
+        text busca
+    }
+
+    precos_glp {
+        char2 uf PK
+        int ano PK
+        float preco_kg
+        text fonte "ANP"
+    }
+
+    consultas_gas {
+        serial id PK
+        timestamp criado_em
+        text marca
+        text modelo
+        text uf
+        float kg_mes
+        float preco_kg
+        text origem_preco
+        float custo_mes
+        text metodo
+    }
+
+    trechos_rag {
+        serial id PK
+        text documento
+        text orgao
+        text tipo_fonte
+        text url
+        text arquivo
+        text secao
+        int pagina
+        text texto
+        vector384 embedding "pgvector"
+        timestamp carregado_em
+    }

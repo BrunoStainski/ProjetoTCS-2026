@@ -54,6 +54,9 @@ pytest                               # tudo;   pytest -m "not banco"  # só os r
 
 ## Banco (definido em `src/banco.py`, constante ESQUEMA)
 
+DER: fonte Mermaid em `docs/der.mmd` e imagem em `docs/der.png` (comando para gerar no topo do .mmd). Só há uma
+FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas). Ao mudar o ESQUEMA, atualizar o DER.
+
 | Tabela | Conteúdo |
 |---|---|
 | `aparelhos` | Catálogo: categoria, marca, modelo, tipo, capacidade, kwh_mes (e por velocidade), kwh_ciclo, potencia_w, standby, `fluxo_lm` (lâmpadas), `origem_dado` |
