@@ -68,6 +68,26 @@ def test_busca_traz_todos_os_tipos_da_marca(api):
 
 
 @pytest.mark.banco
+def test_marcas_de_um_tipo_sem_repetir_maiusculas(api):
+    """O Inmetro tem 'Agratto' e 'AGRATTO' no ar-condicionado: a lista mostra a marca uma vez."""
+    marcas = api.get("/marcas", params={"categoria": "ar_condicionado"}).json()
+    nomes = [m["marca"].strip().upper() for m in marcas]
+    assert len(marcas) > 10 and len(nomes) == len(set(nomes)) and nomes == sorted(nomes)
+    assert "AGRATTO" in nomes and all(m["modelos"] > 0 for m in marcas)
+    assert api.get("/marcas", params={"categoria": "nao_existe"}).json() == []
+
+
+@pytest.mark.banco
+def test_modelos_de_uma_marca(api):
+    marca = next(m for m in api.get("/marcas", params={"categoria": "ar_condicionado"}).json() if m["marca"].upper() == "AGRATTO")
+    lista = api.get("/modelos", params={"categoria": "ar_condicionado", "marca": "agratto", "limite": 5}).json()
+    assert 0 < len(lista) <= 5
+    assert all(a["categoria"] == "ar_condicionado" and a["marca"].strip().upper() == "AGRATTO" for a in lista)
+    assert all(a["total_categoria"] == marca["modelos"] for a in lista)  # as duas grafias juntas
+    assert api.get("/modelos", params={"categoria": "ar_condicionado", "marca": ""}).status_code == 422
+
+
+@pytest.mark.banco
 def test_busca_filtra_por_categoria(api):
     lista = api.get("/aparelhos", params={"busca": "lorenzetti", "categoria": "chuveiro"}).json()
     assert lista and {a["categoria"] for a in lista} == {"chuveiro"}

@@ -4,12 +4,21 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
-## Próxima versão (ainda sem número)
+## App 2.0.0+6 / API 0.4.0
 
 - App redesenhado para o cliente final (público geral, incluindo pessoas mais velhas), mantendo a
   paleta preto e amarelo: texto base 18 (nada abaixo de 16), contraste AA, toque mínimo de 48dp,
   respeita a fonte do sistema até 2x sem quebrar, leitor de tela (TalkBack/VoiceOver) com descrições.
 - Navegação inferior com 3 abas: Calcular, Minha casa e Economizar.
+- Tela de boas-vindas ao abrir o app: só a logo grande com o nome ao lado e o botão
+  "Comece a economizar".
+- Etapa 2 (marca e modelo): lista com todas as marcas do tipo escolhido (ex.: todas as de
+  ar-condicionado), com a quantidade de modelos; tocar na marca abre os modelos dela. Digitar no campo
+  filtra a lista, e "Buscar" continua procurando pela marca e pelo modelo digitados.
+- API: `GET /marcas?categoria=` (marcas de um tipo, sem repetir maiúsculas: "Agratto" e "AGRATTO") e
+  `GET /modelos?categoria=&marca=` (modelos de uma marca, até 50 por padrão).
+- Menu de acesso rápido (☰) com a logo do app (contorno amarelo esmaecido) e o nome: Início, Calcular,
+  Estimar, Minha casa e Economizar.
 - Uma decisão por tela: tipo -> marca/modelo -> uso -> estado -> distribuidora -> resultado
   ("Etapa n de 6"); a estimativa fora do catálogo pergunta uma coisa por vez.
 - Valores em R$ como informação principal; kWh e fórmula como secundários.

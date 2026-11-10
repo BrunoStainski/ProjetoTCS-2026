@@ -35,6 +35,19 @@ String legivel(String categoria) => categoria.replaceAll('_', ' ');
 /// Quantos modelos de cada tipo de aparelho a busca traz (GET /aparelhos?limite=).
 const limiteBuscaPorTipo = 30;
 
+/// Quantos modelos de uma marca a lista de marcas mostra (GET /modelos?limite=).
+const limiteModelosDaMarca = 50;
+
+/// Marca de um tipo de aparelho, com a quantidade de modelos (GET /marcas).
+class Marca {
+  final String nome;
+  final int modelos;
+
+  const Marca(this.nome, this.modelos);
+
+  Marca.fromJson(Map<String, dynamic> j) : nome = j['marca'], modelos = j['modelos'];
+}
+
 class Aparelho {
   final int id;
   final String categoria;
@@ -328,6 +341,18 @@ class Api {
   static Future<List<Aparelho>> buscarAparelhos(String busca, {String? categoria}) async {
     // limite por tipo de aparelho: uma marca com varios tipos traz todos
     final lista = await _get('/aparelhos', {'busca': busca, 'categoria': ?categoria, 'limite': '$limiteBuscaPorTipo'});
+    return [for (final j in lista) Aparelho.fromJson(j)];
+  }
+
+  /// Todas as marcas de um tipo de aparelho (lista de marcas da etapa 2).
+  static Future<List<Marca>> marcas(String categoria) async {
+    final lista = await _get('/marcas', {'categoria': categoria});
+    return [for (final j in lista) Marca.fromJson(j)];
+  }
+
+  /// Modelos de uma marca dentro de um tipo (abre ao tocar na marca).
+  static Future<List<Aparelho>> modelosDaMarca(String categoria, String marca) async {
+    final lista = await _get('/modelos', {'categoria': categoria, 'marca': marca, 'limite': '$limiteModelosDaMarca'});
     return [for (final j in lista) Aparelho.fromJson(j)];
   }
 

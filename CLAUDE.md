@@ -83,7 +83,9 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 ## API (`src/main.py`)
 
 `GET /aparelhos?busca=` (`limite` vale **por tipo** de aparelho, padrão 15, + `total_categoria`; antes era
-no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética), `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
+no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética), `GET /marcas?categoria=`
+(marcas do tipo + nº de modelos, agrupa por `UPPER(TRIM(marca))`), `GET /modelos?categoria=&marca=&limite=`
+(modelos da marca, padrão 50 = `LIMITE_MODELOS_MARCA`), `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
 `POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
@@ -187,6 +189,19 @@ lugar visível (app, web, Android, iOS).
 - Navegação (`navegacao.dart` + `telas/inicio.dart`): barra inferior com 3 abas (Calcular, Minha casa,
   Economizar), ícone + texto; cada aba tem a própria pilha (`Navigator` + `ScaffoldMessenger`), então a
   barra fica visível durante o cálculo. `irPara(Aba, recomecar:, fecharAtual:)` troca de aba.
+- Boas-vindas (`telas/boas_vindas.dart`): abre por cima das abas (`initialRoute: '/boas-vindas'` monta
+  '/' embaixo); só a `MarcaIamp(tamanho: 120, tamanhoNome: 56)` e o botão (sem texto, pedido do grupo);
+  "Comece a economizar" fecha e vai para Calcular etapa 1; voltar do Android nela fecha o app.
+  `IampApp(boasVindas: false)` nos testes das abas.
+- Etapa 2 com tipo escolhido (`TelaModelo`): lista de todas as marcas do tipo (`_ListaDeMarcas`, GET /marcas)
+  filtrada pelo texto digitado; cada marca é um `ExpansionTile` que só busca os modelos ao abrir (GET /modelos).
+  "Buscar" continua a busca por texto (o resultado substitui a lista). Sem tipo, não há lista de marcas.
+- Menu de acesso rápido (`telas/menu.dart`, `drawer` da casca): botão ☰ (tooltip "Menu") só na 1ª tela de
+  cada aba (`Pagina` usa `Scaffold.maybeOf` + `isFirst`); itens Início, Calcular, Estimar, Minha casa,
+  Economizar. Itens são `ListTile` (texto quebra com fonte 2x; `NavigationDrawerDestination` estourava).
+- Marca (`MarcaIamp`, comum.dart): `assets/icone/icone.png` com contorno amarelo esmaecido e o nome ao lado.
+  Usa `cacheWidth` (nos testes a imagem vem como `ResizeImage`). O código dos colegas não passa pelo
+  `dart format`: formatar só os arquivos que você mudou.
 - Uma decisão por tela. Cálculo do catálogo em 6 etapas ("Etapa n de 6", `etapaDoCalculo`): tipo
   (`TelaBusca`, botões grandes) -> marca/modelo (`TelaModelo`) -> uso (`TelaUso`) -> estado (`TelaEstado`,
   oferece a última tarifa) -> distribuidora (`TelaDistribuidora`; ou `TelaTarifaConta`) -> resultado.
@@ -266,8 +281,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (hoje `1.2.0+5`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.3.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
+- Versão do app em `pubspec.yaml` (hoje `2.0.0+6`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.4.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
   Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
   `terraform apply` + `docker compose up -d --build`) -> APK -> tag -> Release (o usuário faz; `gh` sem login).

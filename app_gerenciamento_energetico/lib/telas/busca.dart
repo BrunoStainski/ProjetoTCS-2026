@@ -170,6 +170,28 @@ class _TelaModeloState extends State<TelaModelo> {
   bool _carregando = false;
   String? _erro;
   int _pedido = 0; // so a busca mais recente vale
+  Future<List<Marca>>? _marcas; // todas as marcas do tipo escolhido (lista abaixo do campo)
+  String _filtro = ''; // o que a pessoa digitou: filtra a lista de marcas
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarMarcas();
+  }
+
+  void _carregarMarcas() {
+    final c = widget.categoria;
+    if (c != null) _marcas = Api.marcas(c);
+  }
+
+  /// Mudou o texto: a lista de marcas filtra na hora e o resultado da busca anterior sai da tela.
+  void _digitou(String texto) {
+    setState(() {
+      _filtro = texto.trim().toLowerCase();
+      _resultados = null;
+      _erro = null;
+    });
+  }
 
   @override
   void dispose() {
@@ -222,12 +244,13 @@ class _TelaModeloState extends State<TelaModelo> {
             'Qual é a marca e o modelo?',
             ajuda: c == null
                 ? 'Pode digitar só a marca. A marca e o modelo estão na etiqueta do aparelho ou no manual.'
-                : 'Pode digitar só a marca. A marca e o modelo estão na etiqueta ${c == 'chuveiro' ? 'da embalagem' : 'do aparelho'} ou no manual.',
+                : 'Escolha a marca na lista ou digite a marca e o modelo. Eles estão na etiqueta ${c == 'chuveiro' ? 'da embalagem' : 'do aparelho'} ou no manual.',
           ),
           TextField(
             controller: _texto,
-            autofocus: true,
+            autofocus: c == null, // com a lista de marcas, o teclado nao abre sozinho por cima dela
             textInputAction: TextInputAction.search,
+            onChanged: _digitou,
             onSubmitted: (_) => _buscar(),
             decoration: InputDecoration(
               labelText: 'Marca e/ou modelo',
@@ -257,6 +280,152 @@ class _TelaModeloState extends State<TelaModelo> {
             const SizedBox(height: Espaco.m),
             const ChamadaEstimar(),
           ],
+          // lista de marcas do tipo escolhido (some enquanto o resultado de uma busca esta na tela)
+          if (c != null && resultados == null && !_carregando) ...[
+            const SizedBox(height: Espaco.p),
+            Text('Ou escolha a marca', style: t.forte),
+            const SizedBox(height: Espaco.p),
+            _ListaDeMarcas(
+              categoria: c,
+              marcas: _marcas,
+              filtro: _filtro,
+              aoEscolher: _escolher,
+              tentarDeNovo: () => setState(_carregarMarcas),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Todas as marcas de um tipo, filtradas pelo texto digitado. Cada marca abre os modelos dela.
+class _ListaDeMarcas extends StatelessWidget {
+  final String categoria;
+  final Future<List<Marca>>? marcas;
+  final String filtro;
+  final void Function(Aparelho) aoEscolher;
+  final VoidCallback tentarDeNovo;
+
+  const _ListaDeMarcas({
+    required this.categoria,
+    required this.marcas,
+    required this.filtro,
+    required this.aoEscolher,
+    required this.tentarDeNovo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    return FutureBuilder<List<Marca>>(
+      future: marcas,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Carregando as marcas...');
+        if (snap.hasError) {
+          final erro = snap.error;
+          return MensagemErro(erro is ApiErro ? erro.mensagem : 'Não deu para carregar as marcas.', tentarDeNovo: tentarDeNovo);
+        }
+        final visiveis = [
+          for (final m in snap.data!)
+            if (m.nome.toLowerCase().contains(filtro)) m,
+        ];
+        if (visiveis.isEmpty) {
+          return Text('Nenhuma marca com "$filtro". Toque em Buscar para procurar pelo modelo.', style: t.corpo);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              liveRegion: true,
+              child: Text(visiveis.length == 1 ? '1 marca' : '${visiveis.length} marcas', style: t.rotulo),
+            ),
+            const SizedBox(height: Espaco.p),
+            // a chave e a marca: ao filtrar, cada secao continua com os modelos que ja carregou
+            for (final m in visiveis) _SecaoDaMarca(categoria, m, key: ValueKey(m.nome), aoEscolher: aoEscolher),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Uma marca: fechada mostra o nome e quantos modelos tem; ao abrir, busca os modelos na API.
+class _SecaoDaMarca extends StatefulWidget {
+  final String categoria;
+  final Marca marca;
+  final void Function(Aparelho) aoEscolher;
+
+  const _SecaoDaMarca(this.categoria, this.marca, {super.key, required this.aoEscolher});
+
+  @override
+  State<_SecaoDaMarca> createState() => _SecaoDaMarcaState();
+}
+
+class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
+  Future<List<Aparelho>>? _modelos; // so carrega quando a pessoa abre a marca
+
+  // corpo em bloco: com "=>" a funcao devolveria o Future e o setState(_carregar) quebra
+  void _carregar() {
+    _modelos = Api.modelosDaMarca(widget.categoria, widget.marca.nome);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    final m = widget.marca;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        title: Text(m.nome, style: t.forte),
+        subtitle: Text(m.modelos == 1 ? '1 modelo' : '${m.modelos} modelos', style: t.secundario),
+        onExpansionChanged: (aberta) {
+          if (aberta && _modelos == null) setState(_carregar);
+        },
+        children: [
+          FutureBuilder<List<Aparelho>>(
+            future: _modelos,
+            builder: (context, snap) {
+              if (snap.connectionState != ConnectionState.done) {
+                return const Padding(padding: EdgeInsets.all(Espaco.m), child: Carregando(texto: 'Carregando os modelos...'));
+              }
+              if (snap.hasError) {
+                final erro = snap.error;
+                return Padding(
+                  padding: const EdgeInsets.all(Espaco.m),
+                  child: MensagemErro(
+                    erro is ApiErro ? erro.mensagem : 'Não deu para carregar os modelos.',
+                    tentarDeNovo: () => setState(_carregar),
+                  ),
+                );
+              }
+              final lista = snap.data!;
+              final total = lista.isEmpty ? 0 : (lista.first.totalCategoria > lista.length ? lista.first.totalCategoria : lista.length);
+              return Column(
+                children: [
+                  for (final a in lista) ...[
+                    const Divider(height: 1),
+                    ListTile(
+                      title: Text(a.modelo),
+                      subtitle: a.detalhe.isEmpty ? null : Text(a.detalhe),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => widget.aoEscolher(a),
+                    ),
+                  ],
+                  if (total > lista.length) ...[
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.all(Espaco.m),
+                      child: Text(
+                        'Mostrando ${lista.length} de $total. Digite o modelo no campo acima para achar os outros.',
+                        style: t.secundario,
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
         ],
       ),
     );

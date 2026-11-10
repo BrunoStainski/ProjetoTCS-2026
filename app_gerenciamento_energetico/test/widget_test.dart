@@ -56,6 +56,18 @@ MockClient apiFalsa({List<Uri>? pedidos}) => MockClient((r) async {
       ])
         if (r.url.queryParameters['categoria'] == null || a['categoria'] == r.url.queryParameters['categoria']) a,
     ],
+    '/marcas' => [
+      {'marca': 'BRASTEMP', 'modelos': 1},
+      {'marca': 'CONSUL', 'modelos': 60},
+    ],
+    '/modelos' => r.url.queryParameters['marca'] == 'CONSUL'
+        ? [
+            for (var i = 1; i <= 50; i++)
+              {'id': 100 + i, 'categoria': 'refrigerador', 'marca': 'CONSUL', 'modelo': 'CRM$i', 'total_categoria': 60},
+          ]
+        : [
+            {'id': 2, 'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'modelo': 'GELA', 'total_categoria': 1},
+          ],
     '/aparelhos/2/uso' => {'pergunta': null},
     '/ufs' => ['PR', 'SP'],
     '/distribuidoras' => [
@@ -89,10 +101,114 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  group('Boas-vindas e menu', () {
+    Finder noMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+    // a logo e carregada ja no tamanho da tela (cacheWidth), por isso vem dentro de um ResizeImage
+    final logo = find.byWidgetPredicate(
+      (w) => w is Image && w.image is ResizeImage && (w.image as ResizeImage).imageProvider == const AssetImage(MarcaIamp.imagem),
+    );
+
+    Future<void> abrirMenu(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('abre nas boas-vindas e "Comece a economizar" leva ao cálculo', (tester) async {
+      telaDeCelular(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsOneWidget);
+        expect(logo, findsOneWidget);
+        expect(find.text('Qual aparelho você quer calcular?'), findsNothing);
+        // so a marca e o botao: sem frases, e o icone ao lado do nome (nao em cima)
+        expect(find.text('Sua conta de luz, sem surpresas'), findsNothing);
+        expect(find.textContaining('Inmetro'), findsNothing);
+        final icone = tester.getRect(logo);
+        final nome = tester.getRect(find.text('Iamp'));
+        expect(nome.left, greaterThan(icone.right));
+        expect(nome.center.dy, closeTo(icone.center.dy, 2));
+        expect(icone.width, greaterThanOrEqualTo(100)); // maior que a logo do menu (48)
+
+        await tester.tap(find.text('Comece a economizar'));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(find.text('Comece a economizar'), findsNothing);
+      expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
+      expect(abaAtual.value, Aba.calcular);
+    });
+
+    testWidgets('boas-vindas cabe na tela com a fonte do sistema em 2x', (tester) async {
+      telaDeCelular(tester, fonte: 2);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Comece a economizar'), findsOneWidget);
+    });
+
+    testWidgets('menu cabe na tela com a fonte do sistema em 2x (textos quebram a linha)', (tester) async {
+      telaDeCelular(tester, fonte: 2);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        await abrirMenu(tester);
+      }, apiFalsa);
+      expect(tester.takeException(), isNull);
+      expect(noMenu(find.text('Calcular um aparelho')), findsOneWidget);
+    });
+
+    testWidgets('menu tem a logo com o nome ao lado e leva para Minha casa', (tester) async {
+      telaDeCelular(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        await abrirMenu(tester);
+        expect(noMenu(find.byType(MarcaIamp)), findsOneWidget);
+        expect(noMenu(logo), findsOneWidget);
+        expect(noMenu(find.text('Iamp')), findsOneWidget);
+        for (final item in ['Início', 'Calcular um aparelho', 'Estimar um aparelho', 'Minha casa', 'Economizar']) {
+          expect(noMenu(find.text(item)), findsOneWidget);
+        }
+
+        await tester.tap(noMenu(find.text('Minha casa')));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(find.byType(Drawer), findsNothing); // fechou
+      expect(abaAtual.value, Aba.casa);
+      expect(find.text('Sua casa ainda está vazia'), findsOneWidget);
+    });
+
+    testWidgets('menu: "Estimar um aparelho" abre a estimativa e "Início" volta para as boas-vindas', (tester) async {
+      telaDeCelular(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        await abrirMenu(tester);
+        await tester.tap(noMenu(find.text('Estimar um aparelho')));
+        await tester.pumpAndSettle();
+        expect(find.byType(TelaEstimar), findsOneWidget);
+        expect(find.byTooltip('Menu'), findsNothing); // tela de dentro: seta de voltar no lugar do menu
+
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        await abrirMenu(tester);
+        await tester.tap(noMenu(find.text('Início')));
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsOneWidget);
+
+        await tester.tap(find.text('Comece a economizar'));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
+    });
+  });
+
   group('App', () {
     testWidgets('abre em Calcular com o nome Iamp, as 3 abas e o tema preto e amarelo', (tester) async {
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
       }, apiFalsa);
       expect(find.text('Iamp'), findsOneWidget);
@@ -112,7 +228,7 @@ void main() {
 
     testWidgets('aba Minha casa vazia explica como adicionar', (tester) async {
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Minha casa'));
         await tester.pumpAndSettle();
@@ -124,7 +240,7 @@ void main() {
     testWidgets('aba Economizar sem aparelhos pede para calcular antes (nao chama a IA)', (tester) async {
       final pedidos = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Economizar'));
         await tester.pumpAndSettle();
@@ -137,7 +253,7 @@ void main() {
       telaDeCelular(tester);
       final pedidos = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('Geladeira ou freezer'));
@@ -193,7 +309,7 @@ void main() {
     testWidgets('fonte 2x nao quebra a tela inicial nem a busca', (tester) async {
       telaDeCelular(tester, fonte: 2, alta: true);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
         expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
         await tester.tap(find.text('Geladeira ou freezer'));
@@ -265,7 +381,7 @@ void main() {
       telaDeCelular(tester);
       final semantica = tester.ensureSemantics();
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
       }, apiFalsa);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
@@ -653,7 +769,7 @@ void main() {
         return http.Response(jsonEncode(planoExemplo), 200, headers: _json);
       });
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp());
+        await tester.pumpWidget(const IampApp(boasVindas: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Economizar'));
         await tester.pumpAndSettle();
@@ -717,6 +833,82 @@ void main() {
       expect(find.text('2 aparelhos encontrados'), findsOneWidget);
       expect(find.text('Máquinas de lavar'), findsOneWidget);
       expect(find.text('Geladeiras'), findsOneWidget);
+    });
+  });
+
+  group('Lista de marcas (etapa 2)', () {
+    Future<void> abrirGeladeira(WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaModelo(categoria: 'refrigerador')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('mostra todas as marcas do tipo e abre os modelos ao tocar na marca', (tester) async {
+      telaAlta(tester);
+      final pedidos = <Uri>[];
+      await http.runWithClient(() async {
+        await abrirGeladeira(tester);
+        expect(find.text('Ou escolha a marca'), findsOneWidget);
+        expect(find.text('2 marcas'), findsOneWidget);
+        expect(find.text('BRASTEMP'), findsOneWidget);
+        expect(find.text('60 modelos'), findsOneWidget);
+        expect(pedidos.where((u) => u.path == '/modelos'), isEmpty); // so carrega ao abrir
+
+        await tester.tap(find.text('BRASTEMP'));
+        await tester.pumpAndSettle();
+        expect(pedidos.last.queryParameters, {'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'limite': '50'});
+        await tester.tap(find.text('GELA'));
+        await tester.pumpAndSettle();
+      }, () => apiFalsa(pedidos: pedidos));
+      // segue o calculo normal (geladeira nao pergunta o uso: vai direto para o estado)
+      expect(find.text('Em qual estado você mora?'), findsOneWidget);
+    });
+
+    testWidgets('marca com mais modelos que o limite avisa para digitar o modelo', (tester) async {
+      tester.view.physicalSize = const Size(800, 6000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await http.runWithClient(() async {
+        await abrirGeladeira(tester);
+        await tester.tap(find.text('CONSUL'));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(find.text('CRM1'), findsOneWidget);
+      expect(find.textContaining('Mostrando 50 de 60'), findsOneWidget);
+    });
+
+    testWidgets('digitar filtra as marcas e "Buscar" continua procurando pelo modelo', (tester) async {
+      telaAlta(tester);
+      final pedidos = <Uri>[];
+      await http.runWithClient(() async {
+        await abrirGeladeira(tester);
+        await tester.enterText(find.byType(TextField), 'cons');
+        await tester.pump();
+        expect(find.text('1 marca'), findsOneWidget);
+        expect(find.text('CONSUL'), findsOneWidget);
+        expect(find.text('BRASTEMP'), findsNothing);
+
+        await tester.enterText(find.byType(TextField), 'xyz');
+        await tester.pump();
+        expect(find.textContaining('Nenhuma marca com "xyz"'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), 'brastemp');
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+      }, () => apiFalsa(pedidos: pedidos));
+      expect(pedidos.last.path, '/aparelhos');
+      expect(find.text('1 aparelho encontrado'), findsOneWidget);
+      expect(find.text('Ou escolha a marca'), findsNothing); // o resultado da busca substitui a lista
+    });
+
+    testWidgets('sem tipo escolhido nao mostra lista de marcas', (tester) async {
+      telaAlta(tester);
+      final pedidos = <Uri>[];
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaModelo()));
+        await tester.pumpAndSettle();
+      }, () => apiFalsa(pedidos: pedidos));
+      expect(find.text('Ou escolha a marca'), findsNothing);
+      expect(pedidos.where((u) => u.path == '/marcas'), isEmpty);
     });
   });
 

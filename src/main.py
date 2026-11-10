@@ -24,7 +24,7 @@ import estimativa
 import ml_pipeline
 import rag_agent
 import servico
-from calculadora_residencial import LIMITE_BUSCA
+from calculadora_residencial import LIMITE_BUSCA, LIMITE_MODELOS_MARCA
 from criar_banco import COLUNAS_APARELHOS
 
 
@@ -81,7 +81,7 @@ async def ciclo_de_vida(app):
 app = FastAPI(
     title="iamp API",
     description="Estima o consumo e o custo mensal de energia de aparelhos eletricos residenciais.",
-    version="0.3.0",
+    version="0.4.0",
     lifespan=ciclo_de_vida,
 )
 
@@ -103,6 +103,11 @@ class AparelhoResumo(BaseModel):
 
 class AparelhoEncontrado(AparelhoResumo):
     total_categoria: int  # quantos modelos desse tipo batem com a busca (pode passar do limite)
+
+
+class MarcaResumo(BaseModel):
+    marca: str
+    modelos: int  # quantos modelos a marca tem nesse tipo de aparelho
 
 
 class PerguntaDeUso(BaseModel):
@@ -362,6 +367,26 @@ def buscar_aparelhos(
     con=Depends(conexao),
 ):
     return servico.buscar_modelos(con, busca, categoria, limite)
+
+
+@app.get("/marcas", response_model=list[MarcaResumo], tags=["Aparelhos"])
+def listar_marcas(
+    categoria: str = Query(..., description="Tipo de aparelho. Ver GET /categorias."),
+    con=Depends(conexao),
+):
+    """Marcas de um tipo de aparelho, com a quantidade de modelos (tipo que nao existe: lista vazia)."""
+    return servico.listar_marcas(con, categoria)
+
+
+@app.get("/modelos", response_model=list[AparelhoEncontrado], tags=["Aparelhos"])
+def listar_modelos_da_marca(
+    categoria: str = Query(..., description="Tipo de aparelho. Ver GET /categorias."),
+    marca: str = Query(..., min_length=1, description="Marca, como veio do GET /marcas (sem diferenciar maiusculas)."),
+    limite: int = Query(LIMITE_MODELOS_MARCA, ge=1, le=500),
+    con=Depends(conexao),
+):
+    """Modelos de uma marca dentro de um tipo. total_categoria = quantos a marca tem nesse tipo."""
+    return servico.modelos_da_marca(con, categoria, marca, limite)
 
 
 @app.get("/aparelhos/{aparelho_id}/uso", response_model=PerguntaDeUso, tags=["Aparelhos"])

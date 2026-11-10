@@ -19,7 +19,7 @@ import pandas as pd
 import banco
 from calculadora_residencial import (
     AMPLIACOES_ESTIMATIVA, AVISO_EQUIVALENTES, COLUNAS_NUM, ECONOMIA_MINIMA, EQUIVALENCIA, ESTIMAVEIS,
-    FRACAO_SUSPEITA, HORAS_OPCIONAIS, LIMITE_BUSCA, MINIMO_EQUIVALENTES, PREMISSAS, SEM_SUGESTAO,
+    FRACAO_SUSPEITA, HORAS_OPCIONAIS, LIMITE_BUSCA, LIMITE_MODELOS_MARCA, MINIMO_EQUIVALENTES, PREMISSAS, SEM_SUGESTAO,
     TOLERANCIA_ESTIMATIVA, consumo_mensal_kwh, montar_resultado, normalizar,
 )
 
@@ -56,6 +56,26 @@ def buscar_modelos(con, texto, categoria=None, limite=LIMITE_BUSCA):
            " WHERE ordem <= ? ORDER BY categoria, marca, modelo")
     params.append(limite)
     return _registros(banco.consulta(con, sql, params))
+
+
+def listar_marcas(con, categoria):
+    """Marcas de um tipo de aparelho com a quantidade de modelos (lista de marcas do app).
+
+    O catalogo do Inmetro mistura maiusculas e minusculas na mesma marca ("Agratto" e "AGRATTO"):
+    agrupa sem diferenciar, para a marca aparecer uma vez so.
+    """
+    sql = ("SELECT MIN(marca) AS marca, COUNT(*) AS modelos FROM aparelhos WHERE categoria = ? "
+           "GROUP BY UPPER(TRIM(marca)) ORDER BY UPPER(TRIM(marca))")
+    return _registros(banco.consulta(con, sql, (categoria,)))
+
+
+def modelos_da_marca(con, categoria, marca, limite=LIMITE_MODELOS_MARCA):
+    """Modelos de uma marca dentro de um tipo. total_categoria = quantos a marca tem nesse tipo
+    (pode passar do limite: o app avisa para digitar o modelo)."""
+    sql = ("SELECT id, categoria, marca, modelo, detalhe, COUNT(*) OVER () AS total_categoria "
+           "FROM aparelhos WHERE categoria = ? AND UPPER(TRIM(marca)) = UPPER(TRIM(?)) "
+           "ORDER BY modelo LIMIT ?")
+    return _registros(banco.consulta(con, sql, (categoria, marca, limite)))
 
 
 def aparelho_por_id(con, aparelho_id):
