@@ -1,98 +1,172 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  BPMN do iamp (versao alinhada a implementacao de 2026-11).
-  Abrir/editar em https://demo.bpmn.io ou no Camunda Modeler e exportar o PNG (docs/bpmn_processo.png).
-  Fluxo atual da API: POST /calcular (um por aparelho) + POST /classificar.
-  O CTGAN e o K-Means sao treinados OFFLINE (pool de baixo); na requisicao so se aplica o kmeans.pkl.
--->
-<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
-                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
-                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
-                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
-                  id="Definitions_iamp" targetNamespace="http://iamp.tcs2026/bpmn">
-
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_iamp" targetNamespace="http://iamp.tcs2026/bpmn" exporter="Camunda Modeler" exporterVersion="5.52.0">
   <bpmn:collaboration id="Colab_iamp">
     <bpmn:participant id="Pool_App" name="Usuário (App Flutter)" processRef="Proc_App" />
-    <bpmn:participant id="Pool_Backend" name="Servidor Backend (FastAPI / Python)" processRef="Proc_Backend" />
+    <bpmn:participant id="Pool_Backend" name="Servidor Backend (FastAPI / Python, Docker)" processRef="Proc_Backend" />
     <bpmn:participant id="Pool_Offline" name="Preparação de dados e treino (offline, scripts)" processRef="Proc_Offline" />
     <bpmn:messageFlow id="MF_calc_req" name="POST /calcular" sourceRef="App_EnviarCalc" targetRef="Api_Inicio" />
     <bpmn:messageFlow id="MF_calc_resp" name="kWh, R$ e avisos" sourceRef="Api_Fim" targetRef="App_ResultadoCalc" />
+    <bpmn:messageFlow id="MF_sug_req" name="POST /sugestoes" sourceRef="App_EnviarSug" targetRef="Sug_Inicio" />
+    <bpmn:messageFlow id="MF_sug_resp" name="modelos mais econômicos" sourceRef="Sug_Fim" targetRef="App_SugRecebidas" />
+    <bpmn:messageFlow id="MF_comp_req" name="POST /comparar" sourceRef="App_EnviarComp" targetRef="Comp_Inicio" />
+    <bpmn:messageFlow id="MF_comp_resp" name="economia e payback" sourceRef="Comp_Fim" targetRef="App_Payback" />
     <bpmn:messageFlow id="MF_class_req" name="POST /classificar" sourceRef="App_EnviarClass" targetRef="Ml_Inicio" />
-    <bpmn:messageFlow id="MF_class_resp" name="perfil e plano" sourceRef="Eco_Fim" targetRef="App_Perfil" />
+    <bpmn:messageFlow id="MF_class_resp" name="perfil e comparação" sourceRef="Ml_Fim" targetRef="App_Perfil" />
+    <bpmn:messageFlow id="MF_eco_req" name="POST /eco-coach" sourceRef="App_EnviarEco" targetRef="Eco_Inicio" />
+    <bpmn:messageFlow id="MF_eco_resp" name="plano com fontes [n]" sourceRef="Eco_Fim" targetRef="App_Plano" />
+    <bpmn:textAnnotation id="Nota_Gas">
+      <bpmn:text>Gás de cozinha é um fluxo à parte: escolhe o fogão e o estado → POST /calcular/gas (Inmetro + preço da ANP). É outra conta: não entra na Minha casa.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Dicas">
+      <bpmn:text>Eletroportátil (sem etiqueta do Inmetro): no lugar das sugestões de troca, dicas do Eco-Coach para o aparelho (POST /eco-coach/aparelho).</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Calc">
+      <bpmn:text>Fora do catálogo: geladeira usa a etiqueta, a Portaria Inmetro 20/2006 ou o Random Forest; os outros, a mediana dos modelos equivalentes (com faixa). Valores sem impostos e bandeira.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Economia">
+      <bpmn:text>Equivalente = mesma categoria, medida parecida e mesmo tipo. Só consumo informado pelo Inmetro, economia mínima de 5% e descarte de consumo &lt; 40% da mediana (erro de dado). Payback = preço ÷ economia/mês.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Ml">
+      <bpmn:text>Não usa o banco nem grava nada. Treinado com casas sintéticas: a resposta avisa que o perfil é demonstrativo.</bpmn:text>
+    </bpmn:textAnnotation>
+    <bpmn:textAnnotation id="Nota_Coach">
+      <bpmn:text>O Python calcula todos os números; o Gemini só escreve. Regras no prompt: não inventar números, toda dica com [n], ignorar instruções dentro das fontes. Se o modelo principal falha, tenta o reserva.</bpmn:text>
+    </bpmn:textAnnotation>
     <bpmn:textAnnotation id="Nota_Offline">
-      <bpmn:text>Roda uma vez pelos scripts (não a cada requisição). Os .pkl são versionados; a imagem da API leva só o kmeans.pkl.</bpmn:text>
-    </bpmn:textAnnotation>
-    <bpmn:textAnnotation id="Nota_Class">
-      <bpmn:text>Não usa o banco e não grava nada. Entrada inválida (moradores &lt; 1, lista vazia, consumo zero) → 422.</bpmn:text>
-    </bpmn:textAnnotation>
-    <bpmn:textAnnotation id="Nota_Eco">
-      <bpmn:text>PLANEJADO: Eco-Coach ainda não implementado. O payback é calculado em Python; o LLM só explica.</bpmn:text>
+      <bpmn:text>Roda pelos scripts, não a cada requisição. A imagem da API leva só kmeans.pkl e refrigerador.pkl (guardam só números: a API não precisa de scikit-learn).</bpmn:text>
     </bpmn:textAnnotation>
   </bpmn:collaboration>
-
-  <!-- ===================== App Flutter ===================== -->
   <bpmn:process id="Proc_App" isExecutable="false">
-    <bpmn:startEvent id="App_Inicio" name="Usuário inicia simulação" />
-    <bpmn:userTask id="App_Buscar" name="Buscar aparelho (marca/modelo)" />
+    <bpmn:startEvent id="App_Inicio" name="Quer saber quanto um aparelho gasta" />
+    <bpmn:userTask id="App_Buscar" name="Buscar aparelho por marca/modelo" />
+    <bpmn:exclusiveGateway id="App_NoCatalogo" name="Achou o modelo?" />
     <bpmn:userTask id="App_Uso" name="Informar uso (horas, ciclos ou velocidade)" />
+    <bpmn:userTask id="App_Estimar" name="Informar o que sabe (etiqueta, volume, ano, potência)" />
+    <bpmn:exclusiveGateway id="App_JuntaDados" />
     <bpmn:userTask id="App_Dist" name="Escolher distribuidora ou digitar tarifa da conta" />
-    <bpmn:sendTask id="App_EnviarCalc" name="Enviar POST /calcular" />
-    <bpmn:intermediateCatchEvent id="App_ResultadoCalc" name="Resultado do cálculo recebido">
+    <bpmn:sendTask id="App_EnviarCalc" name="Enviar POST /calcular (ou /calcular/estimado)" />
+    <bpmn:intermediateCatchEvent id="App_ResultadoCalc" name="Consumo e custo recebidos">
       <bpmn:messageEventDefinition id="MED_App_ResultadoCalc" />
     </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="App_VerResultado" name="Ver kWh e R$/mês e pôr na Minha casa" />
+    <bpmn:exclusiveGateway id="App_QuerTroca" name="Ver modelos mais econômicos?" />
+    <bpmn:sendTask id="App_EnviarSug" name="Enviar POST /sugestoes" />
+    <bpmn:intermediateCatchEvent id="App_SugRecebidas" name="Sugestões recebidas">
+      <bpmn:messageEventDefinition id="MED_App_SugRecebidas" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="App_Escolher" name="Escolher modelo e digitar o preço" />
+    <bpmn:sendTask id="App_EnviarComp" name="Enviar POST /comparar" />
+    <bpmn:intermediateCatchEvent id="App_Payback" name="Economia e payback recebidos">
+      <bpmn:messageEventDefinition id="MED_App_Payback" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="App_Trocar" name="Ver payback e trocar na Minha casa" />
+    <bpmn:exclusiveGateway id="App_JuntaTroca" />
     <bpmn:exclusiveGateway id="App_Mais" name="Mais aparelhos?" />
-    <bpmn:sendTask id="App_EnviarClass" name="Enviar POST /classificar (moradores + kWh de cada item)" />
+    <bpmn:userTask id="App_MinhaCasa" name="Abrir Minha casa e informar moradores" />
+    <bpmn:sendTask id="App_EnviarClass" name="Enviar POST /classificar" />
     <bpmn:intermediateCatchEvent id="App_Perfil" name="Perfil recebido">
       <bpmn:messageEventDefinition id="MED_App_Perfil" />
     </bpmn:intermediateCatchEvent>
-    <bpmn:userTask id="App_Exibir" name="Exibir dashboard (custo, perfil e plano)" />
-    <bpmn:endEvent id="App_Fim" name="Simulação concluída" />
-
+    <bpmn:sendTask id="App_EnviarEco" name="Enviar POST /eco-coach (consumos + trocas)" />
+    <bpmn:intermediateCatchEvent id="App_Plano" name="Plano recebido">
+      <bpmn:messageEventDefinition id="MED_App_Plano" />
+    </bpmn:intermediateCatchEvent>
+    <bpmn:userTask id="App_LerPlano" name="Ler plano de economia com as fontes [n]" />
+    <bpmn:endEvent id="App_Fim" name="Plano de economia pronto" />
     <bpmn:sequenceFlow id="F_a1" sourceRef="App_Inicio" targetRef="App_Buscar" />
-    <bpmn:sequenceFlow id="F_a2" sourceRef="App_Buscar" targetRef="App_Uso" />
-    <bpmn:sequenceFlow id="F_a3" sourceRef="App_Uso" targetRef="App_Dist" />
-    <bpmn:sequenceFlow id="F_a4" sourceRef="App_Dist" targetRef="App_EnviarCalc" />
-    <bpmn:sequenceFlow id="F_a5" sourceRef="App_EnviarCalc" targetRef="App_ResultadoCalc" />
-    <bpmn:sequenceFlow id="F_a6" sourceRef="App_ResultadoCalc" targetRef="App_Mais" />
-    <bpmn:sequenceFlow id="F_a7" name="Sim" sourceRef="App_Mais" targetRef="App_Buscar" />
-    <bpmn:sequenceFlow id="F_a8" name="Não" sourceRef="App_Mais" targetRef="App_EnviarClass" />
-    <bpmn:sequenceFlow id="F_a9" sourceRef="App_EnviarClass" targetRef="App_Perfil" />
-    <bpmn:sequenceFlow id="F_a10" sourceRef="App_Perfil" targetRef="App_Exibir" />
-    <bpmn:sequenceFlow id="F_a11" sourceRef="App_Exibir" targetRef="App_Fim" />
+    <bpmn:sequenceFlow id="F_a21" name="Sim" sourceRef="App_Mais" targetRef="App_Buscar" />
+    <bpmn:sequenceFlow id="F_a2" sourceRef="App_Buscar" targetRef="App_NoCatalogo" />
+    <bpmn:sequenceFlow id="F_a3" name="Sim" sourceRef="App_NoCatalogo" targetRef="App_Uso" />
+    <bpmn:sequenceFlow id="F_a4" name="Não" sourceRef="App_NoCatalogo" targetRef="App_Estimar" />
+    <bpmn:sequenceFlow id="F_a5" sourceRef="App_Uso" targetRef="App_JuntaDados" />
+    <bpmn:sequenceFlow id="F_a6" sourceRef="App_Estimar" targetRef="App_JuntaDados" />
+    <bpmn:sequenceFlow id="F_a7" sourceRef="App_JuntaDados" targetRef="App_Dist" />
+    <bpmn:sequenceFlow id="F_a8" sourceRef="App_Dist" targetRef="App_EnviarCalc" />
+    <bpmn:sequenceFlow id="F_a9" sourceRef="App_EnviarCalc" targetRef="App_ResultadoCalc" />
+    <bpmn:sequenceFlow id="F_a10" sourceRef="App_ResultadoCalc" targetRef="App_VerResultado" />
+    <bpmn:sequenceFlow id="F_a11" sourceRef="App_VerResultado" targetRef="App_QuerTroca" />
+    <bpmn:sequenceFlow id="F_a12" name="Sim" sourceRef="App_QuerTroca" targetRef="App_EnviarSug" />
+    <bpmn:sequenceFlow id="F_a19" name="Não" sourceRef="App_QuerTroca" targetRef="App_JuntaTroca" />
+    <bpmn:sequenceFlow id="F_a13" sourceRef="App_EnviarSug" targetRef="App_SugRecebidas" />
+    <bpmn:sequenceFlow id="F_a14" sourceRef="App_SugRecebidas" targetRef="App_Escolher" />
+    <bpmn:sequenceFlow id="F_a15" sourceRef="App_Escolher" targetRef="App_EnviarComp" />
+    <bpmn:sequenceFlow id="F_a16" sourceRef="App_EnviarComp" targetRef="App_Payback" />
+    <bpmn:sequenceFlow id="F_a17" sourceRef="App_Payback" targetRef="App_Trocar" />
+    <bpmn:sequenceFlow id="F_a18" sourceRef="App_Trocar" targetRef="App_JuntaTroca" />
+    <bpmn:sequenceFlow id="F_a20" sourceRef="App_JuntaTroca" targetRef="App_Mais" />
+    <bpmn:sequenceFlow id="F_a22" name="Não" sourceRef="App_Mais" targetRef="App_MinhaCasa" />
+    <bpmn:sequenceFlow id="F_a23" sourceRef="App_MinhaCasa" targetRef="App_EnviarClass" />
+    <bpmn:sequenceFlow id="F_a24" sourceRef="App_EnviarClass" targetRef="App_Perfil" />
+    <bpmn:sequenceFlow id="F_a25" sourceRef="App_Perfil" targetRef="App_EnviarEco" />
+    <bpmn:sequenceFlow id="F_a26" sourceRef="App_EnviarEco" targetRef="App_Plano" />
+    <bpmn:sequenceFlow id="F_a27" sourceRef="App_Plano" targetRef="App_LerPlano" />
+    <bpmn:sequenceFlow id="F_a28" sourceRef="App_LerPlano" targetRef="App_Fim" />
   </bpmn:process>
-
-  <!-- ===================== Backend ===================== -->
   <bpmn:process id="Proc_Backend" isExecutable="false">
     <bpmn:laneSet id="LaneSet_Backend">
-      <bpmn:lane id="Lane_Api" name="API REST + PostgreSQL">
+      <bpmn:lane id="Lane_Coach" name="Eco-Coach (RAG + Gemini)">
+        <bpmn:flowNodeRef>Eco_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Rag</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Llm</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Ok</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Erro</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Fontes</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Fim</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Eco_Totais</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Ml" name="Machine Learning (K-Means)">
+        <bpmn:flowNodeRef>Ml_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Ml_Indicadores</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Ml_Kmeans</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Ml_Comparar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Ml_Fim</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Economia" name="Sugestão de troca e payback">
+        <bpmn:flowNodeRef>Sug_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sug_Buscar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sug_Filtrar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sug_Fim</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Comp_Inicio</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Comp_Calcular</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Comp_Fim</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_Calc" name="Cálculo (API + PostgreSQL)">
         <bpmn:flowNodeRef>Api_Inicio</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Api_Validar</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Api_Valido</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Api_Erro</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Api_Calcular</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Api_NoCatalogo</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Api_Regras</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Api_Estimar</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Api_JuntaCalc</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Api_Tarifa</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Api_Registrar</bpmn:flowNodeRef>
         <bpmn:flowNodeRef>Api_Fim</bpmn:flowNodeRef>
       </bpmn:lane>
-      <bpmn:lane id="Lane_Ml" name="Machine Learning (K-Means)">
-        <bpmn:flowNodeRef>Ml_Inicio</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Ml_Classificar</bpmn:flowNodeRef>
-      </bpmn:lane>
-      <bpmn:lane id="Lane_Eco" name="Agente Eco-Coach (planejado)">
-        <bpmn:flowNodeRef>Eco_Payback</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Eco_Rag</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Eco_Llm</bpmn:flowNodeRef>
-        <bpmn:flowNodeRef>Eco_Fim</bpmn:flowNodeRef>
-      </bpmn:lane>
     </bpmn:laneSet>
-
-    <!-- POST /calcular -->
-    <bpmn:startEvent id="Api_Inicio" name="POST /calcular recebido">
+    <bpmn:startEvent id="Api_Inicio" name="Pedido de cálculo recebido">
       <bpmn:messageEventDefinition id="MED_Api_Inicio" />
     </bpmn:startEvent>
     <bpmn:serviceTask id="Api_Validar" name="Validar aparelho, uso e tarifa" />
     <bpmn:exclusiveGateway id="Api_Valido" name="Dados válidos?" />
-    <bpmn:endEvent id="Api_Erro" name="Erro 404 / 422 devolvido" />
-    <bpmn:serviceTask id="Api_Calcular" name="Calcular kWh e R$ (regras Inmetro + tarifa ANEEL)" />
+    <bpmn:endEvent id="Api_Erro" name="Erro 404 / 422" />
+    <bpmn:exclusiveGateway id="Api_NoCatalogo" name="Aparelho do catálogo?" />
+    <bpmn:serviceTask id="Api_Regras" name="Calcular kWh pelas regras do Inmetro (kWh/mês, kWh/ciclo ou W × horas)" />
+    <bpmn:serviceTask id="Api_Estimar" name="Estimar kWh fora do catálogo (com faixa)">
+      <bpmn:property id="Prop_Estimar" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Estimar">
+        <bpmn:sourceRef>DOR_Refri</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Estimar</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Api_JuntaCalc" />
+    <bpmn:serviceTask id="Api_Tarifa" name="Aplicar tarifa B1 da ANEEL ou a da conta (R$/mês)">
+      <bpmn:property id="Prop_Tarifa" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Tarifa">
+        <bpmn:sourceRef>DS_Postgres</bpmn:sourceRef>
+        <bpmn:targetRef>Prop_Tarifa</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:serviceTask>
     <bpmn:serviceTask id="Api_Registrar" name="Registrar consulta (sem dados pessoais)">
       <bpmn:dataOutputAssociation id="DOA_Registrar">
         <bpmn:targetRef>DS_Postgres</bpmn:targetRef>
@@ -101,165 +175,899 @@
     <bpmn:endEvent id="Api_Fim" name="Resultado enviado">
       <bpmn:messageEventDefinition id="MED_Api_Fim" />
     </bpmn:endEvent>
-    <bpmn:dataStoreReference id="DS_Postgres" name="PostgreSQL (tabela consultas)" />
-
-    <!-- POST /classificar -->
+    <bpmn:dataStoreReference id="DS_Postgres" name="PostgreSQL (aparelhos, tarifas, consultas)" />
+    <bpmn:dataObjectReference id="DOR_Refri" name="refrigerador.pkl" dataObjectRef="DO_Refri" />
+    <bpmn:dataObject id="DO_Refri" />
+    <bpmn:startEvent id="Sug_Inicio" name="POST /sugestoes recebido">
+      <bpmn:messageEventDefinition id="MED_Sug_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Sug_Buscar" name="Buscar equivalentes (mesma categoria, medida e tipo)" />
+    <bpmn:serviceTask id="Sug_Filtrar" name="Filtrar e ordenar pela economia (mesmo uso e tarifa)" />
+    <bpmn:endEvent id="Sug_Fim" name="Sugestões enviadas">
+      <bpmn:messageEventDefinition id="MED_Sug_Fim" />
+    </bpmn:endEvent>
+    <bpmn:startEvent id="Comp_Inicio" name="POST /comparar recebido">
+      <bpmn:messageEventDefinition id="MED_Comp_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Comp_Calcular" name="Calcular economia/mês e payback (Python)" />
+    <bpmn:endEvent id="Comp_Fim" name="Comparação enviada">
+      <bpmn:messageEventDefinition id="MED_Comp_Fim" />
+    </bpmn:endEvent>
     <bpmn:startEvent id="Ml_Inicio" name="POST /classificar recebido">
       <bpmn:messageEventDefinition id="MED_Ml_Inicio" />
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Ml_Classificar" name="Classificar perfil (Consciente / Moderado / Ineficiente)">
-      <bpmn:property id="Prop_Classificar" name="__targetRef_placeholder" />
-      <bpmn:dataInputAssociation id="DIA_Classificar">
+    <bpmn:serviceTask id="Ml_Indicadores" name="Calcular kWh por morador e frações (chuveiro, ar, geladeira)" />
+    <bpmn:serviceTask id="Ml_Kmeans" name="Classificar perfil (Consciente / Moderado / Ineficiente)">
+      <bpmn:property id="Prop_Kmeans" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="DIA_Kmeans">
         <bpmn:sourceRef>DOR_Kmeans</bpmn:sourceRef>
-        <bpmn:targetRef>Prop_Classificar</bpmn:targetRef>
+        <bpmn:targetRef>Prop_Kmeans</bpmn:targetRef>
       </bpmn:dataInputAssociation>
     </bpmn:serviceTask>
+    <bpmn:serviceTask id="Ml_Comparar" name="Comparar com a mediana das casas sintéticas" />
+    <bpmn:endEvent id="Ml_Fim" name="Perfil enviado">
+      <bpmn:messageEventDefinition id="MED_Ml_Fim" />
+    </bpmn:endEvent>
+    <bpmn:dataObjectReference id="DOR_Kmeans" name="kmeans.pkl" dataObjectRef="DO_Kmeans" />
     <bpmn:dataObject id="DO_Kmeans" />
-    <bpmn:dataObjectReference id="DOR_Kmeans" name="models/kmeans.pkl" dataObjectRef="DO_Kmeans" />
-
-    <bpmn:serviceTask id="Eco_Payback" name="Calcular payback das trocas (Python)" />
-    <bpmn:serviceTask id="Eco_Rag" name="Buscar diretrizes técnicas (RAG)">
+    <bpmn:startEvent id="Eco_Inicio" name="POST /eco-coach recebido">
+      <bpmn:messageEventDefinition id="MED_Eco_Inicio" />
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Eco_Rag" name="Buscar trechos parecidos (embeddings locais + pgvector)">
       <bpmn:property id="Prop_Rag" name="__targetRef_placeholder" />
       <bpmn:dataInputAssociation id="DIA_Rag">
         <bpmn:sourceRef>DS_Vetorial</bpmn:sourceRef>
         <bpmn:targetRef>Prop_Rag</bpmn:targetRef>
       </bpmn:dataInputAssociation>
     </bpmn:serviceTask>
-    <bpmn:serviceTask id="Eco_Llm" name="Explicar plano de ação (LLM)" />
-    <bpmn:endEvent id="Eco_Fim" name="Perfil e plano enviados">
+    <bpmn:serviceTask id="Eco_Llm" name="Escrever plano com citações [n] (Gemini)" />
+    <bpmn:exclusiveGateway id="Eco_Ok" name="Gemini respondeu?" />
+    <bpmn:endEvent id="Eco_Erro" name="Erro 503" />
+    <bpmn:serviceTask id="Eco_Fontes" name="Manter só as fontes citadas" />
+    <bpmn:endEvent id="Eco_Fim" name="Plano enviado">
       <bpmn:messageEventDefinition id="MED_Eco_Fim" />
     </bpmn:endEvent>
-    <bpmn:dataStoreReference id="DS_Vetorial" name="Base vetorial (pgvector, candidato)" />
-
+    <bpmn:dataStoreReference id="DS_Vetorial" name="trechos_rag (pgvector): Inmetro + Cemig" />
+    <bpmn:serviceTask id="Eco_Totais" name="Calcular perfil, totais e maiores consumos (Python)" />
     <bpmn:sequenceFlow id="F_b1" sourceRef="Api_Inicio" targetRef="Api_Validar" />
     <bpmn:sequenceFlow id="F_b2" sourceRef="Api_Validar" targetRef="Api_Valido" />
-    <bpmn:sequenceFlow id="F_b3" name="Sim" sourceRef="Api_Valido" targetRef="Api_Calcular" />
-    <bpmn:sequenceFlow id="F_b4" name="Não" sourceRef="Api_Valido" targetRef="Api_Erro" />
-    <bpmn:sequenceFlow id="F_b5" sourceRef="Api_Calcular" targetRef="Api_Registrar" />
-    <bpmn:sequenceFlow id="F_b6" sourceRef="Api_Registrar" targetRef="Api_Fim" />
-    <bpmn:sequenceFlow id="F_b7" sourceRef="Ml_Inicio" targetRef="Ml_Classificar" />
-    <bpmn:sequenceFlow id="F_b8" sourceRef="Ml_Classificar" targetRef="Eco_Payback" />
-    <bpmn:sequenceFlow id="F_b9" sourceRef="Eco_Payback" targetRef="Eco_Rag" />
-    <bpmn:sequenceFlow id="F_b10" sourceRef="Eco_Rag" targetRef="Eco_Llm" />
-    <bpmn:sequenceFlow id="F_b11" sourceRef="Eco_Llm" targetRef="Eco_Fim" />
+    <bpmn:sequenceFlow id="F_b3" name="Não" sourceRef="Api_Valido" targetRef="Api_Erro" />
+    <bpmn:sequenceFlow id="F_b4" name="Sim" sourceRef="Api_Valido" targetRef="Api_NoCatalogo" />
+    <bpmn:sequenceFlow id="F_b5" name="Sim" sourceRef="Api_NoCatalogo" targetRef="Api_Regras" />
+    <bpmn:sequenceFlow id="F_b6" name="Não" sourceRef="Api_NoCatalogo" targetRef="Api_Estimar" />
+    <bpmn:sequenceFlow id="F_b7" sourceRef="Api_Regras" targetRef="Api_JuntaCalc" />
+    <bpmn:sequenceFlow id="F_b8" sourceRef="Api_Estimar" targetRef="Api_JuntaCalc" />
+    <bpmn:sequenceFlow id="F_b9" sourceRef="Api_JuntaCalc" targetRef="Api_Tarifa" />
+    <bpmn:sequenceFlow id="F_b10" sourceRef="Api_Tarifa" targetRef="Api_Registrar" />
+    <bpmn:sequenceFlow id="F_b11" sourceRef="Api_Registrar" targetRef="Api_Fim" />
+    <bpmn:sequenceFlow id="F_e1" sourceRef="Sug_Inicio" targetRef="Sug_Buscar" />
+    <bpmn:sequenceFlow id="F_e2" sourceRef="Sug_Buscar" targetRef="Sug_Filtrar" />
+    <bpmn:sequenceFlow id="F_e3" sourceRef="Sug_Filtrar" targetRef="Sug_Fim" />
+    <bpmn:sequenceFlow id="F_e4" sourceRef="Comp_Inicio" targetRef="Comp_Calcular" />
+    <bpmn:sequenceFlow id="F_e5" sourceRef="Comp_Calcular" targetRef="Comp_Fim" />
+    <bpmn:sequenceFlow id="F_m1" sourceRef="Ml_Inicio" targetRef="Ml_Indicadores" />
+    <bpmn:sequenceFlow id="F_m2" sourceRef="Ml_Indicadores" targetRef="Ml_Kmeans" />
+    <bpmn:sequenceFlow id="F_m3" sourceRef="Ml_Kmeans" targetRef="Ml_Comparar" />
+    <bpmn:sequenceFlow id="F_m4" sourceRef="Ml_Comparar" targetRef="Ml_Fim" />
+    <bpmn:sequenceFlow id="F_k1" sourceRef="Eco_Inicio" targetRef="Eco_Totais" />
+    <bpmn:sequenceFlow id="F_k2" sourceRef="Eco_Totais" targetRef="Eco_Rag" />
+    <bpmn:sequenceFlow id="F_k3" sourceRef="Eco_Rag" targetRef="Eco_Llm" />
+    <bpmn:sequenceFlow id="F_k4" sourceRef="Eco_Llm" targetRef="Eco_Ok" />
+    <bpmn:sequenceFlow id="F_k5" name="Sim" sourceRef="Eco_Ok" targetRef="Eco_Fontes" />
+    <bpmn:sequenceFlow id="F_k6" name="Não" sourceRef="Eco_Ok" targetRef="Eco_Erro" />
+    <bpmn:sequenceFlow id="F_k7" sourceRef="Eco_Fontes" targetRef="Eco_Fim" />
   </bpmn:process>
-
-  <!-- ===================== Offline ===================== -->
   <bpmn:process id="Proc_Offline" isExecutable="false">
-    <bpmn:startEvent id="Off_Inicio" name="Novos dados Inmetro / ANEEL" />
-    <bpmn:serviceTask id="Off_Limpar" name="Limpar datasets (tratar_dados_*.py)" />
+    <bpmn:startEvent id="Off_Inicio" name="Novos dados Inmetro / ANEEL / ANP" />
+    <bpmn:serviceTask id="Off_Limpar" name="Limpar e tratar nulos (tratar_dados_*.py, Pandas)" />
     <bpmn:serviceTask id="Off_Carregar" name="Carregar no PostgreSQL (criar_banco.py)" />
-    <bpmn:serviceTask id="Off_Seed" name="Gerar seed de residências por regras" />
-    <bpmn:serviceTask id="Off_Ctgan" name="Treinar CTGAN e gerar residências sintéticas" />
-    <bpmn:serviceTask id="Off_Kmeans" name="Treinar K-Means (gera kmeans.pkl)" />
+    <bpmn:parallelGateway id="Off_Divide" />
+    <bpmn:serviceTask id="Off_Seed" name="Gerar 3.000 casas por regras (seed)" />
+    <bpmn:serviceTask id="Off_Ctgan" name="Treinar CTGAN e gerar 5.000 casas sintéticas" />
+    <bpmn:serviceTask id="Off_Kmeans" name="Treinar K-Means (kmeans.pkl)" />
+    <bpmn:serviceTask id="Off_Rf" name="Treinar Random Forest de geladeiras (refrigerador.pkl)" />
+    <bpmn:serviceTask id="Off_Embed" name="Gerar embeddings dos documentos (fastembed)" />
+    <bpmn:serviceTask id="Off_Pgvector" name="Gravar trechos no pgvector (carregar_rag.py)" />
+    <bpmn:serviceTask id="Off_Eda" name="Gerar gráficos da EDA (notebook)" />
+    <bpmn:parallelGateway id="Off_Junta" />
     <bpmn:endEvent id="Off_Fim" name="Dados e modelos atualizados" />
     <bpmn:sequenceFlow id="F_c1" sourceRef="Off_Inicio" targetRef="Off_Limpar" />
     <bpmn:sequenceFlow id="F_c2" sourceRef="Off_Limpar" targetRef="Off_Carregar" />
-    <bpmn:sequenceFlow id="F_c3" sourceRef="Off_Carregar" targetRef="Off_Seed" />
-    <bpmn:sequenceFlow id="F_c4" sourceRef="Off_Seed" targetRef="Off_Ctgan" />
-    <bpmn:sequenceFlow id="F_c5" sourceRef="Off_Ctgan" targetRef="Off_Kmeans" />
-    <bpmn:sequenceFlow id="F_c6" sourceRef="Off_Kmeans" targetRef="Off_Fim" />
+    <bpmn:sequenceFlow id="F_c3" sourceRef="Off_Carregar" targetRef="Off_Divide" />
+    <bpmn:sequenceFlow id="F_c4" sourceRef="Off_Divide" targetRef="Off_Seed" />
+    <bpmn:sequenceFlow id="F_c5" sourceRef="Off_Divide" targetRef="Off_Rf" />
+    <bpmn:sequenceFlow id="F_c6" sourceRef="Off_Divide" targetRef="Off_Embed" />
+    <bpmn:sequenceFlow id="F_c7" sourceRef="Off_Divide" targetRef="Off_Eda" />
+    <bpmn:sequenceFlow id="F_c8" sourceRef="Off_Seed" targetRef="Off_Ctgan" />
+    <bpmn:sequenceFlow id="F_c9" sourceRef="Off_Ctgan" targetRef="Off_Kmeans" />
+    <bpmn:sequenceFlow id="F_c11" sourceRef="Off_Kmeans" targetRef="Off_Junta" />
+    <bpmn:sequenceFlow id="F_c12" sourceRef="Off_Rf" targetRef="Off_Junta" />
+    <bpmn:sequenceFlow id="F_c10" sourceRef="Off_Embed" targetRef="Off_Pgvector" />
+    <bpmn:sequenceFlow id="F_c13" sourceRef="Off_Pgvector" targetRef="Off_Junta" />
+    <bpmn:sequenceFlow id="F_c14" sourceRef="Off_Eda" targetRef="Off_Junta" />
+    <bpmn:sequenceFlow id="F_c15" sourceRef="Off_Junta" targetRef="Off_Fim" />
   </bpmn:process>
-
-  <!-- ===================== Layout ===================== -->
   <bpmndi:BPMNDiagram id="Diagrama_iamp">
     <bpmndi:BPMNPlane id="Plano_iamp" bpmnElement="Colab_iamp">
-      <!-- pools e lanes -->
-      <bpmndi:BPMNShape id="S_Pool_App" bpmnElement="Pool_App" isHorizontal="true"><dc:Bounds x="0" y="0" width="2420" height="260" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Pool_Backend" bpmnElement="Pool_Backend" isHorizontal="true"><dc:Bounds x="0" y="320" width="2420" height="680" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Lane_Api" bpmnElement="Lane_Api" isHorizontal="true"><dc:Bounds x="30" y="320" width="2390" height="240" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Lane_Ml" bpmnElement="Lane_Ml" isHorizontal="true"><dc:Bounds x="30" y="560" width="2390" height="200" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Lane_Eco" bpmnElement="Lane_Eco" isHorizontal="true"><dc:Bounds x="30" y="760" width="2390" height="240" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Pool_Offline" bpmnElement="Pool_Offline" isHorizontal="true"><dc:Bounds x="0" y="1060" width="2420" height="220" /></bpmndi:BPMNShape>
-
-      <!-- App -->
-      <bpmndi:BPMNShape id="S_App_Inicio" bpmnElement="App_Inicio"><dc:Bounds x="80" y="112" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Buscar" bpmnElement="App_Buscar"><dc:Bounds x="160" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Uso" bpmnElement="App_Uso"><dc:Bounds x="320" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Dist" bpmnElement="App_Dist"><dc:Bounds x="480" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_EnviarCalc" bpmnElement="App_EnviarCalc"><dc:Bounds x="640" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_ResultadoCalc" bpmnElement="App_ResultadoCalc"><dc:Bounds x="1330" y="112" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Mais" bpmnElement="App_Mais" isMarkerVisible="true"><dc:Bounds x="1410" y="105" width="50" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_EnviarClass" bpmnElement="App_EnviarClass"><dc:Bounds x="1500" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Perfil" bpmnElement="App_Perfil"><dc:Bounds x="2100" y="112" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Exibir" bpmnElement="App_Exibir"><dc:Bounds x="2170" y="90" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_App_Fim" bpmnElement="App_Fim"><dc:Bounds x="2330" y="112" width="36" height="36" /></bpmndi:BPMNShape>
-
-      <bpmndi:BPMNEdge id="E_a1" bpmnElement="F_a1"><di:waypoint x="116" y="130" /><di:waypoint x="160" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a2" bpmnElement="F_a2"><di:waypoint x="280" y="130" /><di:waypoint x="320" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a3" bpmnElement="F_a3"><di:waypoint x="440" y="130" /><di:waypoint x="480" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a4" bpmnElement="F_a4"><di:waypoint x="600" y="130" /><di:waypoint x="640" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a5" bpmnElement="F_a5"><di:waypoint x="760" y="130" /><di:waypoint x="1330" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a6" bpmnElement="F_a6"><di:waypoint x="1366" y="130" /><di:waypoint x="1410" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a7" bpmnElement="F_a7"><di:waypoint x="1435" y="105" /><di:waypoint x="1435" y="40" /><di:waypoint x="220" y="40" /><di:waypoint x="220" y="90" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a8" bpmnElement="F_a8"><di:waypoint x="1460" y="130" /><di:waypoint x="1500" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a9" bpmnElement="F_a9"><di:waypoint x="1620" y="130" /><di:waypoint x="2100" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a10" bpmnElement="F_a10"><di:waypoint x="2136" y="130" /><di:waypoint x="2170" y="130" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_a11" bpmnElement="F_a11"><di:waypoint x="2290" y="130" /><di:waypoint x="2330" y="130" /></bpmndi:BPMNEdge>
-
-      <!-- API -->
-      <bpmndi:BPMNShape id="S_Api_Inicio" bpmnElement="Api_Inicio"><dc:Bounds x="682" y="422" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Validar" bpmnElement="Api_Validar"><dc:Bounds x="760" y="400" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Valido" bpmnElement="Api_Valido" isMarkerVisible="true"><dc:Bounds x="920" y="415" width="50" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Erro" bpmnElement="Api_Erro"><dc:Bounds x="927" y="500" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Calcular" bpmnElement="Api_Calcular"><dc:Bounds x="1010" y="400" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Registrar" bpmnElement="Api_Registrar"><dc:Bounds x="1170" y="400" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_DS_Postgres" bpmnElement="DS_Postgres"><dc:Bounds x="1205" y="490" width="50" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Api_Fim" bpmnElement="Api_Fim"><dc:Bounds x="1330" y="422" width="36" height="36" /></bpmndi:BPMNShape>
-
-      <bpmndi:BPMNEdge id="E_b1" bpmnElement="F_b1"><di:waypoint x="718" y="440" /><di:waypoint x="760" y="440" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b2" bpmnElement="F_b2"><di:waypoint x="880" y="440" /><di:waypoint x="920" y="440" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b3" bpmnElement="F_b3"><di:waypoint x="970" y="440" /><di:waypoint x="1010" y="440" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b4" bpmnElement="F_b4"><di:waypoint x="945" y="465" /><di:waypoint x="945" y="500" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b5" bpmnElement="F_b5"><di:waypoint x="1130" y="440" /><di:waypoint x="1170" y="440" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b6" bpmnElement="F_b6"><di:waypoint x="1290" y="440" /><di:waypoint x="1330" y="440" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_DOA_Registrar" bpmnElement="DOA_Registrar"><di:waypoint x="1230" y="480" /><di:waypoint x="1230" y="490" /></bpmndi:BPMNEdge>
-
-      <!-- ML -->
-      <bpmndi:BPMNShape id="S_Ml_Inicio" bpmnElement="Ml_Inicio"><dc:Bounds x="1542" y="642" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Ml_Classificar" bpmnElement="Ml_Classificar"><dc:Bounds x="1620" y="620" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_DOR_Kmeans" bpmnElement="DOR_Kmeans"><dc:Bounds x="1800" y="615" width="36" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Nota_Class" bpmnElement="Nota_Class"><dc:Bounds x="1220" y="610" width="280" height="70" /></bpmndi:BPMNShape>
-
-      <bpmndi:BPMNEdge id="E_b7" bpmnElement="F_b7"><di:waypoint x="1578" y="660" /><di:waypoint x="1620" y="660" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b8" bpmnElement="F_b8"><di:waypoint x="1680" y="700" /><di:waypoint x="1680" y="840" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_DIA_Classificar" bpmnElement="DIA_Classificar"><di:waypoint x="1800" y="645" /><di:waypoint x="1740" y="650" /></bpmndi:BPMNEdge>
-
-      <!-- Eco-Coach -->
-      <bpmndi:BPMNShape id="S_Eco_Payback" bpmnElement="Eco_Payback"><dc:Bounds x="1620" y="840" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Eco_Rag" bpmnElement="Eco_Rag"><dc:Bounds x="1780" y="840" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_DS_Vetorial" bpmnElement="DS_Vetorial"><dc:Bounds x="1815" y="775" width="50" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Eco_Llm" bpmnElement="Eco_Llm"><dc:Bounds x="1940" y="840" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Eco_Fim" bpmnElement="Eco_Fim"><dc:Bounds x="2100" y="862" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Nota_Eco" bpmnElement="Nota_Eco"><dc:Bounds x="1220" y="840" width="300" height="70" /></bpmndi:BPMNShape>
-
-      <bpmndi:BPMNEdge id="E_b9" bpmnElement="F_b9"><di:waypoint x="1740" y="880" /><di:waypoint x="1780" y="880" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b10" bpmnElement="F_b10"><di:waypoint x="1900" y="880" /><di:waypoint x="1940" y="880" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_b11" bpmnElement="F_b11"><di:waypoint x="2060" y="880" /><di:waypoint x="2100" y="880" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_DIA_Rag" bpmnElement="DIA_Rag"><di:waypoint x="1840" y="825" /><di:waypoint x="1840" y="840" /></bpmndi:BPMNEdge>
-
-      <!-- Offline -->
-      <bpmndi:BPMNShape id="S_Off_Inicio" bpmnElement="Off_Inicio"><dc:Bounds x="80" y="1152" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Limpar" bpmnElement="Off_Limpar"><dc:Bounds x="160" y="1130" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Carregar" bpmnElement="Off_Carregar"><dc:Bounds x="320" y="1130" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Seed" bpmnElement="Off_Seed"><dc:Bounds x="480" y="1130" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Ctgan" bpmnElement="Off_Ctgan"><dc:Bounds x="640" y="1130" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Kmeans" bpmnElement="Off_Kmeans"><dc:Bounds x="800" y="1130" width="120" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Off_Fim" bpmnElement="Off_Fim"><dc:Bounds x="962" y="1152" width="36" height="36" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_Nota_Offline" bpmnElement="Nota_Offline"><dc:Bounds x="1080" y="1135" width="360" height="70" /></bpmndi:BPMNShape>
-
-      <bpmndi:BPMNEdge id="E_c1" bpmnElement="F_c1"><di:waypoint x="116" y="1170" /><di:waypoint x="160" y="1170" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_c2" bpmnElement="F_c2"><di:waypoint x="280" y="1170" /><di:waypoint x="320" y="1170" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_c3" bpmnElement="F_c3"><di:waypoint x="440" y="1170" /><di:waypoint x="480" y="1170" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_c4" bpmnElement="F_c4"><di:waypoint x="600" y="1170" /><di:waypoint x="640" y="1170" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_c5" bpmnElement="F_c5"><di:waypoint x="760" y="1170" /><di:waypoint x="800" y="1170" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_c6" bpmnElement="F_c6"><di:waypoint x="920" y="1170" /><di:waypoint x="962" y="1170" /></bpmndi:BPMNEdge>
-
-      <!-- mensagens entre pools -->
-      <bpmndi:BPMNEdge id="E_MF_calc_req" bpmnElement="MF_calc_req"><di:waypoint x="700" y="170" /><di:waypoint x="700" y="422" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_MF_calc_resp" bpmnElement="MF_calc_resp"><di:waypoint x="1348" y="422" /><di:waypoint x="1348" y="148" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_MF_class_req" bpmnElement="MF_class_req"><di:waypoint x="1560" y="170" /><di:waypoint x="1560" y="642" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_MF_class_resp" bpmnElement="MF_class_resp"><di:waypoint x="2118" y="862" /><di:waypoint x="2118" y="148" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="S_Pool_App" bpmnElement="Pool_App" isHorizontal="true">
+        <dc:Bounds x="160" y="80" width="5440" height="330" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Inicio" bpmnElement="App_Inicio">
+        <dc:Bounds x="230" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="212" y="248" width="73" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Buscar" bpmnElement="App_Buscar">
+        <dc:Bounds x="300" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_NoCatalogo" bpmnElement="App_NoCatalogo" isMarkerVisible="true">
+        <dc:Bounds x="460" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="442" y="187" width="86" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Uso" bpmnElement="App_Uso">
+        <dc:Bounds x="550" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Estimar" bpmnElement="App_Estimar">
+        <dc:Bounds x="550" y="310" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_JuntaDados" bpmnElement="App_JuntaDados" isMarkerVisible="true">
+        <dc:Bounds x="710" y="205" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Dist" bpmnElement="App_Dist">
+        <dc:Bounds x="790" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_EnviarCalc" bpmnElement="App_EnviarCalc">
+        <dc:Bounds x="950" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_ResultadoCalc" bpmnElement="App_ResultadoCalc">
+        <dc:Bounds x="1970" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1945" y="248" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_VerResultado" bpmnElement="App_VerResultado">
+        <dc:Bounds x="2040" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_QuerTroca" bpmnElement="App_QuerTroca" isMarkerVisible="true">
+        <dc:Bounds x="2200" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2181" y="174" width="88" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_EnviarSug" bpmnElement="App_EnviarSug">
+        <dc:Bounds x="2290" y="310" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_SugRecebidas" bpmnElement="App_SugRecebidas">
+        <dc:Bounds x="2722" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2714" y="368" width="52" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Escolher" bpmnElement="App_Escolher">
+        <dc:Bounds x="2790" y="310" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_EnviarComp" bpmnElement="App_EnviarComp">
+        <dc:Bounds x="2950" y="310" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Payback" bpmnElement="App_Payback">
+        <dc:Bounds x="3222" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3211" y="368" width="59" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Trocar" bpmnElement="App_Trocar">
+        <dc:Bounds x="3290" y="310" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_JuntaTroca" bpmnElement="App_JuntaTroca" isMarkerVisible="true">
+        <dc:Bounds x="3450" y="205" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Mais" bpmnElement="App_Mais" isMarkerVisible="true">
+        <dc:Bounds x="3540" y="205" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3525" y="255" width="81" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_MinhaCasa" bpmnElement="App_MinhaCasa">
+        <dc:Bounds x="3630" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_EnviarClass" bpmnElement="App_EnviarClass">
+        <dc:Bounds x="3790" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Perfil" bpmnElement="App_Perfil">
+        <dc:Bounds x="4382" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4365" y="248" width="71" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_EnviarEco" bpmnElement="App_EnviarEco">
+        <dc:Bounds x="4450" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Plano" bpmnElement="App_Plano">
+        <dc:Bounds x="5292" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5273" y="248" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_LerPlano" bpmnElement="App_LerPlano">
+        <dc:Bounds x="5360" y="190" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_App_Fim" bpmnElement="App_Fim">
+        <dc:Bounds x="5520" y="212" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5497" y="248" width="82" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_a1" bpmnElement="F_a1">
+        <di:waypoint x="266" y="230" />
+        <di:waypoint x="300" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a2" bpmnElement="F_a2">
+        <di:waypoint x="420" y="230" />
+        <di:waypoint x="460" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a3" bpmnElement="F_a3">
+        <di:waypoint x="510" y="230" />
+        <di:waypoint x="550" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="521" y="205" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a4" bpmnElement="F_a4">
+        <di:waypoint x="485" y="255" />
+        <di:waypoint x="485" y="350" />
+        <di:waypoint x="550" y="350" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="490" y="293" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a5" bpmnElement="F_a5">
+        <di:waypoint x="670" y="230" />
+        <di:waypoint x="710" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a6" bpmnElement="F_a6">
+        <di:waypoint x="670" y="350" />
+        <di:waypoint x="735" y="350" />
+        <di:waypoint x="735" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a7" bpmnElement="F_a7">
+        <di:waypoint x="760" y="230" />
+        <di:waypoint x="790" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a8" bpmnElement="F_a8">
+        <di:waypoint x="910" y="230" />
+        <di:waypoint x="950" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a9" bpmnElement="F_a9">
+        <di:waypoint x="1070" y="230" />
+        <di:waypoint x="1970" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a10" bpmnElement="F_a10">
+        <di:waypoint x="2006" y="230" />
+        <di:waypoint x="2040" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a11" bpmnElement="F_a11">
+        <di:waypoint x="2160" y="230" />
+        <di:waypoint x="2200" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a12" bpmnElement="F_a12">
+        <di:waypoint x="2225" y="255" />
+        <di:waypoint x="2225" y="350" />
+        <di:waypoint x="2290" y="350" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2231" y="293" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a13" bpmnElement="F_a13">
+        <di:waypoint x="2410" y="350" />
+        <di:waypoint x="2722" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a14" bpmnElement="F_a14">
+        <di:waypoint x="2758" y="350" />
+        <di:waypoint x="2790" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a15" bpmnElement="F_a15">
+        <di:waypoint x="2910" y="350" />
+        <di:waypoint x="2950" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a16" bpmnElement="F_a16">
+        <di:waypoint x="3070" y="350" />
+        <di:waypoint x="3222" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a17" bpmnElement="F_a17">
+        <di:waypoint x="3258" y="350" />
+        <di:waypoint x="3290" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a18" bpmnElement="F_a18">
+        <di:waypoint x="3410" y="350" />
+        <di:waypoint x="3475" y="350" />
+        <di:waypoint x="3475" y="255" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a19" bpmnElement="F_a19">
+        <di:waypoint x="2250" y="230" />
+        <di:waypoint x="3450" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2840" y="205" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a20" bpmnElement="F_a20">
+        <di:waypoint x="3500" y="230" />
+        <di:waypoint x="3540" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a21" bpmnElement="F_a21">
+        <di:waypoint x="3565" y="205" />
+        <di:waypoint x="3565" y="120" />
+        <di:waypoint x="360" y="120" />
+        <di:waypoint x="360" y="190" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1953" y="95" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a22" bpmnElement="F_a22">
+        <di:waypoint x="3590" y="230" />
+        <di:waypoint x="3630" y="230" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3600" y="205" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a23" bpmnElement="F_a23">
+        <di:waypoint x="3750" y="230" />
+        <di:waypoint x="3790" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a24" bpmnElement="F_a24">
+        <di:waypoint x="3910" y="230" />
+        <di:waypoint x="4382" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a25" bpmnElement="F_a25">
+        <di:waypoint x="4418" y="230" />
+        <di:waypoint x="4450" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a26" bpmnElement="F_a26">
+        <di:waypoint x="4570" y="230" />
+        <di:waypoint x="5292" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a27" bpmnElement="F_a27">
+        <di:waypoint x="5328" y="230" />
+        <di:waypoint x="5360" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_a28" bpmnElement="F_a28">
+        <di:waypoint x="5480" y="230" />
+        <di:waypoint x="5520" y="230" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="S_Pool_Backend" bpmnElement="Pool_Backend" isHorizontal="true">
+        <dc:Bounds x="160" y="460" width="5440" height="920" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Lane_Coach" bpmnElement="Lane_Coach" isHorizontal="true">
+        <dc:Bounds x="190" y="1140" width="5410" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Lane_Ml" bpmnElement="Lane_Ml" isHorizontal="true">
+        <dc:Bounds x="190" y="940" width="5410" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Lane_Economia" bpmnElement="Lane_Economia" isHorizontal="true">
+        <dc:Bounds x="190" y="780" width="5410" height="160" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Lane_Calc" bpmnElement="Lane_Calc" isHorizontal="true">
+        <dc:Bounds x="190" y="460" width="5410" height="320" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Inicio" bpmnElement="Api_Inicio">
+        <dc:Bounds x="992" y="532" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="967" y="568" width="87" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Validar" bpmnElement="Api_Validar">
+        <dc:Bounds x="1060" y="510" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Valido" bpmnElement="Api_Valido" isMarkerVisible="true">
+        <dc:Bounds x="1220" y="525" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1207" y="507" width="76" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Erro" bpmnElement="Api_Erro">
+        <dc:Bounds x="1227" y="642" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1210" y="678" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_NoCatalogo" bpmnElement="Api_NoCatalogo" isMarkerVisible="true">
+        <dc:Bounds x="1310" y="525" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1305" y="494" width="60" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Regras" bpmnElement="Api_Regras">
+        <dc:Bounds x="1400" y="510" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Estimar" bpmnElement="Api_Estimar">
+        <dc:Bounds x="1400" y="620" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_JuntaCalc" bpmnElement="Api_JuntaCalc" isMarkerVisible="true">
+        <dc:Bounds x="1560" y="525" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Tarifa" bpmnElement="Api_Tarifa">
+        <dc:Bounds x="1650" y="510" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Registrar" bpmnElement="Api_Registrar">
+        <dc:Bounds x="1810" y="510" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Api_Fim" bpmnElement="Api_Fim">
+        <dc:Bounds x="1970" y="532" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1963" y="568" width="50" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_DS_Postgres" bpmnElement="DS_Postgres">
+        <dc:Bounds x="1735" y="640" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1717" y="690" width="87" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_DOR_Refri" bpmnElement="DOR_Refri">
+        <dc:Bounds x="1350" y="680" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1331" y="730" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sug_Inicio" bpmnElement="Sug_Inicio">
+        <dc:Bounds x="2332" y="842" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2307" y="878" width="87" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sug_Buscar" bpmnElement="Sug_Buscar">
+        <dc:Bounds x="2400" y="820" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sug_Filtrar" bpmnElement="Sug_Filtrar">
+        <dc:Bounds x="2560" y="820" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Sug_Fim" bpmnElement="Sug_Fim">
+        <dc:Bounds x="2722" y="842" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2714" y="878" width="52" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Comp_Inicio" bpmnElement="Comp_Inicio">
+        <dc:Bounds x="2992" y="842" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2969" y="878" width="83" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Comp_Calcular" bpmnElement="Comp_Calcular">
+        <dc:Bounds x="3060" y="820" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Comp_Fim" bpmnElement="Comp_Fim">
+        <dc:Bounds x="3222" y="842" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3209" y="878" width="63" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Ml_Inicio" bpmnElement="Ml_Inicio">
+        <dc:Bounds x="3832" y="1002" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3808" y="1038" width="85" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Ml_Indicadores" bpmnElement="Ml_Indicadores">
+        <dc:Bounds x="3900" y="980" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Ml_Kmeans" bpmnElement="Ml_Kmeans">
+        <dc:Bounds x="4060" y="980" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Ml_Comparar" bpmnElement="Ml_Comparar">
+        <dc:Bounds x="4220" y="980" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Ml_Fim" bpmnElement="Ml_Fim">
+        <dc:Bounds x="4382" y="1002" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4367" y="1038" width="67" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_DOR_Kmeans" bpmnElement="DOR_Kmeans">
+        <dc:Bounds x="4102" y="1075" width="36" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4092" y="1125" width="56" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Inicio" bpmnElement="Eco_Inicio">
+        <dc:Bounds x="4492" y="1202" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4467" y="1238" width="87" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Rag" bpmnElement="Eco_Rag">
+        <dc:Bounds x="4720" y="1180" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Llm" bpmnElement="Eco_Llm">
+        <dc:Bounds x="4880" y="1180" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Ok" bpmnElement="Eco_Ok" isMarkerVisible="true">
+        <dc:Bounds x="5040" y="1195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5036" y="1164" width="59" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Erro" bpmnElement="Eco_Erro">
+        <dc:Bounds x="5047" y="1302" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5044" y="1338" width="43" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Fontes" bpmnElement="Eco_Fontes">
+        <dc:Bounds x="5130" y="1180" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Fim" bpmnElement="Eco_Fim">
+        <dc:Bounds x="5292" y="1202" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5275" y="1238" width="70" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_DS_Vetorial" bpmnElement="DS_Vetorial">
+        <dc:Bounds x="4755" y="1290" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4739" y="1340" width="82" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Eco_Totais" bpmnElement="Eco_Totais">
+        <dc:Bounds x="4560" y="1180" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_b1" bpmnElement="F_b1">
+        <di:waypoint x="1028" y="550" />
+        <di:waypoint x="1060" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b2" bpmnElement="F_b2">
+        <di:waypoint x="1180" y="550" />
+        <di:waypoint x="1220" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b3" bpmnElement="F_b3">
+        <di:waypoint x="1245" y="575" />
+        <di:waypoint x="1245" y="642" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1250" y="599" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b4" bpmnElement="F_b4">
+        <di:waypoint x="1270" y="550" />
+        <di:waypoint x="1310" y="550" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1281" y="525" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b5" bpmnElement="F_b5">
+        <di:waypoint x="1360" y="550" />
+        <di:waypoint x="1400" y="550" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1371" y="525" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b6" bpmnElement="F_b6">
+        <di:waypoint x="1335" y="575" />
+        <di:waypoint x="1335" y="660" />
+        <di:waypoint x="1400" y="660" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1340" y="608" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b7" bpmnElement="F_b7">
+        <di:waypoint x="1520" y="550" />
+        <di:waypoint x="1560" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b8" bpmnElement="F_b8">
+        <di:waypoint x="1520" y="660" />
+        <di:waypoint x="1585" y="660" />
+        <di:waypoint x="1585" y="575" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b9" bpmnElement="F_b9">
+        <di:waypoint x="1610" y="550" />
+        <di:waypoint x="1650" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b10" bpmnElement="F_b10">
+        <di:waypoint x="1770" y="550" />
+        <di:waypoint x="1810" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_b11" bpmnElement="F_b11">
+        <di:waypoint x="1930" y="550" />
+        <di:waypoint x="1970" y="550" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_e1" bpmnElement="F_e1">
+        <di:waypoint x="2368" y="860" />
+        <di:waypoint x="2400" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_e2" bpmnElement="F_e2">
+        <di:waypoint x="2520" y="860" />
+        <di:waypoint x="2560" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_e3" bpmnElement="F_e3">
+        <di:waypoint x="2680" y="860" />
+        <di:waypoint x="2722" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_e4" bpmnElement="F_e4">
+        <di:waypoint x="3028" y="860" />
+        <di:waypoint x="3060" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_e5" bpmnElement="F_e5">
+        <di:waypoint x="3180" y="860" />
+        <di:waypoint x="3222" y="860" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_m1" bpmnElement="F_m1">
+        <di:waypoint x="3868" y="1020" />
+        <di:waypoint x="3900" y="1020" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_m2" bpmnElement="F_m2">
+        <di:waypoint x="4020" y="1020" />
+        <di:waypoint x="4060" y="1020" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_m3" bpmnElement="F_m3">
+        <di:waypoint x="4180" y="1020" />
+        <di:waypoint x="4220" y="1020" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_m4" bpmnElement="F_m4">
+        <di:waypoint x="4340" y="1020" />
+        <di:waypoint x="4382" y="1020" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k1" bpmnElement="F_k1">
+        <di:waypoint x="4528" y="1220" />
+        <di:waypoint x="4560" y="1220" />
+        </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k2" bpmnElement="F_k2">
+        <di:waypoint x="4680" y="1220" />
+        <di:waypoint x="4720" y="1220" />
+        </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k3" bpmnElement="F_k3">
+        <di:waypoint x="4840" y="1220" />
+        <di:waypoint x="4880" y="1220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k4" bpmnElement="F_k4">
+        <di:waypoint x="5000" y="1220" />
+        <di:waypoint x="5040" y="1220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k5" bpmnElement="F_k5">
+        <di:waypoint x="5090" y="1220" />
+        <di:waypoint x="5130" y="1220" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5101" y="1195" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k6" bpmnElement="F_k6">
+        <di:waypoint x="5065" y="1245" />
+        <di:waypoint x="5065" y="1302" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5070" y="1264" width="21" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_k7" bpmnElement="F_k7">
+        <di:waypoint x="5250" y="1220" />
+        <di:waypoint x="5292" y="1220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="S_Pool_Offline" bpmnElement="Pool_Offline" isHorizontal="true">
+        <dc:Bounds x="160" y="1420" width="5440" height="440" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Inicio" bpmnElement="Off_Inicio">
+        <dc:Bounds x="230" y="1622" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="207" y="1658" width="83" height="40" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Limpar" bpmnElement="Off_Limpar">
+        <dc:Bounds x="300" y="1600" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Carregar" bpmnElement="Off_Carregar">
+        <dc:Bounds x="460" y="1600" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Divide" bpmnElement="Off_Divide">
+        <dc:Bounds x="620" y="1615" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Seed" bpmnElement="Off_Seed">
+        <dc:Bounds x="710" y="1450" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Ctgan" bpmnElement="Off_Ctgan">
+        <dc:Bounds x="870" y="1450" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Kmeans" bpmnElement="Off_Kmeans">
+        <dc:Bounds x="1030" y="1450" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Rf" bpmnElement="Off_Rf">
+        <dc:Bounds x="710" y="1550" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Embed" bpmnElement="Off_Embed">
+        <dc:Bounds x="710" y="1650" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Pgvector" bpmnElement="Off_Pgvector">
+        <dc:Bounds x="870" y="1650" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Eda" bpmnElement="Off_Eda">
+        <dc:Bounds x="710" y="1750" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Junta" bpmnElement="Off_Junta">
+        <dc:Bounds x="1190" y="1615" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Off_Fim" bpmnElement="Off_Fim">
+        <dc:Bounds x="1280" y="1622" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1255" y="1658" width="86" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_c1" bpmnElement="F_c1">
+        <di:waypoint x="266" y="1640" />
+        <di:waypoint x="300" y="1640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c2" bpmnElement="F_c2">
+        <di:waypoint x="420" y="1640" />
+        <di:waypoint x="460" y="1640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c3" bpmnElement="F_c3">
+        <di:waypoint x="580" y="1640" />
+        <di:waypoint x="620" y="1640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c4" bpmnElement="F_c4">
+        <di:waypoint x="645" y="1615" />
+        <di:waypoint x="645" y="1490" />
+        <di:waypoint x="710" y="1490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c5" bpmnElement="F_c5">
+        <di:waypoint x="645" y="1615" />
+        <di:waypoint x="645" y="1590" />
+        <di:waypoint x="710" y="1590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c6" bpmnElement="F_c6">
+        <di:waypoint x="645" y="1665" />
+        <di:waypoint x="645" y="1690" />
+        <di:waypoint x="710" y="1690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c7" bpmnElement="F_c7">
+        <di:waypoint x="645" y="1665" />
+        <di:waypoint x="645" y="1790" />
+        <di:waypoint x="710" y="1790" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c8" bpmnElement="F_c8">
+        <di:waypoint x="830" y="1490" />
+        <di:waypoint x="870" y="1490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c9" bpmnElement="F_c9">
+        <di:waypoint x="990" y="1490" />
+        <di:waypoint x="1030" y="1490" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c10" bpmnElement="F_c10">
+        <di:waypoint x="830" y="1690" />
+        <di:waypoint x="870" y="1690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c11" bpmnElement="F_c11">
+        <di:waypoint x="1150" y="1490" />
+        <di:waypoint x="1215" y="1490" />
+        <di:waypoint x="1215" y="1615" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c12" bpmnElement="F_c12">
+        <di:waypoint x="830" y="1590" />
+        <di:waypoint x="1215" y="1590" />
+        <di:waypoint x="1215" y="1615" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c13" bpmnElement="F_c13">
+        <di:waypoint x="990" y="1690" />
+        <di:waypoint x="1215" y="1690" />
+        <di:waypoint x="1215" y="1665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c14" bpmnElement="F_c14">
+        <di:waypoint x="830" y="1790" />
+        <di:waypoint x="1215" y="1790" />
+        <di:waypoint x="1215" y="1665" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_c15" bpmnElement="F_c15">
+        <di:waypoint x="1240" y="1640" />
+        <di:waypoint x="1280" y="1640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNShape id="S_Nota_Gas" bpmnElement="Nota_Gas">
+        <dc:Bounds x="1120" y="295" width="340" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Dicas" bpmnElement="Nota_Dicas">
+        <dc:Bounds x="1510" y="295" width="360" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Calc" bpmnElement="Nota_Calc">
+        <dc:Bounds x="2040" y="510" width="290" height="110" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Economia" bpmnElement="Nota_Economia">
+        <dc:Bounds x="3320" y="805" width="430" height="100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Ml" bpmnElement="Nota_Ml">
+        <dc:Bounds x="4610" y="980" width="360" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Coach" bpmnElement="Nota_Coach">
+        <dc:Bounds x="3960" y="1180" width="470" height="90" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_Nota_Offline" bpmnElement="Nota_Offline">
+        <dc:Bounds x="1380" y="1590" width="420" height="100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_DIA_Estimar" bpmnElement="DIA_Estimar">
+        <di:waypoint x="1386" y="700" />
+        <di:waypoint x="1400" y="690" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DIA_Tarifa" bpmnElement="DIA_Tarifa">
+        <di:waypoint x="1750" y="640" />
+        <di:waypoint x="1730" y="590" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DOA_Registrar" bpmnElement="DOA_Registrar">
+        <di:waypoint x="1840" y="590" />
+        <di:waypoint x="1775" y="645" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DIA_Kmeans" bpmnElement="DIA_Kmeans">
+        <di:waypoint x="4120" y="1075" />
+        <di:waypoint x="4120" y="1060" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DIA_Rag" bpmnElement="DIA_Rag">
+        <di:waypoint x="4780" y="1290" />
+        <di:waypoint x="4780" y="1260" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_calc_req" bpmnElement="MF_calc_req">
+        <di:waypoint x="1010" y="270" />
+        <di:waypoint x="1010" y="532" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="988" y="391" width="74" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_calc_resp" bpmnElement="MF_calc_resp">
+        <di:waypoint x="1988" y="532" />
+        <di:waypoint x="1988" y="248" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1960" y="380" width="86" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_sug_req" bpmnElement="MF_sug_req">
+        <di:waypoint x="2350" y="390" />
+        <di:waypoint x="2350" y="842" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2322" y="606" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_sug_resp" bpmnElement="MF_sug_resp">
+        <di:waypoint x="2740" y="842" />
+        <di:waypoint x="2740" y="368" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2721" y="595" width="68" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_comp_req" bpmnElement="MF_comp_req">
+        <di:waypoint x="3010" y="390" />
+        <di:waypoint x="3010" y="842" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2984" y="606" width="83" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_comp_resp" bpmnElement="MF_comp_resp">
+        <di:waypoint x="3240" y="842" />
+        <di:waypoint x="3240" y="368" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3227" y="595" width="57" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_class_req" bpmnElement="MF_class_req">
+        <di:waypoint x="3850" y="270" />
+        <di:waypoint x="3850" y="1002" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3823" y="626" width="85" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_class_resp" bpmnElement="MF_class_resp">
+        <di:waypoint x="4400" y="1002" />
+        <di:waypoint x="4400" y="248" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4385" y="615" width="61" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_eco_req" bpmnElement="MF_eco_req">
+        <di:waypoint x="4510" y="270" />
+        <di:waypoint x="4510" y="1202" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="4482" y="726" width="87" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_MF_eco_resp" bpmnElement="MF_eco_resp">
+        <di:waypoint x="5310" y="1202" />
+        <di:waypoint x="5310" y="248" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="5283" y="715" width="84" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>
