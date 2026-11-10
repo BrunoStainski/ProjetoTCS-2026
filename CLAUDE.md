@@ -278,7 +278,14 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Próximas etapas
 
-Documento de processo/ética (`docs/documento_processo.md` vazio), registro de prompts
+Documento do projeto: `docs/documento_processo.md` escrito (11 seções, segue o guia da banca); o PDF
+entregável sai de `python scripts/gerar_pdf_documento.py` (Chrome/Edge headless, `markdown` no
+requirements-dev). Seção 2 usa os BPMN em níveis de `docs/bpmn/` (0_visao_geral com subprocessos [+] e
+servidor/Gemini como caixa-preta; 1_calculo, 2_troca_payback, 3_perfil, 4_eco_coach, 5_treino_offline),
+gerados por `scripts/gerar_bpmn_visoes.py` (.bpmn editável + .svg vetorial + .png 2x para o deck; cores:
+amarelo usuário, azul Python, verde ML, roxo IA generativa; sem bpmn-js, o SVG é desenhado pelo script).
+Mudou o processo? ajuste o script, rode-o e gere o PDF de novo. O diagrama completo do grupo fica no
+Anexo A (inteiro + 3 partes cortadas no marcador `<!-- BPMN_PARTES -->`). Registro de prompts
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
 No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular (ngrok ou `infra/oracle/`),
 para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)

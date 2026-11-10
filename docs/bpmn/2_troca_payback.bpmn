@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Def_troca_payback" targetNamespace="http://iamp.tcs2026/bpmn" exporter="scripts/gerar_bpmn_visoes.py" exporterVersion="1.0">
+  <bpmn:collaboration id="Colab_troca_payback">
+    <bpmn:participant id="P_Srv" name="Servidor iamp: troca e payback" processRef="Proc_P_Srv" />
+    <bpmn:textAnnotation id="N_payback"><bpmn:text>Payback simples: sem juros, sem revenda do aparelho antigo e sem reajuste de tarifa. O catálogo não tem preços: o usuário digita o valor.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Proc_P_Srv" isExecutable="false">
+    <bpmn:laneSet id="LS_P_Srv">
+      <bpmn:lane id="L_sug" name="POST /sugestoes">
+        <bpmn:flowNodeRef>s_ini</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>s_busca</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>s_descarta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>s_economia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>s_filtra</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>s_fim</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="L_comp" name="POST /comparar">
+        <bpmn:flowNodeRef>c_ini</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_economia</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_preco</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_payback</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>g_junta</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>c_fim</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="s_ini" name="Aparelho atual recebido"><bpmn:outgoing>F_s_ini_s_busca</bpmn:outgoing><bpmn:messageEventDefinition id="MED_s_ini" /></bpmn:startEvent>
+    <bpmn:serviceTask id="s_busca" name="Buscar equivalentes: mesma categoria, medida parecida e mesmo tipo"><bpmn:incoming>F_s_ini_s_busca</bpmn:incoming><bpmn:outgoing>F_s_busca_s_descarta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="s_descarta" name="Descartar dado imputado e suspeito (consumo &lt; 40% da mediana)"><bpmn:incoming>F_s_busca_s_descarta</bpmn:incoming><bpmn:outgoing>F_s_descarta_s_economia</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="s_economia" name="Calcular a economia com o mesmo uso e a mesma tarifa"><bpmn:incoming>F_s_descarta_s_economia</bpmn:incoming><bpmn:outgoing>F_s_economia_s_filtra</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="s_filtra" name="Manter economia ≥ 5% e ordenar (uma variação por modelo)"><bpmn:incoming>F_s_economia_s_filtra</bpmn:incoming><bpmn:outgoing>F_s_filtra_s_fim</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:endEvent id="s_fim" name="Sugestões enviadas"><bpmn:incoming>F_s_filtra_s_fim</bpmn:incoming><bpmn:messageEventDefinition id="MED_s_fim" /></bpmn:endEvent>
+    <bpmn:startEvent id="c_ini" name="Troca escolhida (+ preço opcional)"><bpmn:outgoing>F_c_ini_c_economia</bpmn:outgoing><bpmn:messageEventDefinition id="MED_c_ini" /></bpmn:startEvent>
+    <bpmn:serviceTask id="c_economia" name="Economia/mês = (kWh atual − kWh novo) × tarifa"><bpmn:incoming>F_c_ini_c_economia</bpmn:incoming><bpmn:outgoing>F_c_economia_g_preco</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="g_preco" name="Preço do novo informado?"><bpmn:incoming>F_c_economia_g_preco</bpmn:incoming><bpmn:outgoing>F_g_preco_c_payback</bpmn:outgoing><bpmn:outgoing>F_g_preco_g_junta</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="c_payback" name="Payback = preço ÷ economia/mês"><bpmn:incoming>F_g_preco_c_payback</bpmn:incoming><bpmn:outgoing>F_c_payback_g_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="g_junta"><bpmn:incoming>F_g_preco_g_junta</bpmn:incoming><bpmn:incoming>F_c_payback_g_junta</bpmn:incoming><bpmn:outgoing>F_g_junta_c_fim</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="c_fim" name="Economia e payback enviados"><bpmn:incoming>F_g_junta_c_fim</bpmn:incoming><bpmn:messageEventDefinition id="MED_c_fim" /></bpmn:endEvent>
+    <bpmn:sequenceFlow id="F_s_ini_s_busca" sourceRef="s_ini" targetRef="s_busca" />
+    <bpmn:sequenceFlow id="F_s_busca_s_descarta" sourceRef="s_busca" targetRef="s_descarta" />
+    <bpmn:sequenceFlow id="F_s_descarta_s_economia" sourceRef="s_descarta" targetRef="s_economia" />
+    <bpmn:sequenceFlow id="F_s_economia_s_filtra" sourceRef="s_economia" targetRef="s_filtra" />
+    <bpmn:sequenceFlow id="F_s_filtra_s_fim" sourceRef="s_filtra" targetRef="s_fim" />
+    <bpmn:sequenceFlow id="F_c_ini_c_economia" sourceRef="c_ini" targetRef="c_economia" />
+    <bpmn:sequenceFlow id="F_c_economia_g_preco" sourceRef="c_economia" targetRef="g_preco" />
+    <bpmn:sequenceFlow id="F_g_preco_c_payback" name="sim" sourceRef="g_preco" targetRef="c_payback" />
+    <bpmn:sequenceFlow id="F_g_preco_g_junta" name="não" sourceRef="g_preco" targetRef="g_junta" />
+    <bpmn:sequenceFlow id="F_c_payback_g_junta" sourceRef="c_payback" targetRef="g_junta" />
+    <bpmn:sequenceFlow id="F_g_junta_c_fim" sourceRef="g_junta" targetRef="c_fim" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diag_troca_payback">
+    <bpmndi:BPMNPlane id="Plane_troca_payback" bpmnElement="Colab_troca_payback">
+      <bpmndi:BPMNShape id="S_P_Srv" bpmnElement="P_Srv" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1280" height="400" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_sug" bpmnElement="L_sug" isHorizontal="true"><dc:Bounds x="40" y="10" width="1250" height="180" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_comp" bpmnElement="L_comp" isHorizontal="true"><dc:Bounds x="40" y="190" width="1250" height="220" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_ini" bpmnElement="s_ini"><dc:Bounds x="107" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="122" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_busca" bpmnElement="s_busca" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="180" y="60" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_descarta" bpmnElement="s_descarta" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="390" y="60" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_economia" bpmnElement="s_economia" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="605" y="60" width="170" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_filtra" bpmnElement="s_filtra" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="815" y="60" width="170" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_s_fim" bpmnElement="s_fim"><dc:Bounds x="1042" y="82" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1000" y="122" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_c_ini" bpmnElement="c_ini"><dc:Bounds x="107" y="272" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="65" y="312" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_c_economia" bpmnElement="c_economia" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="180" y="250" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_preco" bpmnElement="g_preco"><dc:Bounds x="405" y="265" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="360" y="225" width="140" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_c_payback" bpmnElement="c_payback" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="505" y="250" width="150" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_junta" bpmnElement="g_junta"><dc:Bounds x="705" y="265" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_c_fim" bpmnElement="c_fim"><dc:Bounds x="822" y="272" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="780" y="312" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_payback" bpmnElement="N_payback"><dc:Bounds x="930" y="255" width="330" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_F_s_ini_s_busca" bpmnElement="F_s_ini_s_busca"><di:waypoint x="143" y="100" /><di:waypoint x="180" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_s_busca_s_descarta" bpmnElement="F_s_busca_s_descarta"><di:waypoint x="360" y="100" /><di:waypoint x="390" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_s_descarta_s_economia" bpmnElement="F_s_descarta_s_economia"><di:waypoint x="570" y="100" /><di:waypoint x="605" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_s_economia_s_filtra" bpmnElement="F_s_economia_s_filtra"><di:waypoint x="775" y="100" /><di:waypoint x="815" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_s_filtra_s_fim" bpmnElement="F_s_filtra_s_fim"><di:waypoint x="985" y="100" /><di:waypoint x="1042" y="100" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_c_ini_c_economia" bpmnElement="F_c_ini_c_economia"><di:waypoint x="143" y="290" /><di:waypoint x="180" y="290" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_c_economia_g_preco" bpmnElement="F_c_economia_g_preco"><di:waypoint x="360" y="290" /><di:waypoint x="405" y="290" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_preco_c_payback" bpmnElement="F_g_preco_c_payback"><di:waypoint x="455" y="290" /><di:waypoint x="505" y="290" /><bpmndi:BPMNLabel><dc:Bounds x="460" y="270" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_preco_g_junta" bpmnElement="F_g_preco_g_junta"><di:waypoint x="430" y="315" /><di:waypoint x="430" y="375" /><di:waypoint x="730" y="375" /><di:waypoint x="730" y="315" /><bpmndi:BPMNLabel><dc:Bounds x="438" y="356" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_c_payback_g_junta" bpmnElement="F_c_payback_g_junta"><di:waypoint x="655" y="290" /><di:waypoint x="705" y="290" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_junta_c_fim" bpmnElement="F_g_junta_c_fim"><di:waypoint x="755" y="290" /><di:waypoint x="822" y="290" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

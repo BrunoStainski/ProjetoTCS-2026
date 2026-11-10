@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Def_calculo" targetNamespace="http://iamp.tcs2026/bpmn" exporter="scripts/gerar_bpmn_visoes.py" exporterVersion="1.0">
+  <bpmn:collaboration id="Colab_calculo">
+    <bpmn:participant id="P_Srv" name="Servidor iamp: POST /calcular" processRef="Proc_P_Srv" />
+    <bpmn:textAnnotation id="N_impostos"><bpmn:text>Valores sem ICMS, PIS/COFINS, bandeira e iluminação pública: o app sempre avisa.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Proc_P_Srv" isExecutable="false">
+    <bpmn:startEvent id="ini" name="Pedido de cálculo recebido"><bpmn:outgoing>F_ini_validar</bpmn:outgoing><bpmn:messageEventDefinition id="MED_ini" /></bpmn:startEvent>
+    <bpmn:serviceTask id="validar" name="Validar aparelho, uso e tarifa"><bpmn:incoming>F_ini_validar</bpmn:incoming><bpmn:outgoing>F_validar_g_valido</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="g_valido" name="Dados válidos?"><bpmn:incoming>F_validar_g_valido</bpmn:incoming><bpmn:outgoing>F_g_valido_erro</bpmn:outgoing><bpmn:outgoing>F_g_valido_g_catalogo</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="erro" name="Erro 404 / 422"><bpmn:incoming>F_g_valido_erro</bpmn:incoming><bpmn:errorEventDefinition id="EED_erro" /></bpmn:endEvent>
+    <bpmn:exclusiveGateway id="g_catalogo" name="Aparelho no catálogo?"><bpmn:incoming>F_g_valido_g_catalogo</bpmn:incoming><bpmn:outgoing>F_g_catalogo_regras</bpmn:outgoing><bpmn:outgoing>F_g_catalogo_estimar</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="regras" name="Calcular kWh pelas regras do Inmetro (kWh/mês, kWh/ciclo ou W × horas)"><bpmn:incoming>F_g_catalogo_regras</bpmn:incoming><bpmn:outgoing>F_regras_g_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="estimar" name="Estimar kWh fora do catálogo (etiqueta, Portaria 2006 ou Random Forest)"><bpmn:incoming>F_g_catalogo_estimar</bpmn:incoming><bpmn:outgoing>F_estimar_g_junta</bpmn:outgoing><bpmn:property id="P_DA_refri_estimar" name="__targetRef_placeholder" /><bpmn:dataInputAssociation id="DA_refri_estimar"><bpmn:sourceRef>refri</bpmn:sourceRef><bpmn:targetRef>P_DA_refri_estimar</bpmn:targetRef></bpmn:dataInputAssociation></bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="g_junta"><bpmn:incoming>F_regras_g_junta</bpmn:incoming><bpmn:incoming>F_estimar_g_junta</bpmn:incoming><bpmn:outgoing>F_g_junta_tarifa</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="tarifa" name="Aplicar a tarifa B1 da ANEEL ou a da conta de luz"><bpmn:incoming>F_g_junta_tarifa</bpmn:incoming><bpmn:outgoing>F_tarifa_registrar</bpmn:outgoing><bpmn:property id="P_DA_db_tarifa" name="__targetRef_placeholder" /><bpmn:dataInputAssociation id="DA_db_tarifa"><bpmn:sourceRef>db</bpmn:sourceRef><bpmn:targetRef>P_DA_db_tarifa</bpmn:targetRef></bpmn:dataInputAssociation></bpmn:serviceTask>
+    <bpmn:serviceTask id="registrar" name="Registrar a consulta (sem dados pessoais)"><bpmn:incoming>F_tarifa_registrar</bpmn:incoming><bpmn:outgoing>F_registrar_fim</bpmn:outgoing><bpmn:dataOutputAssociation id="DA_db_registrar"><bpmn:targetRef>db</bpmn:targetRef></bpmn:dataOutputAssociation></bpmn:serviceTask>
+    <bpmn:endEvent id="fim" name="Resultado enviado (kWh, R$ e avisos)"><bpmn:incoming>F_registrar_fim</bpmn:incoming><bpmn:messageEventDefinition id="MED_fim" /></bpmn:endEvent>
+    <bpmn:sequenceFlow id="F_ini_validar" sourceRef="ini" targetRef="validar" />
+    <bpmn:sequenceFlow id="F_validar_g_valido" sourceRef="validar" targetRef="g_valido" />
+    <bpmn:sequenceFlow id="F_g_valido_erro" name="não" sourceRef="g_valido" targetRef="erro" />
+    <bpmn:sequenceFlow id="F_g_valido_g_catalogo" name="sim" sourceRef="g_valido" targetRef="g_catalogo" />
+    <bpmn:sequenceFlow id="F_g_catalogo_regras" name="sim" sourceRef="g_catalogo" targetRef="regras" />
+    <bpmn:sequenceFlow id="F_g_catalogo_estimar" name="não" sourceRef="g_catalogo" targetRef="estimar" />
+    <bpmn:sequenceFlow id="F_regras_g_junta" sourceRef="regras" targetRef="g_junta" />
+    <bpmn:sequenceFlow id="F_estimar_g_junta" sourceRef="estimar" targetRef="g_junta" />
+    <bpmn:sequenceFlow id="F_g_junta_tarifa" sourceRef="g_junta" targetRef="tarifa" />
+    <bpmn:sequenceFlow id="F_tarifa_registrar" sourceRef="tarifa" targetRef="registrar" />
+    <bpmn:sequenceFlow id="F_registrar_fim" sourceRef="registrar" targetRef="fim" />
+    <bpmn:dataObjectReference id="refri" name="refrigerador.pkl" dataObjectRef="DO_refri" />
+    <bpmn:dataObject id="DO_refri" />
+    <bpmn:dataStoreReference id="db" name="PostgreSQL (aparelhos, tarifas, consultas)" />
+    <bpmn:dataStoreReference id="db" name="PostgreSQL (aparelhos, tarifas, consultas)" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diag_calculo">
+    <bpmndi:BPMNPlane id="Plane_calculo" bpmnElement="Colab_calculo">
+      <bpmndi:BPMNShape id="S_P_Srv" bpmnElement="P_Srv" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1280" height="400" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_ini" bpmnElement="ini"><dc:Bounds x="72" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="30" y="142" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_validar" bpmnElement="validar" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="145" y="80" width="140" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_valido" bpmnElement="g_valido"><dc:Bounds x="305" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="260" y="55" width="140" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_erro" bpmnElement="erro"><dc:Bounds x="312" y="227" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="270" y="267" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_catalogo" bpmnElement="g_catalogo"><dc:Bounds x="415" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="370" y="55" width="140" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_regras" bpmnElement="regras" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="520" y="80" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_estimar" bpmnElement="estimar" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="520" y="202" width="180" height="86" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_junta" bpmnElement="g_junta"><dc:Bounds x="755" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_tarifa" bpmnElement="tarifa" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="825" y="80" width="150" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_registrar" bpmnElement="registrar" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="1005" y="80" width="150" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_fim" bpmnElement="fim"><dc:Bounds x="1202" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1160" y="142" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_refri" bpmnElement="refri"><dc:Bounds x="742" y="311" width="36" height="48" /><bpmndi:BPMNLabel><dc:Bounds x="700" y="363" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_db" bpmnElement="db"><dc:Bounds x="965" y="245" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="930" y="299" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_impostos" bpmnElement="N_impostos"><dc:Bounds x="1080" y="230" width="190" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_F_ini_validar" bpmnElement="F_ini_validar"><di:waypoint x="108" y="120" /><di:waypoint x="145" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_validar_g_valido" bpmnElement="F_validar_g_valido"><di:waypoint x="285" y="120" /><di:waypoint x="305" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_valido_erro" bpmnElement="F_g_valido_erro"><di:waypoint x="330" y="145" /><di:waypoint x="330" y="245" /><di:waypoint x="312" y="245" /><bpmndi:BPMNLabel><dc:Bounds x="338" y="158" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_valido_g_catalogo" bpmnElement="F_g_valido_g_catalogo"><di:waypoint x="355" y="120" /><di:waypoint x="415" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="360" y="100" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_catalogo_regras" bpmnElement="F_g_catalogo_regras"><di:waypoint x="465" y="120" /><di:waypoint x="520" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="470" y="100" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_catalogo_estimar" bpmnElement="F_g_catalogo_estimar"><di:waypoint x="440" y="145" /><di:waypoint x="440" y="245" /><di:waypoint x="520" y="245" /><bpmndi:BPMNLabel><dc:Bounds x="448" y="158" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_regras_g_junta" bpmnElement="F_regras_g_junta"><di:waypoint x="700" y="120" /><di:waypoint x="755" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_estimar_g_junta" bpmnElement="F_estimar_g_junta"><di:waypoint x="700" y="245" /><di:waypoint x="780" y="245" /><di:waypoint x="780" y="145" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_junta_tarifa" bpmnElement="F_g_junta_tarifa"><di:waypoint x="805" y="120" /><di:waypoint x="825" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_tarifa_registrar" bpmnElement="F_tarifa_registrar"><di:waypoint x="975" y="120" /><di:waypoint x="1005" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_registrar_fim" bpmnElement="F_registrar_fim"><di:waypoint x="1155" y="120" /><di:waypoint x="1202" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DA_refri_estimar" bpmnElement="DA_refri_estimar"><di:waypoint x="742" y="335" /><di:waypoint x="680" y="285" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DA_db_tarifa" bpmnElement="DA_db_tarifa"><di:waypoint x="975" y="245" /><di:waypoint x="920" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DA_db_registrar" bpmnElement="DA_db_registrar"><di:waypoint x="1060" y="160" /><di:waypoint x="1005" y="245" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
