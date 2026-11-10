@@ -283,10 +283,10 @@ Documento de processo/ética (`docs/documento_processo.md` vazio), registro de p
 No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular (ngrok ou `infra/oracle/`),
 para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
 Nomes dos tipos no filtro da busca ainda usam `legivel` ("refrigerador"); as seções já usam `tituloDaCategoria`.
-BPMN também precisa do `/eco-coach`.
-BPMN: fonte editável em `docs/bpmn_processo.bpmn` (abrir em demo.bpmn.io) e imagem exportada em
-`docs/bpmn_processo.png`. Mostra `/calcular` + `/classificar` e o treino de ML offline; ao mudar a API
-(ex.: um futuro `POST /simulacao`), atualizar os dois. PENDENTE: incluir `/sugestoes` e `/comparar`.
+BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
+`docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
+Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Gás e
+dicas de eletroportátil entram como anotação. Ao mudar a API, atualizar o .bpmn e exportar o PNG de novo.
 
 ## Limitações conhecidas (usar na parte de ética)
 
