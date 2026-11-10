@@ -127,10 +127,20 @@ def test_chuveiro_pede_horas_obrigatorias(api, chuveiro_5500):
 
 
 @pytest.mark.banco
+def test_ventilador_do_catalogo_pede_velocidade_e_horas(api, id_da_categoria):
+    aparelho_id = id_da_categoria("ventilador_de_mesa")
+    assert api.get(f"/aparelhos/{aparelho_id}/uso").json()["perguntar_horas"]
+    corpo = {"aparelho_id": aparelho_id, "tarifa_manual": 1.0, "velocidade": "media", "registrar": False}
+    uma = api.post("/calcular", json={**corpo, "horas_dia": 1}).json()["kwh_mes"]
+    oito = api.post("/calcular", json={**corpo, "horas_dia": 8}).json()["kwh_mes"]
+    assert oito == pytest.approx(8 * uma, rel=0.01)
+
+
+@pytest.mark.banco
 def test_ar_condicionado_pede_horas_opcionais(api, id_da_categoria):
     """padrao=None com opcional=True: o app deve aceitar em branco (fica o valor do Inmetro)."""
     uso = api.get(f"/aparelhos/{id_da_categoria('ar_condicionado')}/uso").json()
-    assert uso == {"pergunta": "horas", "opcoes": None, "padrao": None, "opcional": True}
+    assert uso == {"pergunta": "horas", "opcoes": None, "padrao": None, "opcional": True, "perguntar_horas": False}
 
 
 @pytest.mark.banco

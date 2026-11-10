@@ -87,12 +87,14 @@ class PerguntaDeUso {
   final List<String> opcoes;
   final dynamic padrao;
   final bool opcional;
+  final bool perguntarHoras; // ventiladores: depois da velocidade, pergunta as horas por dia
 
   PerguntaDeUso.fromJson(Map<String, dynamic> j)
     : pergunta = j['pergunta'],
       opcoes = List<String>.from(j['opcoes'] ?? const []),
       padrao = j['padrao'],
-      opcional = j['opcional'] ?? false;
+      opcional = j['opcional'] ?? false,
+      perguntarHoras = j['perguntar_horas'] ?? false;
 }
 
 class Distribuidora {
@@ -129,6 +131,7 @@ class Resultado {
   final double? custoMaxMes;
   final String? tipo;
   final double? capacidade;
+  final bool pelosParecidos; // gasto da mediana dos modelos parecidos (sem o numero do aparelho)
 
   Resultado.fromJson(Map<String, dynamic> j)
     : categoria = j['categoria'],
@@ -150,10 +153,49 @@ class Resultado {
       custoMinMes = _realOuNulo(j['custo_min_mes']),
       custoMaxMes = _realOuNulo(j['custo_max_mes']),
       tipo = j['tipo'],
-      capacidade = _realOuNulo(j['capacidade']);
+      capacidade = _realOuNulo(j['capacidade']),
+      pelosParecidos = j['pelos_parecidos'] ?? false;
 
   String get nome => '$marca $modelo';
   bool get temFaixa => custoMinMes != null && custoMaxMes != null && custoMaxMes! > custoMinMes!;
+}
+
+/// Tipo do Inmetro com um nome que a pessoa reconhece olhando o aparelho.
+class TipoEstimavel {
+  final String valor; // vai para a API como esta
+  final String nome;
+  final String? descricao;
+
+  TipoEstimavel.fromJson(Map<String, dynamic> j) : valor = j['valor'], nome = j['nome'], descricao = j['descricao'];
+}
+
+class TamanhoComum {
+  final double valor;
+  final String nome;
+
+  TamanhoComum.fromJson(Map<String, dynamic> j) : valor = (j['valor'] as num).toDouble(), nome = j['nome'];
+}
+
+/// Numero escrito no proprio aparelho (etiqueta do Inmetro ou potencia da plaqueta).
+class FormaDeInformar {
+  final String campo; // kwh_mes, kwh_ciclo ou potencia_w
+  final String nome;
+  final String rotulo;
+  final String unidade;
+  final String onde;
+  final String? dica;
+  final String exemplo;
+  final double maximo;
+
+  FormaDeInformar.fromJson(Map<String, dynamic> j)
+    : campo = j['campo'],
+      nome = j['nome'],
+      rotulo = j['rotulo'],
+      unidade = j['unidade'],
+      onde = j['onde'],
+      dica = j['dica'],
+      exemplo = j['exemplo'],
+      maximo = (j['maximo'] as num).toDouble();
 }
 
 class CategoriaEstimavel {
@@ -161,9 +203,11 @@ class CategoriaEstimavel {
   final String nome;
   final bool especial;
   final String? medida;
-  final List<String> tipos;
-  final String? etiquetaRotulo;
-  final bool etiquetaObrigatoria;
+  final String? unidadeMedida;
+  final List<TamanhoComum> tamanhos;
+  final List<TipoEstimavel> tipos;
+  final List<FormaDeInformar> formas;
+  final bool valorObrigatorio; // sem catalogo para comparar: precisa de uma das formas
   final PerguntaDeUso uso;
 
   CategoriaEstimavel.fromJson(Map<String, dynamic> j)
@@ -171,9 +215,11 @@ class CategoriaEstimavel {
       nome = j['nome'],
       especial = j['especial'] ?? false,
       medida = j['medida'],
-      tipos = List<String>.from(j['tipos'] ?? const []),
-      etiquetaRotulo = j['etiqueta_rotulo'],
-      etiquetaObrigatoria = j['etiqueta_obrigatoria'] ?? false,
+      unidadeMedida = j['unidade_medida'],
+      tamanhos = [for (final t in j['tamanhos'] ?? const []) TamanhoComum.fromJson(t)],
+      tipos = [for (final t in j['tipos'] ?? const []) TipoEstimavel.fromJson(t)],
+      formas = [for (final f in j['formas'] ?? const []) FormaDeInformar.fromJson(f)],
+      valorObrigatorio = j['valor_obrigatorio'] ?? false,
       uso = PerguntaDeUso.fromJson(j['uso']);
 }
 
@@ -373,8 +419,9 @@ class Api {
   static Future<Resultado> estimar(String rota, Map<String, dynamic> corpo) async =>
       Resultado.fromJson(await _post(rota, corpo));
 
-  static Future<List<Resistivo>> resistivos() async =>
-      [for (final j in await _get('/resistivos')) Resistivo.fromJson(j)];
+  static Future<List<Resistivo>> resistivos() async => [
+    for (final j in await _get('/resistivos')) Resistivo.fromJson(j),
+  ];
 
   static Future<Dicas> dicas(Resultado r) async => Dicas.fromJson(
     await _post('/eco-coach/aparelho', {
@@ -386,8 +433,9 @@ class Api {
     }, limite: const Duration(seconds: 60)),
   );
 
-  static Future<List<CategoriaEstimavel>> categoriasEstimaveis() async =>
-      [for (final j in await _get('/estimativa/categorias')) CategoriaEstimavel.fromJson(j)];
+  static Future<List<CategoriaEstimavel>> categoriasEstimaveis() async => [
+    for (final j in await _get('/estimativa/categorias')) CategoriaEstimavel.fromJson(j),
+  ];
 
   static Map<String, dynamic> _atualEstimado(Resultado atual) => {
     'categoria': atual.categoria,
@@ -395,6 +443,7 @@ class Api {
     'tipo': atual.tipo,
     'kwh_mes': atual.kwhMes,
     'nome': atual.nome,
+    'pelos_parecidos': atual.pelosParecidos,
   };
 
   static Future<Sugestoes> sugestoesEstimado(Resultado atual, Map<String, dynamic> usoETarifa) async =>
@@ -407,7 +456,10 @@ class Api {
     double? precoNovo,
   }) async => Comparacao.fromJson(
     await _post('/comparar/estimado', {
-      ..._atualEstimado(atual)..remove('capacidade')..remove('tipo'),
+      ..._atualEstimado(atual)
+        ..remove('capacidade')
+        ..remove('tipo')
+        ..remove('pelos_parecidos'),
       'alternativa_id': alternativaId,
       'preco_novo': precoNovo,
       ...usoETarifa,

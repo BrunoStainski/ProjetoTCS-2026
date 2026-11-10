@@ -1,5 +1,7 @@
-// Estimativa de aparelho fora do catalogo do Inmetro, uma pergunta por tela.
+// Estimativa de aparelho fora do catalogo do Inmetro (antigo ou sem modelo), uma pergunta por tela.
 // As perguntas dependem das respostas (geladeira pergunta o ano; eletroportatil, a potencia...).
+// Eletro grande: tipo e tamanho (servem para comparar com modelos novos) e depois o numero escrito no
+// proprio aparelho (vale para aparelho antigo); sem ele, o gasto sai dos modelos parecidos do catalogo.
 // Voltar (seta ou botao do celular) volta uma pergunta, sem perder o que ja foi respondido.
 
 import 'package:flutter/material.dart';
@@ -60,7 +62,11 @@ class _TelaEstimarState extends State<TelaEstimar> {
   final _congelador = TextEditingController();
   final _ano = TextEditingController();
 
+  FormaDeInformar? _forma; // numero que a pessoa achou no aparelho
+  bool _semNumero = false; // nao achou: usa tipo e tamanho
   String? _tipo;
+  double? _tamanho;
+  bool _outroTamanho = false;
   final _medida = TextEditingController();
   final _etiqueta = TextEditingController();
   final _tempo = ControleTempo();
@@ -76,7 +82,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   bool get _geladeira => _categoria?.especial ?? false;
   bool get _soFreezer => _tipoGeladeira?.startsWith('freezer') ?? false;
-  bool get _temEtiqueta => _etiqueta.text.trim().isNotEmpty;
+  bool get _comPotencia => _forma?.campo == 'potencia_w';
 
   @override
   void initState() {
@@ -130,7 +136,11 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   void _escolherCategoria(CategoriaEstimavel c) {
     if (_categoria?.categoria != c.categoria) {
+      _forma = c.valorObrigatorio && c.formas.isNotEmpty ? c.formas.first : null;
+      _semNumero = false;
       _tipo = null;
+      _tamanho = null;
+      _outroTamanho = false;
       _tipoGeladeira = null;
       _frostFree = null;
       _medida.clear();
@@ -153,6 +163,19 @@ class _TelaEstimarState extends State<TelaEstimar> {
       _dias.text = numero(r.diasMes, casas: 0);
     }
     _resistivo = r;
+    _avancar();
+  }
+
+  void _escolherForma(FormaDeInformar? forma) {
+    if (forma?.campo != _forma?.campo) _etiqueta.clear();
+    _forma = forma;
+    _semNumero = forma == null;
+    _avancar();
+  }
+
+  void _escolherTamanho(double? tamanho) {
+    _tamanho = tamanho;
+    _outroTamanho = tamanho == null;
     _avancar();
   }
 
@@ -232,20 +255,21 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   Consulta _consultaPesado(CategoriaEstimavel c) {
     final (marca, modelo) = _marcaEModelo();
-    final etiqueta = _opcional(_etiqueta);
+    final pedeHoras = c.uso.pergunta == 'horas' || c.uso.perguntarHoras;
     return Consulta(
       Aparelho(id: 0, categoria: c.categoria, marca: marca ?? c.nome, modelo: modelo ?? ''),
       estimativa: Estimativa(rotaEstimado, {
         'categoria': c.categoria,
-        'tipo': etiqueta == null ? _tipo : null,
-        'medida': etiqueta == null ? _opcional(_medida) : null,
-        'valor_etiqueta': etiqueta,
+        'tipo': _tipo,
+        'medida': c.medida == null ? null : (_outroTamanho ? _opcional(_medida) : _tamanho),
+        'valor_etiqueta': _forma == null ? null : _opcional(_etiqueta),
+        'campo_etiqueta': _forma?.campo,
         'marca': marca,
         'modelo': modelo,
       }),
-      horasDia: c.uso.pergunta == 'horas' ? _tempo.horasDia : null,
+      horasDia: pedeHoras ? _tempo.horasDia : null,
       ciclosMes: c.uso.pergunta == 'ciclos' ? lerNumero(_ciclos.text) : null,
-      velocidade: c.uso.pergunta == 'velocidade' ? _velocidade : null,
+      velocidade: c.uso.pergunta == 'velocidade' && _semNumero ? _velocidade : null,
     );
   }
 
@@ -278,7 +302,8 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   _Pergunta _perguntaGrupo() => _Pergunta(
     'Que tipo de aparelho é?',
-    ajuda: 'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
+    ajuda:
+        'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
         'com o que você souber.',
     campos: [
       CartaoOpcao(
@@ -390,86 +415,146 @@ class _TelaEstimarState extends State<TelaEstimar> {
   ];
 
   List<_Pergunta> _perguntasCategoria(CategoriaEstimavel c) {
-    final rotuloEtiqueta = c.etiquetaRotulo == null ? null : legivel(c.etiquetaRotulo!);
+    final forma = _forma;
     return [
-      if (rotuloEtiqueta != null)
+      if (c.tipos.isNotEmpty)
         _Pergunta(
-          c.etiquetaObrigatoria ? 'Qual é o valor da etiqueta?' : 'Tem a etiqueta do Inmetro?',
-          ajuda: c.etiquetaObrigatoria
-              ? 'Está escrito no próprio aparelho ou na embalagem.'
-              : 'Com o valor da etiqueta o cálculo fica exato. Sem ele, usamos modelos parecidos.',
-          campos: [_campo(_etiqueta, rotuloEtiqueta)],
-          validar: () {
-            if (c.etiquetaObrigatoria && !_temEtiqueta) {
-              return 'Digite o valor de "$rotuloEtiqueta". Ele está no aparelho ou na embalagem.';
-            }
-            return _invalido(_etiqueta) ? 'Confira o número digitado.' : null;
-          },
-          textoPular: c.etiquetaObrigatoria ? null : 'Não tenho a etiqueta',
-          aoPular: _etiqueta.clear,
-        ),
-      if (!_temEtiqueta && c.tipos.isNotEmpty)
-        _Pergunta(
-          'Qual é o tipo?',
+          'Qual destes é o seu?',
           campos: [
             for (final tipo in c.tipos)
-              CartaoOpcao(titulo: tipo, selecionada: _tipo == tipo, onTap: () => _escolher(() => _tipo = tipo)),
+              CartaoOpcao(
+                titulo: tipo.nome,
+                subtitulo: tipo.descricao,
+                selecionada: _tipo == tipo.valor,
+                onTap: () => _escolher(() => _tipo = tipo.valor),
+              ),
           ],
         ),
-      if (!_temEtiqueta && c.medida != null)
+      if (c.medida != null) _perguntaTamanho(c),
+      if (c.medida != null && _outroTamanho)
         _Pergunta(
-          'Qual é o tamanho?',
-          ajuda: 'Está na etiqueta do aparelho ou no manual.',
-          campos: [_campo(_medida, legivel(c.medida!))],
+          'Digite o tamanho',
+          ajuda: '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+          campos: [_campo(_medida, legivel(c.medida!).split(' (').first, sufixo: c.unidadeMedida)],
           validar: () => _opcional(_medida) == null || _invalido(_medida)
-              ? 'Digite ${legivel(c.medida!).toLowerCase()} ou volte e informe o valor da etiqueta.'
+              ? 'Digite o número, como está escrito. Se não souber, volte e escolha um dos tamanhos.'
               : null,
         ),
-      ..._perguntasUso(c.uso),
+      if (!c.valorObrigatorio) _perguntaForma(c),
+      if (forma != null) _perguntaValor(forma),
+      ..._perguntasUso(c.uso, horasObrigatorias: _comPotencia, semVelocidade: !_semNumero),
     ];
   }
 
-  List<_Pergunta> _perguntasUso(PerguntaDeUso uso) => switch (uso.pergunta) {
-    'horas' => [
-      _Pergunta(
-        'Quanto tempo por dia ele fica ligado?',
-        ajuda: uso.opcional
-            ? 'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.'
-            : uso.padrao != null
-            ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
-            : 'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
-        campos: [CampoTempo(controle: _tempo)],
-        validar: () {
-          if (!_tempo.valido) return 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.';
-          if (_tempo.horasDia == null && !uso.opcional) return 'Digite o tempo de uso por dia.';
-          return null;
-        },
-        textoPular: uso.opcional ? 'Não sei, usar o valor do Inmetro' : null,
-        aoPular: _tempo.limpar,
+  _Pergunta _perguntaForma(CategoriaEstimavel c) => _Pergunta(
+    'Você consegue ver algum destes no aparelho?',
+    ajuda: 'Com o número do próprio aparelho o cálculo fica certo, mesmo se ele for antigo.',
+    campos: [
+      for (final f in c.formas)
+        CartaoOpcao(
+          icone: f.campo == 'potencia_w' ? Icons.bolt : Icons.receipt_long_outlined,
+          titulo: f.nome,
+          subtitulo: f.onde,
+          selecionada: _forma?.campo == f.campo,
+          onTap: () => _escolherForma(f),
+        ),
+      CartaoOpcao(
+        icone: Icons.help_outline,
+        titulo: 'Não consigo ver nenhum',
+        subtitulo: c.medida == null
+            ? 'Tudo bem: calculamos com os modelos do catálogo do Inmetro.'
+            : 'Tudo bem: calculamos com os modelos parecidos do Inmetro.',
+        selecionada: _semNumero,
+        onTap: () => _escolherForma(null),
       ),
     ],
-    'ciclos' => [
-      _Pergunta(
-        'Quantas vezes por mês você lava roupa?',
-        ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
-        campos: [_campo(_ciclos, 'Lavagens por mês', sufixo: 'vezes', inteiro: true)],
-        validar: () {
-          final ciclos = lerNumero(_ciclos.text);
-          return ciclos == null || ciclos < 0 ? 'Digite quantas lavagens por mês. Ex.: 12.' : null;
-        },
+  );
+
+  _Pergunta _perguntaValor(FormaDeInformar f) => _Pergunta(
+    'Qual é ${f.campo == 'potencia_w' ? 'a potência' : 'o consumo de energia'}?',
+    ajuda: [f.onde, if (f.dica != null) f.dica!].join(' '),
+    campos: [_campo(_etiqueta, f.rotulo, sufixo: f.unidade, exemplo: f.exemplo)],
+    validar: () {
+      final v = _opcional(_etiqueta);
+      return v == null || _invalido(_etiqueta, maximo: f.maximo)
+          ? 'Digite o número em ${f.unidade}, como está escrito. ${f.exemplo}.'
+          : null;
+    },
+  );
+
+  _Pergunta _perguntaTamanho(CategoriaEstimavel c) => _Pergunta(
+    'Qual é o tamanho?',
+    ajuda: '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+    campos: [
+      for (final t in c.tamanhos)
+        CartaoOpcao(
+          titulo: t.nome,
+          selecionada: !_outroTamanho && _tamanho == t.valor,
+          onTap: () => _escolherTamanho(t.valor),
+        ),
+      CartaoOpcao(
+        icone: Icons.edit_outlined,
+        titulo: 'Outro tamanho',
+        subtitulo: 'Digitar o número',
+        selecionada: _outroTamanho,
+        onTap: () => _escolherTamanho(null),
       ),
     ],
-    'velocidade' => [
-      _Pergunta(
-        'Em qual velocidade você costuma usar?',
-        campos: [
-          for (final o in uso.opcoes)
-            CartaoOpcao(titulo: o, selecionada: _velocidade == o, onTap: () => _escolher(() => _velocidade = o)),
-        ],
-      ),
-    ],
-    _ => const [],
-  };
+  );
+
+  /// horasObrigatorias: com a potencia da plaqueta, so as horas dizem quanto gasta.
+  /// semVelocidade: com a potencia, a velocidade do ventilador nao entra na conta.
+  List<_Pergunta> _perguntasUso(PerguntaDeUso uso, {bool horasObrigatorias = false, bool semVelocidade = false}) {
+    final opcional = uso.opcional && !horasObrigatorias;
+    final horas = _Pergunta(
+      'Quanto tempo por dia ele fica ligado?',
+      ajuda: uso.perguntarHoras
+          ? 'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.'
+          : opcional
+          ? 'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.'
+          : uso.padrao != null
+          ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
+          : 'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
+      campos: [CampoTempo(controle: _tempo)],
+      validar: () {
+        if (!_tempo.valido) return 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.';
+        if (_tempo.horasDia == null && !opcional) return 'Digite o tempo de uso por dia.';
+        return null;
+      },
+      textoPular: opcional ? 'Não sei, usar o valor do Inmetro' : null,
+      aoPular: _tempo.limpar,
+    );
+    return switch (uso.pergunta) {
+      'horas' => [horas],
+      'ciclos' => [
+        _Pergunta(
+          'Quantas vezes por mês você lava roupa?',
+          ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+          campos: [_campo(_ciclos, 'Lavagens por mês', sufixo: 'vezes', inteiro: true)],
+          validar: () {
+            final ciclos = lerNumero(_ciclos.text);
+            return ciclos == null || ciclos < 0 ? 'Digite quantas lavagens por mês. Ex.: 12.' : null;
+          },
+        ),
+      ],
+      'velocidade' => [
+        if (!semVelocidade)
+          _Pergunta(
+            'Em qual velocidade você costuma usar?',
+            campos: [
+              for (final o in uso.opcoes)
+                CartaoOpcao(
+                  titulo: nomeDaVelocidade(o),
+                  selecionada: _velocidade == o,
+                  onTap: () => _escolher(() => _velocidade = o),
+                ),
+            ],
+          ),
+        if (uso.perguntarHoras) horas,
+      ],
+      _ => const [],
+    };
+  }
 
   _Pergunta _perguntaNome() => _Pergunta(
     'Qual é a marca e o modelo?',

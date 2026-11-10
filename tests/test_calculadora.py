@@ -56,6 +56,15 @@ def test_ventilador_usa_a_velocidade_escolhida():
     assert consumo_mensal_kwh(v, velocidade="baixa")["kwh_mes"] == pytest.approx(1.0)
 
 
+def test_ventilador_multiplica_o_consumo_de_1_hora_do_inmetro_pelas_horas():
+    v = aparelho("ventilador_de_mesa", kwh_mes=2.0, kwh_mes_baixa=1.0, kwh_mes_media=2.0, kwh_mes_alta=3.0)
+    assert HORAS_REFERENCIA_INMETRO["ventilador_de_mesa"] == 1.0
+    r = consumo_mensal_kwh(v, velocidade="alta", horas_dia=8)
+    assert r["kwh_mes"] == pytest.approx(24.0)
+    assert "velocidade alta" in r["metodo"] and "8 h/dia" in r["metodo"]
+    assert consumo_mensal_kwh(v, horas_dia=8)["kwh_mes"] == pytest.approx(16.0)
+
+
 def test_ar_condicionado_sem_horas_usa_inmetro_e_com_horas_usa_potencia():
     ar = aparelho("ar_condicionado", kwh_mes=64.0, potencia_w=1000)
     assert consumo_mensal_kwh(ar)["kwh_mes"] == pytest.approx(64.0)

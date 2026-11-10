@@ -1,6 +1,11 @@
+import math
+
+import pandas as pd
 import pytest
 
 import estimativa
+import servico
+from calculadora_residencial import COLUNAS_NUM
 
 CRM45 = {"tipo": "duplex", "frost_free": True, "volume_total_l": 407, "volume_congelador_l": 90,
          "ano_compra": 2014, "ano_referencia": 2026}
@@ -176,7 +181,13 @@ def test_categorias_estimaveis_cobrem_o_catalogo(api):
     categorias = {c["categoria"]: c for c in api.get("/estimativa/categorias").json()}
     assert {"refrigerador", "maquina_de_lavar", "ar_condicionado", "televisor", "chuveiro"} <= set(categorias)
     assert categorias["maquina_de_lavar"]["tipos"] and categorias["maquina_de_lavar"]["uso"]["pergunta"] == "ciclos"
-    assert categorias["chuveiro"]["etiqueta_obrigatoria"]
+    assert categorias["chuveiro"]["valor_obrigatorio"]
+    lavar = categorias["maquina_de_lavar"]
+    assert lavar["tipos"][0] == {"valor": "Top Load (automatica)", "nome": "Automática que abre por cima",
+                                 "descricao": "Tampa em cima. Lava, enxágua e centrifuga sozinha."}
+    assert [f["campo"] for f in categorias["televisor"]["formas"]] == ["potencia_w", "kwh_mes"]
+    assert categorias["ventilador_de_mesa"]["uso"]["perguntar_horas"]
+    assert categorias["ventilador_de_teto"]["medida"] is None and not categorias["ventilador_de_teto"]["tamanhos"]
 
 
 @pytest.mark.banco
@@ -184,14 +195,67 @@ def test_categorias_estimaveis_cobrem_o_catalogo(api):
     {"categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)", "medida": 12, "ciclos_mes": 12},
     {"categoria": "ar_condicionado", "tipo": "Split Hi-Wall", "medida": 12000, "horas_dia": 8},
     {"categoria": "televisor", "medida": 50},
-    {"categoria": "ventilador_de_teto", "medida": 100, "velocidade": "media"},
+    {"categoria": "ventilador_de_mesa", "medida": 40, "velocidade": "media", "horas_dia": 8},
+    {"categoria": "ventilador_de_teto", "velocidade": "media", "horas_dia": 8},
 ])
 def test_estimativa_por_modelos_parecidos(api, corpo):
     resposta = api.post("/calcular/estimado", json={**corpo, **TARIFA})
     assert resposta.status_code == 200, resposta.text
     r = resposta.json()
     assert r["aproximado"] and r["kwh_min"] <= r["kwh_mes"] <= r["kwh_max"]
-    assert r["capacidade"] == corpo["medida"]
+    assert r["capacidade"] == corpo.get("medida")
+
+
+@pytest.mark.banco
+def test_ventilador_estimado_multiplica_pelas_horas_de_uso(api):
+    corpo = {"categoria": "ventilador_de_mesa", "medida": 40, "velocidade": "media", **TARIFA}
+    uma_hora = api.post("/calcular/estimado", json={**corpo, "horas_dia": 1}).json()
+    oito_horas = api.post("/calcular/estimado", json={**corpo, "horas_dia": 8}).json()
+    assert oito_horas["kwh_mes"] == pytest.approx(8 * uma_hora["kwh_mes"], rel=0.01)
+
+
+@pytest.mark.banco
+@pytest.mark.parametrize("corpo, kwh", [
+    ({"categoria": "televisor", "campo_etiqueta": "potencia_w", "valor_etiqueta": 120, "horas_dia": 5}, 18.0),
+    ({"categoria": "ar_condicionado", "campo_etiqueta": "potencia_w", "valor_etiqueta": 1100, "horas_dia": 8}, 264.0),
+    ({"categoria": "ventilador_de_teto", "campo_etiqueta": "potencia_w", "valor_etiqueta": 130, "horas_dia": 8,
+      "velocidade": "alta"}, 31.2),
+    ({"categoria": "maquina_de_lavar", "valor_etiqueta": 0.25, "ciclos_mes": 15}, 3.75),
+])
+def test_valor_escrito_no_aparelho_vale_tambem_para_antigos(api, corpo, kwh):
+    r = api.post("/calcular/estimado", json={**corpo, **TARIFA}).json()
+    assert r["kwh_mes"] == pytest.approx(kwh)
+    assert r["kwh_min"] == r["kwh_max"] == r["kwh_mes"]
+
+
+@pytest.mark.banco
+@pytest.mark.parametrize("corpo", [
+    {"categoria": "ar_condicionado", "campo_etiqueta": "potencia_w", "valor_etiqueta": 1100},
+    {"categoria": "ar_condicionado", "campo_etiqueta": "kwh_mes", "valor_etiqueta": 30, "horas_dia": 8},
+    {"categoria": "televisor", "campo_etiqueta": "potencia_w", "valor_etiqueta": 5000, "horas_dia": 5},
+    {"categoria": "chuveiro", "medida": 10, "horas_dia": 0.25},
+])
+def test_valor_escrito_no_aparelho_invalido_e_rejeitado(api, corpo):
+    assert api.post("/calcular/estimado", json={**corpo, **TARIFA}).status_code == 422
+
+
+@pytest.mark.banco
+def test_texto_da_estimativa_usa_o_mesmo_kwh_por_ciclo_do_calculo(api):
+    r = api.post("/calcular/estimado", json={"categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)",
+                                              "medida": 8, "ciclos_mes": 15, **TARIFA}).json()
+    kwh_ciclo = float(r["metodo"].split("Uso: ")[1].split(" kWh por ciclo")[0])
+    assert kwh_ciclo * 15 == pytest.approx(r["kwh_mes"], abs=0.005)
+    assert r["kwh_min"] <= kwh_ciclo * 15 <= r["kwh_max"]
+    assert r["detalhe"] == "Automática que abre por cima, 8 kg" and ".csv" not in r["origem_tarifa"]
+
+
+def test_poucos_modelos_parecidos_usam_o_menor_e_o_maior(monkeypatch):
+    tres = pd.DataFrame([{**{c: math.nan for c in COLUNAS_NUM}, "categoria": "maquina_de_lavar", "kwh_ciclo": v}
+                         for v in (0.2, 0.3, 0.5)])
+    monkeypatch.setattr(servico, "_equivalentes", lambda *_: (tres, 0.1, False))
+    r = servico.estimar_por_equivalentes(None, "maquina_de_lavar", medida=8, ciclos_mes=10)
+    assert (r["kwh_min"], r["kwh_mes"], r["kwh_max"]) == pytest.approx((2, 3, 5))
+    assert "menor e o maior" in r["metodo"] and "0.3 kWh por ciclo x 10" in r["metodo"]
 
 
 @pytest.mark.banco
@@ -225,3 +289,27 @@ def test_geladeira_estimada_recebe_sugestoes_e_compara(api):
 def test_api_exige_uma_tarifa(api_sem_banco):
     resposta = api_sem_banco.post("/calcular/resistivo", json={"categoria": "chuveiro", "registrar": False})
     assert resposta.status_code == 422
+
+
+@pytest.mark.banco
+def test_sugestoes_de_aparelho_estimado_pelos_parecidos_nao_dizem_que_ele_e_economico(api):
+    corpo = {"categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)", "ciclos_mes": 15, **TARIFA}
+    r = api.post("/calcular/estimado", json={**corpo, "medida": 8}).json()
+    assert r["pelos_parecidos"]
+    s = api.post("/sugestoes/estimado", json={
+        **corpo, "capacidade": r["capacidade"], "kwh_mes": r["kwh_mes"], "pelos_parecidos": True}).json()
+    assert s["sugestoes"] == [] and "calculado pelos modelos atuais parecidos" in s["mensagem"]
+    assert "já está entre os mais econômicos" not in s["mensagem"]
+
+
+@pytest.mark.banco
+def test_valor_da_etiqueta_guarda_tipo_e_tamanho_para_comparar(api):
+    r = api.post("/calcular/estimado", json={
+        "categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)", "medida": 8,
+        "valor_etiqueta": 0.4, "ciclos_mes": 15, **TARIFA}).json()
+    assert not r["pelos_parecidos"] and r["kwh_mes"] == pytest.approx(6.0)
+    assert r["capacidade"] == 8 and r["detalhe"] == "Automática que abre por cima, 8 kg"
+    s = api.post("/sugestoes/estimado", json={
+        "categoria": "maquina_de_lavar", "tipo": "Top Load (automatica)", "capacidade": 8, "kwh_mes": 6.0,
+        "ciclos_mes": 15, **TARIFA}).json()
+    assert s["sugestoes"] and all(x["kwh_mes"] < 6.0 for x in s["sugestoes"])

@@ -72,7 +72,9 @@ máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, 
 
 ## Regras de cálculo (`consumo_mensal_kwh`)
 
-1. Inmetro informa kWh/mês -> usa a tabela (ventilador: por velocidade)
+1. Inmetro informa kWh/mês -> usa a tabela (ventilador: por velocidade). Ventilador: o kWh/mês do Inmetro é de
+   **1 h por dia** (conferido nos CSVs brutos), então as horas são obrigatórias e multiplicam o valor
+   (`HORAS_REFERENCIA_INMETRO`; TV: 6,59 h). Sem horas, o `metodo` diz que é o valor do ensaio.
 2. Informa kWh/ciclo -> kWh/ciclo x ciclos/mês (máquina de lavar)
 3. Só potência -> W x horas/dia x 30 / 1000 (+ stand-by). Chuveiro exige horas do usuário.
 Premissas de uso padrão (`PREMISSAS`) são do grupo, sem fonte — o app avisa que são estimativa.
@@ -123,10 +125,20 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
 - Limpeza das geladeiras: o consumo antigo não é mais imputado nas linhas que têm o consumo do padrão 2025 (antes
   recebiam a média do grupo, ex.: 41,831608 nas Consul CRM); volume total menor que o do refrigerador é refeito
   pela soma dos compartimentos (`volume_corrigido`; caso real: Consul CRM44 com 94 L -> 377 L).
-- Eletro pesado fora do catálogo (`servico.estimar_por_equivalentes`, config `ESTIMAVEIS`): com o valor da
-  etiqueta (kWh/mês, kWh/ciclo ou W) o cálculo é exato; sem ele, mediana dos modelos do catálogo com a mesma
-  medida (±10%, ampliando até ±40% para ter 5) e o mesmo tipo onde o tipo é padronizado; faixa = 1º a 3º quartil.
-  Fora a geladeira, não há dado de época: a estimativa usa modelos atuais e o app avisa que pode subestimar.
+- Eletro pesado fora do catálogo, antigo ou sem modelo (`servico.estimar_por_equivalentes`, config `ESTIMAVEIS`):
+  tipo e tamanho (sempre, para comparar com modelos novos) e depois o número escrito no próprio aparelho
+  (`formas`, enviado em `valor_etiqueta` + `campo_etiqueta`):
+  etiqueta do Inmetro (kWh/ciclo da lavadora, kWh/mês da TV) ou **potência da plaqueta** (W) × horas, que vale
+  para aparelho antigo (TV de tubo, ar de janela velho...). Ar e ventilador não pedem etiqueta: a do ar mudou de
+  kWh/mês para kWh/ano em 2023 e a do ventilador é de 1 h/dia. Com potência, as horas são obrigatórias.
+  Sem número: tipo com nome conhecido (`NOMES_DOS_TIPOS`, ex.: "Automática que abre por cima") e tamanho em
+  opções prontas (`tamanhos`) ou digitado -> "aparelho de referência" com a mediana (e os quartis) das colunas de
+  consumo dos modelos com a mesma medida (±10%, ampliando até ±40% para ter 5) e o mesmo tipo onde o tipo é
+  padronizado: o mesmo kWh/ciclo (ou W) entra no cálculo e no texto. Faixa = 1º a 3º quartil; com menos de 4
+  modelos, menor e maior. Ventilador de teto não pede tamanho (diâmetro do catálogo com erros): usa todos.
+  Fora a geladeira, não há dado de época: sem o número do aparelho, usa modelos atuais e o app avisa.
+  Nesse caso o resultado vem com `pelos_parecidos: true`; o app repassa em `POST /sugestoes/estimado` e, sem
+  sugestão, a mensagem explica que a comparação é circular (não diz que o aparelho "já é dos mais econômicos").
 - Eletroportáteis: tabela `portateis` (carga de `datasets/processed/eletroportateis.csv`, com fonte por linha;
   potência e uso típicos são premissas do grupo). kWh = W/1000 × tempo/dia × dias. Sem sugestão de modelos (não têm
   etiqueta do Inmetro): o app mostra as dicas do Eco-Coach (`POST /eco-coach/aparelho`).

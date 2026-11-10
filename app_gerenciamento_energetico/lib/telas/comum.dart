@@ -73,6 +73,14 @@ String tituloDaCategoria(String categoria) => switch (categoria) {
   _ => _primeiraMaiuscula(categoria),
 };
 
+/// Velocidade do ventilador como a API manda ("media") para a tela ("Média").
+String nomeDaVelocidade(String velocidade) => switch (velocidade) {
+  'baixa' => 'Baixa',
+  'media' => 'Média',
+  'alta' => 'Alta',
+  _ => _primeiraMaiuscula(velocidade),
+};
+
 class ControleTempo {
   final horas = TextEditingController();
   final minutos = TextEditingController();

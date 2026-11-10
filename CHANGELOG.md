@@ -4,6 +4,26 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## Próxima versão (ainda sem número)
+
+- Ventiladores: o consumo mensal do Inmetro é de 1 hora por dia e o app não perguntava as horas (um ventilador
+  ligado a noite toda saía 8 vezes menor). Agora pergunta a velocidade e as horas, no catálogo e na estimativa.
+- Estimativa de eletro grande (antigo ou fora do catálogo) refeita: tipo com nome conhecido ("Automática que
+  abre por cima", "Split de parede"...) e tamanho em opções prontas; depois "você consegue ver algum destes no
+  aparelho?" (etiqueta do Inmetro ou a potência escrita na plaqueta, que vale para aparelho antigo); sem número,
+  o gasto sai dos modelos parecidos do catálogo.
+  Ar-condicionado e ventilador não pedem mais o kWh/mês da etiqueta (unidade e base mudaram entre etiquetas).
+- "Gastar menos" de aparelho estimado pelos modelos parecidos não diz mais que ele "já está entre os mais
+  econômicos" (era circular: o gasto dele é a mediana desses modelos); explica e pede o número da etiqueta.
+  Textos dessa tela com acento e critério legível ("até 15% de diferença").
+- Corrigido: o texto "Como calculamos" da estimativa mostrava o kWh/ciclo do primeiro modelo da lista e não o
+  da mediana usada no cálculo (ex.: 0,27 × 15 com resultado 3,83 kWh). Agora o mesmo valor entra nos dois.
+  Com menos de 4 modelos parecidos, a faixa é do menor ao maior. Acentos e textos da tela corrigidos; a origem
+  da tarifa não mostra mais o nome do arquivo CSV.
+- API: `GET /estimativa/categorias` troca `etiqueta_campo`, `etiqueta_rotulo` e `etiqueta_obrigatoria` por
+  `formas`, `tamanhos`, `unidade_medida` e `valor_obrigatorio`, e `tipos` vira lista de `{valor, nome, descricao}`;
+  `POST /calcular/estimado` ganha `campo_etiqueta`; `PerguntaDeUso` ganha `perguntar_horas`.
+
 ## App 2.0.0+6 / API 0.4.0
 
 - App redesenhado para o cliente final (público geral, incluindo pessoas mais velhas), mantendo a
@@ -27,7 +47,6 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 - Removido o cálculo de gás de cozinha (app, API, banco, scripts, dados e testes): o projeto foca só em
   energia elétrica. **Mudança que quebra a API:** `GET /fogoes`, `GET /gas/precos` e
   `POST /calcular/gas` não existem mais.
-
 ## App 1.2.0+5 / API 0.3.0
 
 - Gás de cozinha: fogões do Inmetro, preço do GLP por estado (ANP) e tela "Gás de cozinha" no app
