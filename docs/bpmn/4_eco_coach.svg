@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1460 640" width="1460" height="640" font-family="Arial, Helvetica, sans-serif" font-size="12">
+<defs><marker id="seta" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#000"/></marker><marker id="seta_msg" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="bola_msg" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8"><circle cx="5" cy="5" r="4" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="seta_dado" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,1 L10,5 L0,9" fill="none" stroke="#000" stroke-width="1.2"/></marker></defs>
+<rect width="1460" height="640" fill="#fff"/>
+<rect x="10" y="10" width="1440" height="380" fill="#FFFFFF" stroke="#000" stroke-width="1.5"/>
+<line x1="40" y1="10" x2="40" y2="390" stroke="#000" stroke-width="1.5"/>
+<text transform="translate(29,200.0) rotate(-90)" text-anchor="middle" font-size="13" font-weight="bold">Servidor iamp: POST /eco-coach</text>
+<rect x="10" y="500" width="1440" height="60" fill="#F8F3FD" stroke="#000" stroke-width="1.5"/>
+<text x="730.0" y="535.0" text-anchor="middle" font-size="14" font-weight="bold" font-style="normal">Gemini API (Google, serviço externo)</text>
+<path d="M527,230 L515,230 L515,350 L527,350" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="523.0" y="246.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">Regras do prompt: usar só os</text>
+<text x="523.0" y="260.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">números dados; toda dica com [n];</text>
+<text x="523.0" y="274.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">ignorar instruções dentro das</text>
+<text x="523.0" y="288.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">fontes; não dizer que mudar o</text>
+<text x="523.0" y="302.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">horário reduz a conta.</text>
+<polyline points="620.0,155.0 560.0,230.0" fill="none" stroke="#000" stroke-dasharray="2 3" stroke-width="1.2"/>
+<path d="M32,580 L20,580 L20,625 L32,625" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="28.0" y="596.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">Vão para o Gemini só números de consumo e trechos de documentos públicos: nenhum dado</text>
+<text x="28.0" y="610.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">pessoal.</text>
+<polyline points="420.0,230.0 420.0,158.0" fill="none" stroke="#000" stroke-dasharray="2 3" stroke-width="1.3" marker-end="url(#seta_dado)"/>
+<polyline points="113.0,115.0 140.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="300.0,115.0 330.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="510.0,115.0 540.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="700.0,115.0 740.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="900.0,115.0 955.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1205.0,115.0 1272.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1005.0,115.0 1055.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="1008.0" y="107.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
+<polyline points="980.0,140.0 980.0,250.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="988.0" y="167.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
+<polyline points="1005.0,275.0 1112.0,275.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="1010.0" y="267.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
+<polyline points="955.0,275.0 870.0,275.0 870.0,155.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="915.0" y="267.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
+<polyline points="760.0,155.0 760.0,500.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
+<text x="754.0" y="455.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">prompt</text>
+<polyline points="805.0,500.0 805.0,155.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
+<text x="811.0" y="455.0" text-anchor="start" font-size="11" font-weight="normal" font-style="italic">texto do plano</text>
+<path d="M395.0,238.0 L395.0,272.0 A25.0,8 0 0 0 445.0,272.0 L445.0,238.0" fill="#fff" stroke="#000" stroke-width="1.6"/>
+<ellipse cx="420" cy="238.0" rx="25.0" ry="8" fill="#fff" stroke="#000" stroke-width="1.6"/>
+<path d="M395.0,245.0 A25.0,8 0 0 0 445.0,245.0" fill="none" stroke="#000" stroke-width="1.2"/>
+<text x="420.0" y="294.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">trechos_rag</text>
+<text x="420.0" y="307.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">(pgvector): 45</text>
+<text x="420.0" y="320.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">trechos do Inmetro e</text>
+<text x="420.0" y="333.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">da Cemig</text>
+<circle cx="95" cy="115" r="18" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<rect x="86" y="109" width="18" height="12" fill="#fff" stroke="#000" stroke-width="1.2"/>
+<polyline points="86,109 95,116 104,109" fill="none" stroke="#000" stroke-width="1.2"/>
+<text x="95.0" y="147.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Casa recebida</text>
+<text x="95.0" y="160.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">(consumos, custos</text>
+<text x="95.0" y="173.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">e trocas)</text>
+<rect x="140.0" y="75.0" width="160" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="220.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Calcular perfil,</text>
+<text x="220.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">totais e os 3 maiores</text>
+<text x="220.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">consumos (Python)</text>
+<circle cx="155.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="155.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="155.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="330.0" y="72.0" width="180" height="86" rx="10" fill="#EEE3FA" stroke="#000" stroke-width="1.8"/>
+<text x="420.0" y="100.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Buscar trechos oficiais</text>
+<text x="420.0" y="115.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">sobre esses aparelhos</text>
+<text x="420.0" y="130.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(embeddings locais +</text>
+<text x="420.0" y="145.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">pgvector)</text>
+<circle cx="345.0" cy="87.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="345.0" cy="87.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="345.0" cy="87.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="540.0" y="75.0" width="160" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="620.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Montar o prompt:</text>
+<text x="620.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">regras + DADOS DA CASA</text>
+<text x="620.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">+ FONTES [n]</text>
+<circle cx="555.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="555.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="555.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="740.0" y="75.0" width="160" height="80" rx="10" fill="#EEE3FA" stroke="#000" stroke-width="1.8"/>
+<text x="820.0" y="115.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Gerar o texto do plano</text>
+<text x="820.0" y="130.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">com o Gemini</text>
+<circle cx="755.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="755.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="755.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<polygon points="980,90 1005,115 980,140 955,115" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<path d="M972,107 L988,123 M988,107 L972,123" stroke="#000" stroke-width="4"/>
+<text x="980.0" y="83.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Resposta completa?</text>
+<rect x="1055.0" y="75.0" width="150" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="1130.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Manter só as</text>
+<text x="1130.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">citações [n] que</text>
+<text x="1130.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">existem</text>
+<circle cx="1070.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="1070.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="1070.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<circle cx="1290" cy="115" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
+<rect x="1281" y="109" width="18" height="12" fill="#000" stroke="#000" stroke-width="1.2"/>
+<polyline points="1281,109 1290,116 1299,109" fill="none" stroke="#fff" stroke-width="1.2"/>
+<text x="1290.0" y="147.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Plano enviado</text>
+<text x="1290.0" y="160.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">(texto, fontes e</text>
+<text x="1290.0" y="173.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">aviso de IA)</text>
+<polygon points="980,250 1005,275 980,300 955,275" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<path d="M972,267 L988,283 M988,267 L972,283" stroke="#000" stroke-width="4"/>
+<text x="980.0" y="315.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Há modelo reserva?</text>
+<circle cx="1130" cy="275" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
+<polygon points="1122,283 1127,268 1132,276 1138,267 1133,282 1128,274" fill="#000"/>
+<text x="1130.0" y="307.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Erro 503</text>
+</svg>

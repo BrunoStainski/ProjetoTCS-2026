@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 300" width="1300" height="300" font-family="Arial, Helvetica, sans-serif" font-size="12">
+<defs><marker id="seta" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#000"/></marker><marker id="seta_msg" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="bola_msg" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8"><circle cx="5" cy="5" r="4" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="seta_dado" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,1 L10,5 L0,9" fill="none" stroke="#000" stroke-width="1.2"/></marker></defs>
+<rect width="1300" height="300" fill="#fff"/>
+<rect x="10" y="10" width="1280" height="280" fill="#FFFFFF" stroke="#000" stroke-width="1.5"/>
+<line x1="40" y1="10" x2="40" y2="290" stroke="#000" stroke-width="1.5"/>
+<text transform="translate(29,150.0) rotate(-90)" text-anchor="middle" font-size="13" font-weight="bold">Servidor iamp: POST /classificar</text>
+<path d="M912,195 L900,195 L900,255 L912,255" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="908.0" y="211.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">Não usa o banco nem grava nada. Treinado com 5.000</text>
+<text x="908.0" y="225.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">casas sintéticas (CTGAN): o perfil é demonstrativo.</text>
+<polyline points="665.0,201.0 600.0,160.0" fill="none" stroke="#000" stroke-dasharray="2 3" stroke-width="1.3" marker-end="url(#seta_dado)"/>
+<polyline points="685.0,201.0 750.0,160.0" fill="none" stroke="#000" stroke-dasharray="2 3" stroke-width="1.3" marker-end="url(#seta_dado)"/>
+<polyline points="113.0,115.0 175.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="200.0,140.0 200.0,225.0 182.0,225.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="208.0" y="165.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
+<polyline points="225.0,115.0 270.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="232.0" y="107.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
+<polyline points="450.0,115.0 480.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="660.0,115.0 690.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="870.0,115.0 905.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1075.0,115.0 1152.0,115.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<path d="M657.0,201.0 L683.0,201.0 L693.0,211.0 L693.0,249.0 L657.0,249.0 Z" fill="#fff" stroke="#000" stroke-width="1.6"/>
+<path d="M683.0,201.0 L683.0,211.0 L693.0,211.0" fill="none" stroke="#000" stroke-width="1.2"/>
+<text x="675.0" y="263.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">kmeans.pkl (só</text>
+<text x="675.0" y="276.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">números)</text>
+<circle cx="95" cy="115" r="18" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<rect x="86" y="109" width="18" height="12" fill="#fff" stroke="#000" stroke-width="1.2"/>
+<polyline points="86,109 95,116 104,109" fill="none" stroke="#000" stroke-width="1.2"/>
+<text x="95.0" y="147.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Casa recebida</text>
+<text x="95.0" y="160.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">(moradores + kWh</text>
+<text x="95.0" y="173.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">de cada item)</text>
+<polygon points="200,90 225,115 200,140 175,115" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<path d="M192,107 L208,123 M208,107 L192,123" stroke="#000" stroke-width="4"/>
+<text x="200.0" y="83.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Entrada válida?</text>
+<circle cx="200" cy="225" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
+<polygon points="192,233 197,218 202,226 208,217 203,232 198,224" fill="#000"/>
+<text x="200.0" y="257.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Erro 422</text>
+<rect x="270.0" y="75.0" width="180" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="360.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Calcular kWh por morador</text>
+<text x="360.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">e frações (chuveiro, ar,</text>
+<text x="360.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">geladeira)</text>
+<circle cx="285.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="285.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="285.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="480.0" y="75.0" width="180" height="80" rx="10" fill="#DFF3E6" stroke="#000" stroke-width="1.8"/>
+<text x="570.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Aplicar escala e pesos</text>
+<text x="570.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(log kWh/morador × 2;</text>
+<text x="570.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">frações × 0,5)</text>
+<circle cx="495.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="495.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="495.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="690.0" y="75.0" width="180" height="80" rx="10" fill="#DFF3E6" stroke="#000" stroke-width="1.8"/>
+<text x="780.0" y="108.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Atribuir ao centróide</text>
+<text x="780.0" y="123.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">mais próximo (Consciente,</text>
+<text x="780.0" y="138.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Moderado ou Ineficiente)</text>
+<circle cx="705.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="705.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="705.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="905.0" y="75.0" width="170" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="990.0" y="115.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Comparar com a mediana</text>
+<text x="990.0" y="130.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">das casas sintéticas</text>
+<circle cx="920.0" cy="90.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="920.0" cy="90.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="920.0" cy="90.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<circle cx="1170" cy="115" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
+<rect x="1161" y="109" width="18" height="12" fill="#000" stroke="#000" stroke-width="1.2"/>
+<polyline points="1161,109 1170,116 1179,109" fill="none" stroke="#fff" stroke-width="1.2"/>
+<text x="1170.0" y="147.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Perfil enviado</text>
+<text x="1170.0" y="160.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">(com aviso de</text>
+<text x="1170.0" y="173.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">dado sintético)</text>
+</svg>

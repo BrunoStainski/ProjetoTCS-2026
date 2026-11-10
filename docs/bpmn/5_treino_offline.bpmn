@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Def_treino_offline" targetNamespace="http://iamp.tcs2026/bpmn" exporter="scripts/gerar_bpmn_visoes.py" exporterVersion="1.0">
+  <bpmn:collaboration id="Colab_treino_offline">
+    <bpmn:participant id="P_Off" name="Preparação de dados e treino (offline, scripts)" processRef="Proc_P_Off" />
+    <bpmn:textAnnotation id="N_saidas"><bpmn:text>Roda pelos scripts, não a cada requisição. Os .pkl guardam só números: a imagem da API não precisa do scikit-learn.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Proc_P_Off" isExecutable="false">
+    <bpmn:startEvent id="ini" name="Novos dados Inmetro / ANEEL / ANP"><bpmn:outgoing>F_ini_limpar</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:serviceTask id="limpar" name="Limpar e tratar nulos (tratar_dados_*.py, Pandas)"><bpmn:incoming>F_ini_limpar</bpmn:incoming><bpmn:outgoing>F_limpar_carregar</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="carregar" name="Carregar no PostgreSQL (criar_banco.py)"><bpmn:incoming>F_limpar_carregar</bpmn:incoming><bpmn:outgoing>F_carregar_abre</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:parallelGateway id="abre"><bpmn:incoming>F_carregar_abre</bpmn:incoming><bpmn:outgoing>F_abre_seed</bpmn:outgoing><bpmn:outgoing>F_abre_rf</bpmn:outgoing><bpmn:outgoing>F_abre_emb</bpmn:outgoing><bpmn:outgoing>F_abre_eda</bpmn:outgoing></bpmn:parallelGateway>
+    <bpmn:serviceTask id="seed" name="Gerar 3.000 casas por regras (seed)"><bpmn:incoming>F_abre_seed</bpmn:incoming><bpmn:outgoing>F_seed_ctgan</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="ctgan" name="Treinar CTGAN e gerar 5.000 casas sintéticas"><bpmn:incoming>F_seed_ctgan</bpmn:incoming><bpmn:outgoing>F_ctgan_kmeans</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="kmeans" name="Treinar K-Means com 3 grupos (kmeans.pkl)"><bpmn:incoming>F_ctgan_kmeans</bpmn:incoming><bpmn:outgoing>F_kmeans_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="rf" name="Treinar Random Forest de geladeiras (refrigerador.pkl)"><bpmn:incoming>F_abre_rf</bpmn:incoming><bpmn:outgoing>F_rf_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="emb" name="Gerar embeddings dos documentos (fastembed)"><bpmn:incoming>F_abre_emb</bpmn:incoming><bpmn:outgoing>F_emb_pgv</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="pgv" name="Gravar trechos no pgvector (carregar_rag.py)"><bpmn:incoming>F_emb_pgv</bpmn:incoming><bpmn:outgoing>F_pgv_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="eda" name="Gerar os gráficos da EDA (notebook)"><bpmn:incoming>F_abre_eda</bpmn:incoming><bpmn:outgoing>F_eda_junta</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:parallelGateway id="junta"><bpmn:incoming>F_kmeans_junta</bpmn:incoming><bpmn:incoming>F_rf_junta</bpmn:incoming><bpmn:incoming>F_pgv_junta</bpmn:incoming><bpmn:incoming>F_eda_junta</bpmn:incoming><bpmn:outgoing>F_junta_fim</bpmn:outgoing></bpmn:parallelGateway>
+    <bpmn:endEvent id="fim" name="Dados e modelos atualizados"><bpmn:incoming>F_junta_fim</bpmn:incoming></bpmn:endEvent>
+    <bpmn:sequenceFlow id="F_ini_limpar" sourceRef="ini" targetRef="limpar" />
+    <bpmn:sequenceFlow id="F_limpar_carregar" sourceRef="limpar" targetRef="carregar" />
+    <bpmn:sequenceFlow id="F_carregar_abre" sourceRef="carregar" targetRef="abre" />
+    <bpmn:sequenceFlow id="F_abre_seed" sourceRef="abre" targetRef="seed" />
+    <bpmn:sequenceFlow id="F_abre_rf" sourceRef="abre" targetRef="rf" />
+    <bpmn:sequenceFlow id="F_abre_emb" sourceRef="abre" targetRef="emb" />
+    <bpmn:sequenceFlow id="F_abre_eda" sourceRef="abre" targetRef="eda" />
+    <bpmn:sequenceFlow id="F_seed_ctgan" sourceRef="seed" targetRef="ctgan" />
+    <bpmn:sequenceFlow id="F_ctgan_kmeans" sourceRef="ctgan" targetRef="kmeans" />
+    <bpmn:sequenceFlow id="F_emb_pgv" sourceRef="emb" targetRef="pgv" />
+    <bpmn:sequenceFlow id="F_kmeans_junta" sourceRef="kmeans" targetRef="junta" />
+    <bpmn:sequenceFlow id="F_rf_junta" sourceRef="rf" targetRef="junta" />
+    <bpmn:sequenceFlow id="F_pgv_junta" sourceRef="pgv" targetRef="junta" />
+    <bpmn:sequenceFlow id="F_eda_junta" sourceRef="eda" targetRef="junta" />
+    <bpmn:sequenceFlow id="F_junta_fim" sourceRef="junta" targetRef="fim" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diag_treino_offline">
+    <bpmndi:BPMNPlane id="Plane_treino_offline" bpmnElement="Colab_treino_offline">
+      <bpmndi:BPMNShape id="S_P_Off" bpmnElement="P_Off" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1400" height="430" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_ini" bpmnElement="ini"><dc:Bounds x="82" y="207" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="40" y="247" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_limpar" bpmnElement="limpar" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="160" y="185" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_carregar" bpmnElement="carregar" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="340" y="185" width="140" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_abre" bpmnElement="abre"><dc:Bounds x="500" y="200" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_seed" bpmnElement="seed" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="570" y="30" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_ctgan" bpmnElement="ctgan" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="770" y="30" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_kmeans" bpmnElement="kmeans" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="970" y="30" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_rf" bpmnElement="rf" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="570" y="130" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_emb" bpmnElement="emb" color:background-color="#EEE3FA" color:border-color="#000000"><dc:Bounds x="570" y="240" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_pgv" bpmnElement="pgv" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="770" y="240" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_eda" bpmnElement="eda" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="570" y="340" width="160" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_junta" bpmnElement="junta"><dc:Bounds x="1175" y="200" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_fim" bpmnElement="fim"><dc:Bounds x="1302" y="207" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1260" y="247" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_saidas" bpmnElement="N_saidas"><dc:Bounds x="20" y="455" width="640" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_F_ini_limpar" bpmnElement="F_ini_limpar"><di:waypoint x="118" y="225" /><di:waypoint x="160" y="225" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_limpar_carregar" bpmnElement="F_limpar_carregar"><di:waypoint x="320" y="225" /><di:waypoint x="340" y="225" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_carregar_abre" bpmnElement="F_carregar_abre"><di:waypoint x="480" y="225" /><di:waypoint x="500" y="225" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_abre_seed" bpmnElement="F_abre_seed"><di:waypoint x="525" y="200" /><di:waypoint x="525" y="70" /><di:waypoint x="570" y="70" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_abre_rf" bpmnElement="F_abre_rf"><di:waypoint x="525" y="200" /><di:waypoint x="525" y="170" /><di:waypoint x="570" y="170" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_abre_emb" bpmnElement="F_abre_emb"><di:waypoint x="525" y="250" /><di:waypoint x="525" y="280" /><di:waypoint x="570" y="280" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_abre_eda" bpmnElement="F_abre_eda"><di:waypoint x="525" y="250" /><di:waypoint x="525" y="380" /><di:waypoint x="570" y="380" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_seed_ctgan" bpmnElement="F_seed_ctgan"><di:waypoint x="730" y="70" /><di:waypoint x="770" y="70" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_ctgan_kmeans" bpmnElement="F_ctgan_kmeans"><di:waypoint x="930" y="70" /><di:waypoint x="970" y="70" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_emb_pgv" bpmnElement="F_emb_pgv"><di:waypoint x="730" y="280" /><di:waypoint x="770" y="280" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_kmeans_junta" bpmnElement="F_kmeans_junta"><di:waypoint x="1130" y="70" /><di:waypoint x="1200" y="70" /><di:waypoint x="1200" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_rf_junta" bpmnElement="F_rf_junta"><di:waypoint x="730" y="170" /><di:waypoint x="1200" y="170" /><di:waypoint x="1200" y="200" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_pgv_junta" bpmnElement="F_pgv_junta"><di:waypoint x="930" y="280" /><di:waypoint x="1200" y="280" /><di:waypoint x="1200" y="250" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_eda_junta" bpmnElement="F_eda_junta"><di:waypoint x="730" y="380" /><di:waypoint x="1200" y="380" /><di:waypoint x="1200" y="250" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_junta_fim" bpmnElement="F_junta_fim"><di:waypoint x="1225" y="225" /><di:waypoint x="1302" y="225" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

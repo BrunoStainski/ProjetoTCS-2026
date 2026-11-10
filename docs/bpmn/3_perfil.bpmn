@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:color="http://www.omg.org/spec/BPMN/non-normative/color/1.0" id="Def_perfil" targetNamespace="http://iamp.tcs2026/bpmn" exporter="scripts/gerar_bpmn_visoes.py" exporterVersion="1.0">
+  <bpmn:collaboration id="Colab_perfil">
+    <bpmn:participant id="P_Srv" name="Servidor iamp: POST /classificar" processRef="Proc_P_Srv" />
+    <bpmn:textAnnotation id="N_sintetico"><bpmn:text>Não usa o banco nem grava nada. Treinado com 5.000 casas sintéticas (CTGAN): o perfil é demonstrativo.</bpmn:text></bpmn:textAnnotation>
+  </bpmn:collaboration>
+  <bpmn:process id="Proc_P_Srv" isExecutable="false">
+    <bpmn:startEvent id="ini" name="Casa recebida (moradores + kWh de cada item)"><bpmn:outgoing>F_ini_g_valida</bpmn:outgoing><bpmn:messageEventDefinition id="MED_ini" /></bpmn:startEvent>
+    <bpmn:exclusiveGateway id="g_valida" name="Entrada válida?"><bpmn:incoming>F_ini_g_valida</bpmn:incoming><bpmn:outgoing>F_g_valida_erro</bpmn:outgoing><bpmn:outgoing>F_g_valida_fracoes</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="erro" name="Erro 422"><bpmn:incoming>F_g_valida_erro</bpmn:incoming><bpmn:errorEventDefinition id="EED_erro" /></bpmn:endEvent>
+    <bpmn:serviceTask id="fracoes" name="Calcular kWh por morador e frações (chuveiro, ar, geladeira)"><bpmn:incoming>F_g_valida_fracoes</bpmn:incoming><bpmn:outgoing>F_fracoes_escala</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="escala" name="Aplicar escala e pesos (log kWh/morador × 2; frações × 0,5)"><bpmn:incoming>F_fracoes_escala</bpmn:incoming><bpmn:outgoing>F_escala_centroide</bpmn:outgoing><bpmn:property id="P_DA_kmeans_escala" name="__targetRef_placeholder" /><bpmn:dataInputAssociation id="DA_kmeans_escala"><bpmn:sourceRef>kmeans</bpmn:sourceRef><bpmn:targetRef>P_DA_kmeans_escala</bpmn:targetRef></bpmn:dataInputAssociation></bpmn:serviceTask>
+    <bpmn:serviceTask id="centroide" name="Atribuir ao centróide mais próximo (Consciente, Moderado ou Ineficiente)"><bpmn:incoming>F_escala_centroide</bpmn:incoming><bpmn:outgoing>F_centroide_mediana</bpmn:outgoing><bpmn:property id="P_DA_kmeans_centroide" name="__targetRef_placeholder" /><bpmn:dataInputAssociation id="DA_kmeans_centroide"><bpmn:sourceRef>kmeans</bpmn:sourceRef><bpmn:targetRef>P_DA_kmeans_centroide</bpmn:targetRef></bpmn:dataInputAssociation></bpmn:serviceTask>
+    <bpmn:serviceTask id="mediana" name="Comparar com a mediana das casas sintéticas"><bpmn:incoming>F_centroide_mediana</bpmn:incoming><bpmn:outgoing>F_mediana_fim</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:endEvent id="fim" name="Perfil enviado (com aviso de dado sintético)"><bpmn:incoming>F_mediana_fim</bpmn:incoming><bpmn:messageEventDefinition id="MED_fim" /></bpmn:endEvent>
+    <bpmn:sequenceFlow id="F_ini_g_valida" sourceRef="ini" targetRef="g_valida" />
+    <bpmn:sequenceFlow id="F_g_valida_erro" name="não" sourceRef="g_valida" targetRef="erro" />
+    <bpmn:sequenceFlow id="F_g_valida_fracoes" name="sim" sourceRef="g_valida" targetRef="fracoes" />
+    <bpmn:sequenceFlow id="F_fracoes_escala" sourceRef="fracoes" targetRef="escala" />
+    <bpmn:sequenceFlow id="F_escala_centroide" sourceRef="escala" targetRef="centroide" />
+    <bpmn:sequenceFlow id="F_centroide_mediana" sourceRef="centroide" targetRef="mediana" />
+    <bpmn:sequenceFlow id="F_mediana_fim" sourceRef="mediana" targetRef="fim" />
+    <bpmn:dataObjectReference id="kmeans" name="kmeans.pkl (só números)" dataObjectRef="DO_kmeans" />
+    <bpmn:dataObject id="DO_kmeans" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diag_perfil">
+    <bpmndi:BPMNPlane id="Plane_perfil" bpmnElement="Colab_perfil">
+      <bpmndi:BPMNShape id="S_P_Srv" bpmnElement="P_Srv" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1280" height="280" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_ini" bpmnElement="ini"><dc:Bounds x="77" y="97" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="35" y="137" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_valida" bpmnElement="g_valida"><dc:Bounds x="175" y="90" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="130" y="50" width="140" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_erro" bpmnElement="erro"><dc:Bounds x="182" y="207" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="140" y="247" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_fracoes" bpmnElement="fracoes" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="270" y="75" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_escala" bpmnElement="escala" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="480" y="75" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_centroide" bpmnElement="centroide" color:background-color="#DFF3E6" color:border-color="#000000"><dc:Bounds x="690" y="75" width="180" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_mediana" bpmnElement="mediana" color:background-color="#E3EEFA" color:border-color="#000000"><dc:Bounds x="905" y="75" width="170" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_fim" bpmnElement="fim"><dc:Bounds x="1152" y="97" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1110" y="137" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_kmeans" bpmnElement="kmeans"><dc:Bounds x="657" y="201" width="36" height="48" /><bpmndi:BPMNLabel><dc:Bounds x="615" y="253" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_sintetico" bpmnElement="N_sintetico"><dc:Bounds x="900" y="195" width="330" height="60" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="E_F_ini_g_valida" bpmnElement="F_ini_g_valida"><di:waypoint x="113" y="115" /><di:waypoint x="175" y="115" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_valida_erro" bpmnElement="F_g_valida_erro"><di:waypoint x="200" y="140" /><di:waypoint x="200" y="225" /><di:waypoint x="182" y="225" /><bpmndi:BPMNLabel><dc:Bounds x="208" y="153" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_valida_fracoes" bpmnElement="F_g_valida_fracoes"><di:waypoint x="225" y="115" /><di:waypoint x="270" y="115" /><bpmndi:BPMNLabel><dc:Bounds x="232" y="95" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_fracoes_escala" bpmnElement="F_fracoes_escala"><di:waypoint x="450" y="115" /><di:waypoint x="480" y="115" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_escala_centroide" bpmnElement="F_escala_centroide"><di:waypoint x="660" y="115" /><di:waypoint x="690" y="115" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_centroide_mediana" bpmnElement="F_centroide_mediana"><di:waypoint x="870" y="115" /><di:waypoint x="905" y="115" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_mediana_fim" bpmnElement="F_mediana_fim"><di:waypoint x="1075" y="115" /><di:waypoint x="1152" y="115" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DA_kmeans_escala" bpmnElement="DA_kmeans_escala"><di:waypoint x="665" y="201" /><di:waypoint x="600" y="160" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_DA_kmeans_centroide" bpmnElement="DA_kmeans_centroide"><di:waypoint x="685" y="201" /><di:waypoint x="750" y="160" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
