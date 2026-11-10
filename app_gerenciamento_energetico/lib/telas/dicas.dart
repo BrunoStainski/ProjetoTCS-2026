@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'eco_coach.dart';
 import 'texto_plano.dart';
 
+/// Dicas do Eco-Coach para um aparelho so (eletroportateis, que nao tem modelos para comparar).
 class TelaDicas extends StatefulWidget {
   final Resultado resultado;
   final Future<Dicas> Function(Resultado) buscarDicas;
@@ -26,6 +28,7 @@ class _TelaDicasState extends State<TelaDicas> {
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final r = widget.resultado;
     return Pagina(
       titulo: 'Como gastar menos',
@@ -33,16 +36,7 @@ class _TelaDicasState extends State<TelaDicas> {
         future: _dicas,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: Espaco.m),
-                  Text('O Eco-Coach está preparando dicas para o seu aparelho...', style: Estilos.secundario),
-                ],
-              ),
-            );
+            return const Carregando(texto: 'O Eco-Coach está preparando dicas para o seu aparelho...');
           }
           if (snap.hasError) {
             return MensagemErro(
@@ -55,25 +49,24 @@ class _TelaDicasState extends State<TelaDicas> {
           final d = snap.data!;
           return ListView(
             children: [
-              Card(
-                child: ListTile(
-                  leading: Icon(iconeDaCategoria(r.categoria), color: Cores.amarelo),
-                  title: Text(r.nome, style: Estilos.forte),
-                  subtitle: Text('${numero(r.kwhMes)} kWh/mês - ${reais(r.custoMes)} por mês', style: Estilos.secundario),
+              MergeSemantics(
+                child: Card(
+                  child: ListTile(
+                    leading: Icon(iconeDaCategoria(r.categoria)),
+                    title: Text(r.nome),
+                    subtitle: Text('${reais(r.custoMes)} por mês · ${numero(r.kwhMes)} kWh'),
+                  ),
                 ),
               ),
               const SizedBox(height: Espaco.m),
               TextoPlano(d.texto),
               if (d.fontes.isNotEmpty) ...[
                 const Titulo('Fontes'),
-                for (final f in d.fontes)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Espaco.p),
-                    child: Text('[${f.n}] ${f.orgao} - ${f.documento}\n${f.url}', style: Estilos.secundario),
-                  ),
+                for (final f in d.fontes) CartaoFonte(f),
               ],
               const SizedBox(height: Espaco.m),
               ListaAvisos([d.aviso]),
+              SizedBox(height: t.alvoToque),
             ],
           );
         },

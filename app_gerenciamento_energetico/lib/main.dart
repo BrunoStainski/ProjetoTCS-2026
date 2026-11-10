@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'tema.dart';
-import 'telas/busca.dart';
+import 'telas/inicio.dart';
 
 void main() {
   runApp(const IampApp());
@@ -12,6 +12,6 @@ class IampApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'iamp', debugShowCheckedModeBanner: false, theme: temaIamp(), home: const TelaBusca());
+    return MaterialApp(title: 'Iamp', debugShowCheckedModeBanner: false, theme: temaIamp(), home: const TelaInicio());
   }
 }

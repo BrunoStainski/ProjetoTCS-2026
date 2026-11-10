@@ -17,8 +17,10 @@ DROP TABLE IF EXISTS distribuidoras;
 DROP TABLE IF EXISTS aparelhos;
 DROP TABLE IF EXISTS cargas;
 DROP TABLE IF EXISTS portateis;
+-- gas de cozinha saiu do projeto: apaga as tabelas que bancos antigos ainda tenham
 DROP TABLE IF EXISTS fogoes;
 DROP TABLE IF EXISTS precos_glp;
+DROP TABLE IF EXISTS consultas_gas;
 
 CREATE TABLE portateis (
     categoria  TEXT PRIMARY KEY,
@@ -27,30 +29,6 @@ CREATE TABLE portateis (
     horas_dia  DOUBLE PRECISION NOT NULL CHECK (horas_dia BETWEEN 0 AND 24),
     dias_mes   DOUBLE PRECISION NOT NULL CHECK (dias_mes BETWEEN 0 AND 31),
     fonte      TEXT NOT NULL
-);
-
-CREATE TABLE fogoes (
-    id                 SERIAL PRIMARY KEY,
-    marca              TEXT NOT NULL,
-    modelo             TEXT NOT NULL,
-    tipo               TEXT,
-    bocas              INTEGER,
-    rendimento_pct     DOUBLE PRECISION,
-    forno_litros       DOUBLE PRECISION,
-    consumo_forno_kg_h DOUBLE PRECISION,
-    classe_mesa        TEXT,
-    classe_forno       TEXT,
-    detalhe            TEXT,
-    busca              TEXT NOT NULL,
-    UNIQUE (marca, modelo)
-);
-
-CREATE TABLE precos_glp (
-    uf       CHAR(2) NOT NULL,
-    ano      INTEGER NOT NULL,
-    preco_kg DOUBLE PRECISION NOT NULL CHECK (preco_kg > 0),
-    fonte    TEXT NOT NULL,
-    PRIMARY KEY (uf, ano)
 );
 
 CREATE TABLE aparelhos (
@@ -132,19 +110,6 @@ CREATE TABLE IF NOT EXISTS consultas (
     tarifa_kwh    DOUBLE PRECISION NOT NULL,
     origem_tarifa TEXT NOT NULL,
     custo_mes     DOUBLE PRECISION NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS consultas_gas (
-    id           SERIAL PRIMARY KEY,
-    criado_em    TIMESTAMP NOT NULL DEFAULT now(),
-    marca        TEXT NOT NULL,
-    modelo       TEXT NOT NULL,
-    uf           TEXT NOT NULL,
-    kg_mes       DOUBLE PRECISION NOT NULL,
-    preco_kg     DOUBLE PRECISION NOT NULL,
-    origem_preco TEXT NOT NULL,
-    custo_mes    DOUBLE PRECISION NOT NULL,
-    metodo       TEXT NOT NULL
 );
 """
 
@@ -235,16 +200,5 @@ def registrar_consulta(con, r, horas_dia=None, ciclos_mes=None, velocidade=None)
          None if r["distribuidora"] == "-" else r["distribuidora"],
          horas_dia, ciclos_mes, velocidade, r["kwh_mes"], r["metodo"],
          r["tarifa_kwh"], r["origem_tarifa"], r["custo_mes"]),
-    )
-    con.commit()
-
-
-def registrar_consulta_gas(con, r):
-    executar(
-        con,
-        "INSERT INTO consultas_gas (marca, modelo, uf, kg_mes, preco_kg, origem_preco, custo_mes, metodo) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (r["marca"], r["modelo"], r["uf"], r["kg_mes"], r["preco_kg"], r["origem_preco"], r["custo_mes"],
-         r["metodo"]),
     )
     con.commit()

@@ -1,8 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- O app chama a API do iamp pela rede -->
+    <!-- O app chama a API do Iamp pela rede -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="iamp"
+        android:label="Iamp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

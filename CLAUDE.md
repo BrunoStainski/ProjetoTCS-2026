@@ -1,4 +1,4 @@
-# iamp — contexto do projeto para o Claude Code
+# Iamp — contexto do projeto para o Claude Code
 
 Copiloto de eficiência energética residencial (bootcamp TCS 2026). O usuário escolhe um
 aparelho (marca/modelo) e a distribuidora de energia; o iamp calcula o consumo (kWh/mês) e o
@@ -89,7 +89,7 @@ no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética),
 `POST /calcular/refrigerador-antigo` (geladeira fora do catálogo), `POST /calcular/estimado` (eletro pesado fora do
 catálogo), `GET /estimativa/categorias`, `POST /sugestoes/estimado`, `POST /comparar/estimado`,
 `POST /calcular/resistivo` + `GET /resistivos` (eletroportáteis, tabela `portateis`), `POST /eco-coach/aparelho`
-(dicas para um aparelho), `GET /fogoes`, `GET /gas/precos`, `POST /calcular/gas` (gás de cozinha).
+(dicas para um aparelho).
 Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py); os de estimativa, de `Tarifa`.
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
 A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
@@ -127,14 +127,13 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
   etiqueta do Inmetro): o app mostra as dicas do Eco-Coach (`POST /eco-coach/aparelho`).
 - Tempo de uso no app em horas e minutos (`ControleTempo`/`CampoTempo`); o `metodo` da API também ("15 min/dia").
 
-## Gás de cozinha (`src/gas.py`)
+## Gás de cozinha: removido
 
-- Fogões: tabela `fogoes` (Inmetro, `fogoes_fornos_gas_limpo.csv`, 1.259 modelos GLP). Preço: tabela `precos_glp`
-  (ANP, Anuário 2026 tabela 3.22, R$/kg por UF e ano; `scripts/tratar_dados_preco_glp.py`); usa o ano mais recente.
-- kg/mês = bocas (h/dia × 1,75 kW ÷ 12,8 kWh/kg × 63% ÷ rendimento do modelo) + forno (h/dia × kg/h do Inmetro),
-  × dias. A boca de 1,75 kW e o PCI de 12,8 kWh/kg são premissas (o Inmetro só dá o rendimento das bocas); 63% é a
-  mediana do catálogo. Sem modelo: medianas (63%, forno 0,12 kg/h). Preço do estado ou do botijão informado.
-- Histórico em `consultas_gas`. O gás não entra em "Minha casa" (é outra conta).
+O grupo decidiu focar só em energia elétrica: o cálculo de gás de cozinha (fogões do Inmetro, preço do
+GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `banco.ESQUEMA` ainda apaga
+`fogoes`, `precos_glp` e `consultas_gas` de bancos antigos, e `banco_carregado()` recarrega o banco se a
+tabela `fogoes` ainda existir.
+
 `banco_carregado()` compara as colunas de `aparelhos` com `COLUNAS_APARELHOS` (criar_banco.py): ao
 adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
 
@@ -169,37 +168,48 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
 
 ## App Flutter (`app_gerenciamento_energetico/lib/`)
 
-- `tema.dart`: identidade visual. `Cores` (preto de fundo, amarelo `#FFD000` só em ação e valor
-  principal = regra 60/30/10, verde `#3DDC84` = economia/bom, vermelho `#FF5C5C` = alerta; texto
-  branco 100/80/60% de opacidade; detalhes nunca em branco: ícones, bordas (`borda` = amarelo 55%),
-  divisórias (amarelo 25%) e contornos são amarelos), `Estilos` (4 tamanhos: 32/20/16/13, 2 pesos, dígitos tabulares
-  em valores) e `Espaco` (grade de 8). Não usar cor/tamanho solto nas telas.
-- Padrões de tela (`telas/comum.dart`): ação principal no `rodape` da `Pagina` (zona do polegar);
-  valor principal em `CartaoDestaque` (contorno + brilho, conta até o valor); toque mínimo 48dp
-  (tema); payback verde até 60 meses, amarelo acima, vermelho se não se paga (corte do grupo).
+Público: quem paga as contas de casa, incluindo pessoas mais velhas ou com pouca familiaridade com
+tecnologia. Interface moderna, mas acessível por padrão. Nome exibido: **Iamp** (I maiúsculo) em todo
+lugar visível (app, web, Android, iOS).
+
+- `tema.dart`: tudo o que é visual. `Cores` (paleta preto e amarelo `#FFD000`, verde = economia,
+  vermelho = alerta; texto branco 100/90/80%, nada abaixo de 80% para manter contraste AA no preto),
+  `Espaco` (grade 4/8) e a extensão `Iamp` (ThemeExtension) com os estilos de texto (34/22/18/16, base 18,
+  nada abaixo de 16), cores com significado, raios, ícones, alvo de toque (48dp) e as decorações
+  `cartaoDestaque`/`selo`. Nas telas: `final t = Iamp.de(context);` e nunca cor/tamanho solto.
+- Acessibilidade: o app respeita o tamanho de fonte do sistema; com 150% ou mais (`fonteGrande`) o que
+  ficaria lado a lado empilha (`LadoALado`, `CampoTempo`, `GradeDeTipos`). Nenhuma informação só por cor
+  (payback tem frase "Se paga rápido/Demora/Não se paga"; perfil tem nome e ícone). Cartões clicáveis com
+  `MergeSemantics`, botões de ícone com tooltip que diz o aparelho, `ValorAnimado` lido só com o valor final.
+- Navegação (`navegacao.dart` + `telas/inicio.dart`): barra inferior com 3 abas (Calcular, Minha casa,
+  Economizar), ícone + texto; cada aba tem a própria pilha (`Navigator` + `ScaffoldMessenger`), então a
+  barra fica visível durante o cálculo. `irPara(Aba, recomecar:, fecharAtual:)` troca de aba.
+- Uma decisão por tela. Cálculo do catálogo em 6 etapas ("Etapa n de 6", `etapaDoCalculo`): tipo
+  (`TelaBusca`, botões grandes) -> marca/modelo (`TelaModelo`) -> uso (`TelaUso`) -> estado (`TelaEstado`,
+  oferece a última tarifa) -> distribuidora (`TelaDistribuidora`; ou `TelaTarifaConta`) -> resultado.
+  Estimativa (`estimar.dart`): uma pergunta por tela, com "Não sei"/"Não tenho" nas opcionais; voltar
+  volta uma pergunta (`PopScope`).
+- R$ é a informação principal; kWh, tarifa e fórmula ficam como texto secundário ou em "Como calculamos".
+- Padrões (`telas/comum.dart`): `Pagina` (ação principal no `rodape`), `CabecalhoPergunta`, `CartaoOpcao`,
+  `CartaoDestaque`, `CartaoInfo`, `BarraParte` (barra + % escrito), `MensagemErro`, `Carregando`.
 - Ícone: `assets/icone/*.png` -> `dart run flutter_launcher_icons` (config no pubspec.yaml).
-- Skills de design usadas (instaladas só no PC, globais): mobile-app-ui-design, mobile-android-design,
-  flutter-build-responsive-layout, flutter-fix-layout-issues.
 - `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
-  ChangeNotifier global `casa`; só em memória, sem persistência).
-- Telas (`telas/`): busca -> uso -> distribuidora (oferece a última tarifa) -> resultado ->
-  minha_casa (total, quantidade por item, perfil K-Means) | sugestoes -> comparar (payback, trocar na casa)
-  | minha_casa -> eco_coach (POST /eco-coach; espera com raio pulsando, plano, fontes [n]).
-- Eco-Coach no app: `texto_plano.dart` mostra o markdown do Gemini sem pacote extra (títulos, listas,
-  **negrito**, citações [n] em amarelo). Trocas com payback calculado em `comparar.dart` entram em
-  `casa.trocas` (máx. 5) e vão no corpo. O plano fica em `casa.plano` até a casa mudar (poupa o limite
-  gratuito do Gemini). Timeout do /eco-coach no app: 90 s. Links das fontes são selecionáveis (sem url_launcher).
-- `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, em branco = valor do Inmetro.
-- Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra);
-  avisos (SnackBar) que navegam usam o `NavigatorState` guardado antes, não o `context` da tela.
-- Busca (`busca.dart`): resultados agrupados por tipo em seções que abrem (`ResultadosPorTipo`, nome do
-  tipo em `tituloDaCategoria`), com a quantidade; um tipo só já vem aberto; acima de 30 por tipo
-  (`limiteBuscaPorTipo`) avisa para digitar parte do modelo. Trocar o tipo refaz a busca na hora (só a
-  resposta mais recente vale: `_pedido`). Teste com API falsa: `http.runWithClient` + `MockClient`.
-- Aviso "foi para a sua casa": `avisarAdicionado` (comum.dart) some em 5 s (`duracaoAviso`). Desde o
-  Flutter 3.29 SnackBar com botão fica até alguém tocar (`persist`), por isso o `persist: false`.
-- Testes em `test/widget_test.dart` (tema, casa vazia, somas, troca, formatação, uso opcional, Eco-Coach,
-  busca por tipo, aviso que some).
+  ChangeNotifier global `casa`; só em memória, sem persistência). Remover item tem "Desfazer" (`reinserir`).
+- Minha casa: total por mês, cada item com R$, % da conta, quantidade (−/+) e botões visíveis ("Ver modelos
+  que gastam menos", "Remover"); perfil K-Means mostrado em R$ por pessoa (tarifa média da casa).
+- Economizar (`eco_coach.dart`): só chama o /eco-coach quando a pessoa toca em "Montar meu plano"; o plano
+  fica em `casa.plano` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
+  markdown do Gemini sem pacote extra (títulos em letras normais, listas, **negrito**, citações [n] em
+  amarelo). Trocas com payback de `comparar.dart` entram em `casa.trocas` (máx. 5). Timeout: 90 s.
+- `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, "Não sei" = valor do Inmetro.
+- Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra).
+- Busca: resultados agrupados por tipo (`ResultadosPorTipo`, `tituloDaCategoria`); um tipo só já vem aberto;
+  acima de 30 por tipo (`limiteBuscaPorTipo`) avisa para digitar parte do modelo; só a resposta mais
+  recente vale (`_pedido`). Teste com API falsa: `http.runWithClient` + `MockClient`.
+- Aviso "foi para a sua casa": `avisarAdicionado` some em 5 s (`duracaoAviso`, `persist: false`).
+- Testes em `test/widget_test.dart`: fluxo completo com API falsa, abas, estimativa pergunta a pergunta,
+  fonte 2x sem estouro (tela de 360dp), guidelines de toque 48dp, rótulos e contraste
+  (`meetsGuideline`), Eco-Coach, somas e formatação.
 
 ## Machine Learning (Dupla 2)
 
@@ -289,11 +299,11 @@ Anexo A (inteiro + 3 partes cortadas no marcador `<!-- BPMN_PARTES -->`). Regist
 (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
 No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular (ngrok ou `infra/oracle/`),
 para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
-Nomes dos tipos no filtro da busca ainda usam `legivel` ("refrigerador"); as seções já usam `tituloDaCategoria`.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
 Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Gás e
 dicas de eletroportátil entram como anotação. Ao mudar a API, atualizar o .bpmn e exportar o PNG de novo.
+PENDENTE: o gás saiu do projeto; tirar a anotação de gás do BPMN e do `docs/documento_processo`.
 
 ## Limitações conhecidas (usar na parte de ética)
 

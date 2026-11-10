@@ -1,3 +1,7 @@
+// Estimativa de aparelho fora do catalogo do Inmetro, uma pergunta por tela.
+// As perguntas dependem das respostas (geladeira pergunta o ano; eletroportatil, a potencia...).
+// Voltar (seta ou botao do celular) volta uma pergunta, sem perder o que ja foi respondido.
+
 import 'package:flutter/material.dart';
 
 import '../api.dart';
@@ -16,6 +20,18 @@ const tiposDeGeladeira = {
   'freezer_horizontal': 'Freezer horizontal',
 };
 
+/// Uma pergunta da estimativa. Sem `validar`, e uma escolha: tocar numa opcao ja avanca.
+class _Pergunta {
+  final String titulo;
+  final String? ajuda;
+  final List<Widget> campos;
+  final String? Function()? validar;
+  final String? textoPular;
+  final VoidCallback? aoPular;
+
+  const _Pergunta(this.titulo, {this.ajuda, required this.campos, this.validar, this.textoPular, this.aoPular});
+}
+
 class TelaEstimar extends StatefulWidget {
   final Future<List<CategoriaEstimavel>> Function() carregarCategorias;
   final Future<List<Resistivo>> Function() carregarResistivos;
@@ -31,13 +47,16 @@ class TelaEstimar extends StatefulWidget {
 }
 
 class _TelaEstimarState extends State<TelaEstimar> {
-  Grupo _grupo = Grupo.pesado;
+  int _indice = 0;
+  String? _erro;
+  bool _falhouCarga = false;
+
+  Grupo? _grupo;
   List<CategoriaEstimavel>? _categorias;
   CategoriaEstimavel? _categoria;
-  String? _erro;
 
-  String _tipoGeladeira = 'duplex';
-  bool _frostFree = true;
+  String? _tipoGeladeira;
+  bool? _frostFree;
   final _congelador = TextEditingController();
   final _ano = TextEditingController();
 
@@ -56,7 +75,8 @@ class _TelaEstimarState extends State<TelaEstimar> {
   final _dias = TextEditingController();
 
   bool get _geladeira => _categoria?.especial ?? false;
-  bool get _soFreezer => _tipoGeladeira.startsWith('freezer');
+  bool get _soFreezer => _tipoGeladeira?.startsWith('freezer') ?? false;
+  bool get _temEtiqueta => _etiqueta.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -75,7 +95,10 @@ class _TelaEstimarState extends State<TelaEstimar> {
   }
 
   Future<void> _carregar() async {
-    setState(() => _erro = null);
+    setState(() {
+      _erro = null;
+      _falhouCarga = false;
+    });
     try {
       final categorias = await widget.carregarCategorias();
       final resistivos = await widget.carregarResistivos();
@@ -83,30 +106,59 @@ class _TelaEstimarState extends State<TelaEstimar> {
       setState(() {
         _categorias = categorias;
         _resistivos = resistivos;
-        if (categorias.isNotEmpty) _escolherCategoria(categorias.first);
-        if (resistivos.isNotEmpty) _escolherResistivo(resistivos.first);
       });
     } catch (_) {
-      if (mounted) setState(() => _erro = 'Não consegui carregar os aparelhos. A API está rodando?');
+      if (mounted) {
+        setState(() {
+          _falhouCarga = true;
+          _erro = 'Não consegui carregar a lista de aparelhos. Confira a internet e tente de novo.';
+        });
+      }
     }
   }
 
+  // ---------- respostas ----------
+
+  void _escolherGrupo(Grupo g) {
+    if (_grupo != g) {
+      _categoria = null;
+      _resistivo = null;
+    }
+    _grupo = g;
+    _avancar();
+  }
+
   void _escolherCategoria(CategoriaEstimavel c) {
+    if (_categoria?.categoria != c.categoria) {
+      _tipo = null;
+      _tipoGeladeira = null;
+      _frostFree = null;
+      _medida.clear();
+      _etiqueta.clear();
+      final uso = c.uso;
+      _tempo.definir(uso.pergunta == 'horas' ? (uso.padrao as num?)?.toDouble() : null);
+      _ciclos.text = uso.pergunta == 'ciclos' && uso.padrao != null
+          ? numero((uso.padrao as num).toDouble(), casas: 0)
+          : '';
+      _velocidade = uso.pergunta == 'velocidade' ? uso.padrao as String? : null;
+    }
     _categoria = c;
-    _tipo = null;
-    _medida.clear();
-    _etiqueta.clear();
-    _erro = null;
-    final uso = c.uso;
-    _tempo.definir(uso.pergunta == 'horas' ? (uso.padrao as num?)?.toDouble() : null);
-    _ciclos.text = uso.pergunta == 'ciclos' && uso.padrao != null ? numero((uso.padrao as num).toDouble(), casas: 0) : '';
-    _velocidade = uso.pergunta == 'velocidade' ? uso.padrao as String? : null;
+    _avancar();
   }
 
   void _escolherResistivo(Resistivo r) {
+    if (_resistivo?.categoria != r.categoria) {
+      _potencia.clear();
+      _tempoPortatil.definir(r.horasDia);
+      _dias.text = numero(r.diasMes, casas: 0);
+    }
     _resistivo = r;
-    _tempoPortatil.definir(r.horasDia);
-    _dias.text = numero(r.diasMes, casas: 0);
+    _avancar();
+  }
+
+  void _escolher(VoidCallback mudar) {
+    mudar();
+    _avancar();
   }
 
   double? _opcional(TextEditingController c) => c.text.trim().isEmpty ? null : lerNumero(c.text);
@@ -123,314 +175,417 @@ class _TelaEstimarState extends State<TelaEstimar> {
     return (partes.first, partes.length > 1 ? partes.skip(1).join(' ') : null);
   }
 
-  void _mostrarErro(String mensagem) => setState(() => _erro = mensagem);
+  // ---------- navegacao entre as perguntas ----------
 
-  void _continuar() {
-    if (_grupo == Grupo.portatil) return _continuarPortatil();
-    if (_categoria == null) return;
-    _geladeira ? _continuarGeladeira() : _continuarPesado(_categoria!);
+  void _avancar() {
+    final ultima = _indice >= _perguntas().length - 1;
+    setState(() {
+      _erro = null;
+      if (!ultima) _indice++;
+    });
+    if (ultima) _concluir();
   }
 
-  void _continuarGeladeira() {
-    final volume = lerNumero(_medida.text);
-    final ano = int.tryParse(_ano.text.trim());
-    final anoAtual = DateTime.now().year;
-    if (volume == null || volume <= 0 || volume > 1000) {
-      return _mostrarErro('Informe a capacidade total em litros (está na etiqueta ou no manual).');
+  void _voltar() => setState(() {
+    _erro = null;
+    _indice--;
+  });
+
+  void _continuar(_Pergunta p) {
+    final erro = p.validar!();
+    if (erro != null) {
+      setState(() => _erro = erro);
+      return;
     }
-    if (ano == null || ano < 1980 || ano > anoAtual) {
-      return _mostrarErro('Informe o ano de compra entre 1980 e $anoAtual (ex.: 2014).');
-    }
-    final congelador = _soFreezer ? null : _opcional(_congelador);
-    if (!_soFreezer && (_invalido(_congelador, minimo: -1) || (congelador ?? 0) > volume)) {
-      return _mostrarErro('Os litros do freezer precisam ser um número menor que a capacidade total.');
-    }
-    if (_invalido(_etiqueta, maximo: 300)) {
-      return _mostrarErro('O consumo da etiqueta precisa ser um número em kWh/mês (ex.: 52,5).');
-    }
+    _avancar();
+  }
+
+  void _pular(_Pergunta p) {
+    p.aoPular?.call();
+    _avancar();
+  }
+
+  void _concluir() {
+    final consulta = switch (_grupo) {
+      Grupo.portatil => _consultaPortatil(),
+      _ => _geladeira ? _consultaGeladeira() : _consultaPesado(_categoria!),
+    };
+    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaEstado(consulta: consulta)));
+  }
+
+  Consulta _consultaGeladeira() {
     final (marca, modelo) = _marcaEModelo();
-    _seguir(
-      Consulta(
-        Aparelho(id: 0, categoria: 'refrigerador', marca: marca ?? 'Geladeira', modelo: modelo ?? ''),
-        estimativa: Estimativa(rotaGeladeira, {
-          'tipo': _tipoGeladeira,
-          'frost_free': _frostFree,
-          'volume_total_l': volume,
-          'volume_congelador_l': congelador,
-          'ano_compra': ano,
-          'kwh_etiqueta': _opcional(_etiqueta),
-          'marca': marca,
-          'modelo': modelo,
-        }),
-      ),
+    return Consulta(
+      Aparelho(id: 0, categoria: 'refrigerador', marca: marca ?? 'Geladeira', modelo: modelo ?? ''),
+      estimativa: Estimativa(rotaGeladeira, {
+        'tipo': _tipoGeladeira,
+        'frost_free': _frostFree ?? false,
+        'volume_total_l': lerNumero(_medida.text),
+        'volume_congelador_l': _soFreezer ? null : _opcional(_congelador),
+        'ano_compra': int.tryParse(_ano.text.trim()),
+        'kwh_etiqueta': _opcional(_etiqueta),
+        'marca': marca,
+        'modelo': modelo,
+      }),
     );
   }
 
-  void _continuarPesado(CategoriaEstimavel c) {
-    if (_invalido(_medida) || _invalido(_etiqueta)) return _mostrarErro('Confira os números digitados.');
-    final medida = _opcional(_medida);
+  Consulta _consultaPesado(CategoriaEstimavel c) {
+    final (marca, modelo) = _marcaEModelo();
     final etiqueta = _opcional(_etiqueta);
-    if (c.etiquetaObrigatoria && etiqueta == null) return _mostrarErro('Preencha o campo "${c.etiquetaRotulo}".');
-    if (!c.etiquetaObrigatoria && medida == null && etiqueta == null) {
-      return _mostrarErro('Informe ${c.medida!.toLowerCase()} ou o valor da etiqueta.');
-    }
-    if (c.tipos.isNotEmpty && _tipo == null && etiqueta == null) return _mostrarErro('Escolha o tipo.');
-
-    double? horas;
-    double? ciclos;
-    switch (c.uso.pergunta) {
-      case 'horas':
-        if (!_tempo.valido) return _mostrarErro('Confira o tempo de uso (minutos de 0 a 59, até 24 h por dia).');
-        horas = _tempo.horasDia;
-        if (horas == null && !c.uso.opcional) return _mostrarErro('Informe o tempo de uso por dia.');
-      case 'ciclos':
-        ciclos = lerNumero(_ciclos.text);
-        if (ciclos == null || ciclos < 0) return _mostrarErro('Informe quantas lavagens por mês.');
-    }
-    final (marca, modelo) = _marcaEModelo();
-    _seguir(
-      Consulta(
-        Aparelho(id: 0, categoria: c.categoria, marca: marca ?? c.nome, modelo: modelo ?? ''),
-        estimativa: Estimativa(rotaEstimado, {
-          'categoria': c.categoria,
-          'tipo': _tipo,
-          'medida': medida,
-          'valor_etiqueta': etiqueta,
-          'marca': marca,
-          'modelo': modelo,
-        }),
-        horasDia: horas,
-        ciclosMes: ciclos,
-        velocidade: c.uso.pergunta == 'velocidade' ? _velocidade : null,
-      ),
+    return Consulta(
+      Aparelho(id: 0, categoria: c.categoria, marca: marca ?? c.nome, modelo: modelo ?? ''),
+      estimativa: Estimativa(rotaEstimado, {
+        'categoria': c.categoria,
+        'tipo': etiqueta == null ? _tipo : null,
+        'medida': etiqueta == null ? _opcional(_medida) : null,
+        'valor_etiqueta': etiqueta,
+        'marca': marca,
+        'modelo': modelo,
+      }),
+      horasDia: c.uso.pergunta == 'horas' ? _tempo.horasDia : null,
+      ciclosMes: c.uso.pergunta == 'ciclos' ? lerNumero(_ciclos.text) : null,
+      velocidade: c.uso.pergunta == 'velocidade' ? _velocidade : null,
     );
   }
 
-  void _continuarPortatil() {
-    final r = _resistivo;
-    if (r == null) return _mostrarErro('Escolha o aparelho.');
-    if (_invalido(_potencia, maximo: 10000) || _invalido(_dias, minimo: -1, maximo: 31)) {
-      return _mostrarErro('Confira os números: potência em W e dias entre 0 e 31.');
-    }
-    if (!_tempoPortatil.valido) return _mostrarErro('Confira o tempo de uso (minutos de 0 a 59, até 24 h por dia).');
-    _seguir(
-      Consulta(
-        Aparelho(id: 0, categoria: r.categoria, marca: r.nome, modelo: ''),
-        estimativa: Estimativa(rotaResistivo, {
-          'categoria': r.categoria,
-          'potencia_w': _opcional(_potencia),
-          'dias_mes': _opcional(_dias),
-        }),
-        horasDia: _tempoPortatil.horasDia,
-      ),
+  Consulta _consultaPortatil() {
+    final r = _resistivo!;
+    return Consulta(
+      Aparelho(id: 0, categoria: r.categoria, marca: r.nome, modelo: ''),
+      estimativa: Estimativa(rotaResistivo, {
+        'categoria': r.categoria,
+        'potencia_w': _opcional(_potencia),
+        'dias_mes': _opcional(_dias),
+      }),
+      horasDia: _tempoPortatil.horasDia,
     );
   }
 
-  void _seguir(Consulta consulta) {
-    setState(() => _erro = null);
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDistribuidora(consulta: consulta)));
-  }
+  // ---------- as perguntas ----------
 
-  @override
-  Widget build(BuildContext context) {
-    final carregado = _categorias != null && _resistivos != null;
-    return Pagina(
-      titulo: 'Estimar o gasto',
-      rodape: carregado ? FilledButton(onPressed: _continuar, child: const Text('Continuar')) : null,
-      filho: ListView(
-        children: [
-          const Text(
-            'Não está no catálogo do Inmetro? Calculamos um gasto aproximado com o que você souber do aparelho.',
-            style: Estilos.secundario,
-          ),
-          const SizedBox(height: Espaco.m),
-          SegmentedButton<Grupo>(
-            segments: const [
-              ButtonSegment(value: Grupo.pesado, label: Text('Eletro pesado'), icon: Icon(Icons.kitchen)),
-              ButtonSegment(value: Grupo.portatil, label: Text('Eletroportáteis'), icon: Icon(Icons.blender_outlined)),
-            ],
-            selected: {_grupo},
-            onSelectionChanged: (s) => setState(() {
-              _grupo = s.first;
-              _erro = null;
-            }),
-          ),
-          const SizedBox(height: Espaco.m),
-          if (_erro != null) ...[
-            MensagemErro(_erro!, tentarDeNovo: carregado ? null : _carregar),
-            const SizedBox(height: Espaco.p),
-          ],
-          if (!carregado && _erro == null) const Center(child: CircularProgressIndicator()),
-          if (carregado) ...(_grupo == Grupo.pesado ? _camposPesado() : _camposPortatil()),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _camposPesado() {
-    final c = _categoria;
+  List<_Pergunta> _perguntas() {
     return [
-      _lista<CategoriaEstimavel>(
-        rotulo: 'Aparelho',
-        valor: c,
-        opcoes: _categorias!,
-        texto: (x) => legivel(x.nome),
-        aoMudar: (x) => setState(() => _escolherCategoria(x)),
-      ),
-      if (c != null) ...(c.especial ? _camposGeladeira() : _camposCategoria(c)),
-      _campo(_nome, 'Marca e modelo (opcional)', exemplo: 'Ex.: Consul CRM45', texto: true),
+      _perguntaGrupo(),
+      if (_grupo == Grupo.portatil) ..._perguntasPortatil(),
+      if (_grupo == Grupo.pesado) ...[
+        _perguntaAparelhoPesado(),
+        if (_categoria != null) ...(_geladeira ? _perguntasGeladeira() : _perguntasCategoria(_categoria!)),
+        if (_categoria != null) _perguntaNome(),
+      ],
     ];
   }
 
-  List<Widget> _camposGeladeira() => [
-    _lista<String>(
-      rotulo: 'Tipo',
-      valor: _tipoGeladeira,
-      opcoes: tiposDeGeladeira.keys.toList(),
-      texto: (t) => tiposDeGeladeira[t]!,
-      aoMudar: (t) => setState(() => _tipoGeladeira = t),
+  _Pergunta _perguntaGrupo() => _Pergunta(
+    'Que tipo de aparelho é?',
+    ajuda: 'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
+        'com o que você souber.',
+    campos: [
+      CartaoOpcao(
+        icone: Icons.kitchen,
+        titulo: 'Eletrodoméstico grande',
+        subtitulo: 'Geladeira, máquina de lavar, ar-condicionado, chuveiro, TV...',
+        selecionada: _grupo == Grupo.pesado,
+        onTap: () => _escolherGrupo(Grupo.pesado),
+      ),
+      CartaoOpcao(
+        icone: Icons.blender_outlined,
+        titulo: 'Eletroportátil',
+        subtitulo: 'Air fryer, secador de cabelo, ferro de passar, cafeteira...',
+        selecionada: _grupo == Grupo.portatil,
+        onTap: () => _escolherGrupo(Grupo.portatil),
+      ),
+    ],
+  );
+
+  _Pergunta _perguntaAparelhoPesado() => _Pergunta(
+    'Qual é o aparelho?',
+    campos: [
+      for (final c in _categorias!)
+        CartaoOpcao(
+          icone: iconeDaCategoria(c.categoria),
+          titulo: c.nome,
+          selecionada: _categoria?.categoria == c.categoria,
+          onTap: () => _escolherCategoria(c),
+        ),
+    ],
+  );
+
+  List<_Pergunta> _perguntasGeladeira() => [
+    _Pergunta(
+      'Qual é o tipo?',
+      campos: [
+        for (final MapEntry(key: tipo, value: nome) in tiposDeGeladeira.entries)
+          CartaoOpcao(
+            titulo: nome,
+            selecionada: _tipoGeladeira == tipo,
+            onTap: () => _escolher(() => _tipoGeladeira = tipo),
+          ),
+      ],
     ),
-    SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      value: _frostFree,
-      onChanged: (v) => setState(() => _frostFree = v),
-      title: const Text('Frost-free'),
-      subtitle: const Text('Não forma gelo nas paredes (não precisa degelar).', style: Estilos.secundario),
+    _Pergunta(
+      'Ela forma gelo nas paredes?',
+      ajuda: 'Quem não forma gelo é "frost-free" e não precisa degelar.',
+      campos: [
+        CartaoOpcao(
+          titulo: 'Não forma gelo (frost-free)',
+          subtitulo: 'Não precisa degelar.',
+          selecionada: _frostFree == true,
+          onTap: () => _escolher(() => _frostFree = true),
+        ),
+        CartaoOpcao(
+          titulo: 'Forma gelo',
+          subtitulo: 'Precisa degelar de vez em quando.',
+          selecionada: _frostFree == false,
+          onTap: () => _escolher(() => _frostFree = false),
+        ),
+      ],
     ),
-    _campo(_medida, 'Capacidade total (litros)', exemplo: 'Ex.: 407'),
+    _Pergunta(
+      'Qual é a capacidade total?',
+      ajuda: 'Em litros. Está na etiqueta dentro da porta ou no manual.',
+      campos: [_campo(_medida, 'Capacidade total', sufixo: 'litros', exemplo: 'Ex.: 407')],
+      validar: () {
+        final volume = lerNumero(_medida.text);
+        return volume == null || volume <= 0 || volume > 1000
+            ? 'Digite a capacidade total em litros (está na etiqueta ou no manual).'
+            : null;
+      },
+    ),
     if (!_soFreezer)
-      _campo(
-        _congelador,
-        'Litros do freezer (opcional)',
-        exemplo: 'Ex.: 90',
-        ajuda: 'Melhora a estimativa. Está na etiqueta ou no manual.',
+      _Pergunta(
+        'Quantos litros tem o freezer?',
+        ajuda: 'Melhora a estimativa. Se não souber, toque em "Não sei".',
+        campos: [_campo(_congelador, 'Litros do freezer', sufixo: 'litros', exemplo: 'Ex.: 90')],
+        validar: () {
+          final volume = lerNumero(_medida.text) ?? 0;
+          final congelador = _opcional(_congelador);
+          return _invalido(_congelador, minimo: -1) || (congelador ?? 0) > volume
+              ? 'Os litros do freezer precisam ser menores que a capacidade total.'
+              : null;
+        },
+        textoPular: 'Não sei',
+        aoPular: _congelador.clear,
       ),
-    _campo(_ano, 'Ano de compra', exemplo: 'Ex.: 2014', inteiro: true),
-    const Titulo('Tem a etiqueta do Inmetro?'),
-    _campo(
-      _etiqueta,
-      'Consumo da etiqueta em kWh/mês (opcional)',
-      exemplo: 'Ex.: 52,5',
-      ajuda: 'É o número em kWh/mês da etiqueta colada no aparelho. Com ele o resultado fica bem mais preciso.',
+    _Pergunta(
+      'Em que ano você comprou?',
+      ajuda: 'Geladeiras mais antigas costumam gastar mais.',
+      campos: [_campo(_ano, 'Ano de compra', exemplo: 'Ex.: 2014', inteiro: true)],
+      validar: () {
+        final ano = int.tryParse(_ano.text.trim());
+        final anoAtual = DateTime.now().year;
+        return ano == null || ano < 1980 || ano > anoAtual
+            ? 'Digite o ano de compra entre 1980 e $anoAtual. Ex.: 2014.'
+            : null;
+      },
+    ),
+    _Pergunta(
+      'Tem a etiqueta amarela do Inmetro?',
+      ajuda: 'É o número em kWh por mês da etiqueta colada no aparelho. Com ele o resultado fica bem mais preciso.',
+      campos: [_campo(_etiqueta, 'Consumo da etiqueta', sufixo: 'kWh/mês', exemplo: 'Ex.: 52,5')],
+      validar: () => _invalido(_etiqueta, maximo: 300) ? 'Digite o número em kWh por mês. Ex.: 52,5.' : null,
+      textoPular: 'Não tenho a etiqueta',
+      aoPular: _etiqueta.clear,
     ),
   ];
 
-  List<Widget> _camposCategoria(CategoriaEstimavel c) => [
-    if (c.tipos.isNotEmpty)
-      _lista<String>(
-        rotulo: 'Tipo',
-        valor: _tipo,
-        opcoes: c.tipos,
-        texto: (t) => t,
-        aoMudar: (t) => setState(() => _tipo = t),
-      ),
-    if (c.medida != null) _campo(_medida, legivel(c.medida!)),
-    if (c.etiquetaRotulo != null) ...[
-      if (!c.etiquetaObrigatoria) const Titulo('Tem a etiqueta do Inmetro?'),
-      _campo(
-        _etiqueta,
-        c.etiquetaObrigatoria ? legivel(c.etiquetaRotulo!) : '${legivel(c.etiquetaRotulo!)} (opcional)',
-        ajuda: c.etiquetaObrigatoria
-            ? 'Está escrita no próprio aparelho ou na embalagem.'
-            : 'Com o valor da etiqueta o cálculo fica exato. Sem ele, usamos modelos parecidos do catálogo.',
-      ),
-    ],
-    ..._camposUso(c.uso),
-  ];
+  List<_Pergunta> _perguntasCategoria(CategoriaEstimavel c) {
+    final rotuloEtiqueta = c.etiquetaRotulo == null ? null : legivel(c.etiquetaRotulo!);
+    return [
+      if (rotuloEtiqueta != null)
+        _Pergunta(
+          c.etiquetaObrigatoria ? 'Qual é o valor da etiqueta?' : 'Tem a etiqueta do Inmetro?',
+          ajuda: c.etiquetaObrigatoria
+              ? 'Está escrito no próprio aparelho ou na embalagem.'
+              : 'Com o valor da etiqueta o cálculo fica exato. Sem ele, usamos modelos parecidos.',
+          campos: [_campo(_etiqueta, rotuloEtiqueta)],
+          validar: () {
+            if (c.etiquetaObrigatoria && !_temEtiqueta) {
+              return 'Digite o valor de "$rotuloEtiqueta". Ele está no aparelho ou na embalagem.';
+            }
+            return _invalido(_etiqueta) ? 'Confira o número digitado.' : null;
+          },
+          textoPular: c.etiquetaObrigatoria ? null : 'Não tenho a etiqueta',
+          aoPular: _etiqueta.clear,
+        ),
+      if (!_temEtiqueta && c.tipos.isNotEmpty)
+        _Pergunta(
+          'Qual é o tipo?',
+          campos: [
+            for (final tipo in c.tipos)
+              CartaoOpcao(titulo: tipo, selecionada: _tipo == tipo, onTap: () => _escolher(() => _tipo = tipo)),
+          ],
+        ),
+      if (!_temEtiqueta && c.medida != null)
+        _Pergunta(
+          'Qual é o tamanho?',
+          ajuda: 'Está na etiqueta do aparelho ou no manual.',
+          campos: [_campo(_medida, legivel(c.medida!))],
+          validar: () => _opcional(_medida) == null || _invalido(_medida)
+              ? 'Digite ${legivel(c.medida!).toLowerCase()} ou volte e informe o valor da etiqueta.'
+              : null,
+        ),
+      ..._perguntasUso(c.uso),
+    ];
+  }
 
-  List<Widget> _camposUso(PerguntaDeUso uso) => switch (uso.pergunta) {
+  List<_Pergunta> _perguntasUso(PerguntaDeUso uso) => switch (uso.pergunta) {
     'horas' => [
-      CampoTempo(
-        controle: _tempo,
-        rotulo: uso.opcional ? 'Tempo de uso por dia (opcional)' : 'Tempo de uso por dia',
+      _Pergunta(
+        'Quanto tempo por dia ele fica ligado?',
         ajuda: uso.opcional
-            ? 'Em branco, usamos o consumo do ensaio do Inmetro.'
+            ? 'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.'
             : uso.padrao != null
-            ? 'Valor sugerido é uma estimativa. Troque pelo seu uso real.'
-            : 'Obrigatório. Ex.: 0 h 15 min.',
+            ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
+            : 'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
+        campos: [CampoTempo(controle: _tempo)],
+        validar: () {
+          if (!_tempo.valido) return 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.';
+          if (_tempo.horasDia == null && !uso.opcional) return 'Digite o tempo de uso por dia.';
+          return null;
+        },
+        textoPular: uso.opcional ? 'Não sei, usar o valor do Inmetro' : null,
+        aoPular: _tempo.limpar,
       ),
-      const SizedBox(height: Espaco.m),
     ],
-    'ciclos' => [_campo(_ciclos, 'Lavagens por mês', inteiro: true)],
-    'velocidade' => [
-      const Text('Em qual velocidade você costuma usar?', style: Estilos.forte),
-      const SizedBox(height: Espaco.p),
-      SegmentedButton<String>(
-        segments: [for (final o in uso.opcoes) ButtonSegment(value: o, label: Text(o))],
-        selected: {?_velocidade},
-        onSelectionChanged: (s) => setState(() => _velocidade = s.first),
+    'ciclos' => [
+      _Pergunta(
+        'Quantas vezes por mês você lava roupa?',
+        ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+        campos: [_campo(_ciclos, 'Lavagens por mês', sufixo: 'vezes', inteiro: true)],
+        validar: () {
+          final ciclos = lerNumero(_ciclos.text);
+          return ciclos == null || ciclos < 0 ? 'Digite quantas lavagens por mês. Ex.: 12.' : null;
+        },
       ),
-      const SizedBox(height: Espaco.m),
+    ],
+    'velocidade' => [
+      _Pergunta(
+        'Em qual velocidade você costuma usar?',
+        campos: [
+          for (final o in uso.opcoes)
+            CartaoOpcao(titulo: o, selecionada: _velocidade == o, onTap: () => _escolher(() => _velocidade = o)),
+        ],
+      ),
     ],
     _ => const [],
   };
 
-  List<Widget> _camposPortatil() {
+  _Pergunta _perguntaNome() => _Pergunta(
+    'Qual é a marca e o modelo?',
+    ajuda: 'Opcional. Serve só para você reconhecer o aparelho na sua casa.',
+    campos: [_campo(_nome, 'Marca e modelo', exemplo: 'Ex.: Consul CRM45', texto: true)],
+    validar: () => null,
+    textoPular: 'Pular',
+    aoPular: _nome.clear,
+  );
+
+  List<_Pergunta> _perguntasPortatil() {
     final r = _resistivo;
     return [
-      _lista<Resistivo>(
-        rotulo: 'Aparelho',
-        valor: r,
-        opcoes: _resistivos!,
-        texto: (x) => legivel(x.nome),
-        aoMudar: (x) => setState(() => _escolherResistivo(x)),
+      _Pergunta(
+        'Qual é o aparelho?',
+        campos: [
+          for (final x in _resistivos!)
+            CartaoOpcao(
+              icone: iconeDaCategoria(x.categoria),
+              titulo: x.nome,
+              subtitulo: 'Típica: ${numero(x.potenciaW, casas: 0)} W',
+              selecionada: _resistivo?.categoria == x.categoria,
+              onTap: () => _escolherResistivo(x),
+            ),
+        ],
       ),
-      _campo(
-        _potencia,
-        'Potência em W (opcional)',
-        exemplo: r == null ? null : 'Típica: ${numero(r.potenciaW, casas: 0)} W',
-        ajuda: 'Está na etiqueta embaixo ou atrás do aparelho. Em branco, usamos a típica.',
-      ),
-      CampoTempo(
-        controle: _tempoPortatil,
-        rotulo: 'Tempo de uso por dia',
-        ajuda: r == null ? null : 'Sugerido: ${duracao(r.horasDia)}. Troque pelo seu uso real.',
-      ),
-      const SizedBox(height: Espaco.m),
-      _campo(_dias, 'Dias de uso no mês', inteiro: true),
+      if (r != null) ...[
+        _Pergunta(
+          'Qual é a potência?',
+          ajuda: 'Em watts (W). Está na etiqueta embaixo ou atrás do aparelho.',
+          campos: [_campo(_potencia, 'Potência', sufixo: 'W', exemplo: 'Típica: ${numero(r.potenciaW, casas: 0)} W')],
+          validar: () => _invalido(_potencia, maximo: 10000) ? 'Digite a potência em watts. Ex.: 1500.' : null,
+          textoPular: 'Não sei, usar a típica (${numero(r.potenciaW, casas: 0)} W)',
+          aoPular: _potencia.clear,
+        ),
+        _Pergunta(
+          'Quanto tempo por dia você usa?',
+          ajuda: 'Sugerido: ${duracao(r.horasDia)}. Troque pelo seu uso real.',
+          campos: [CampoTempo(controle: _tempoPortatil)],
+          validar: () =>
+              _tempoPortatil.valido ? null : 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
+        ),
+        _Pergunta(
+          'Em quantos dias do mês você usa?',
+          campos: [_campo(_dias, 'Dias de uso no mês', sufixo: 'dias', inteiro: true)],
+          validar: () => _invalido(_dias, minimo: -1, maximo: 31) ? 'Digite um número de dias entre 0 e 31.' : null,
+        ),
+      ],
     ];
-  }
-
-  Widget _lista<T>({
-    required String rotulo,
-    required T? valor,
-    required List<T> opcoes,
-    required String Function(T) texto,
-    required void Function(T) aoMudar,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Espaco.m),
-      child: DropdownButtonFormField<T>(
-        key: ValueKey('$rotulo-${_categoria?.categoria}'),
-        initialValue: valor,
-        isExpanded: true,
-        dropdownColor: Cores.superficieAlta,
-        iconEnabledColor: Cores.amarelo,
-        decoration: InputDecoration(labelText: rotulo),
-        items: [for (final o in opcoes) DropdownMenuItem(value: o, child: Text(texto(o)))],
-        onChanged: (v) {
-          if (v != null) aoMudar(v);
-        },
-      ),
-    );
   }
 
   Widget _campo(
     TextEditingController controle,
     String rotulo, {
     String? exemplo,
-    String? ajuda,
+    String? sufixo,
     bool inteiro = false,
     bool texto = false,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: Espaco.m),
-      child: TextField(
-        controller: controle,
-        keyboardType: texto ? TextInputType.text : TextInputType.numberWithOptions(decimal: !inteiro),
-        onSubmitted: (_) => _continuar(),
-        decoration: InputDecoration(labelText: rotulo, hintText: exemplo, helperText: ajuda, helperMaxLines: 3),
+    return TextField(
+      controller: controle,
+      autofocus: true,
+      keyboardType: texto ? TextInputType.text : TextInputType.numberWithOptions(decimal: !inteiro),
+      decoration: InputDecoration(labelText: rotulo, hintText: exemplo, suffixText: sufixo),
+    );
+  }
+
+  // ---------- tela ----------
+
+  @override
+  Widget build(BuildContext context) {
+    final carregado = _categorias != null && _resistivos != null;
+    if (!carregado) {
+      return Pagina(
+        titulo: 'Estimar o gasto',
+        filho: _falhouCarga ? MensagemErro(_erro!, tentarDeNovo: _carregar) : const Carregando(),
+      );
+    }
+    final perguntas = _perguntas();
+    final indice = _indice.clamp(0, perguntas.length - 1);
+    final p = perguntas[indice];
+    return PopScope(
+      canPop: indice == 0,
+      onPopInvokedWithResult: (saiu, _) {
+        if (!saiu) _voltar();
+      },
+      child: Pagina(
+        titulo: 'Estimar o gasto',
+        etapa: Etapa(indice + 1, perguntas.length),
+        rodape: p.validar == null ? null : _rodape(p),
+        filho: ListView(
+          key: ValueKey(indice), // cada pergunta comeca do topo
+          children: [
+            CabecalhoPergunta(p.titulo, ajuda: p.ajuda),
+            ...p.campos,
+            if (_erro != null) ...[
+              const SizedBox(height: Espaco.m),
+              MensagemErro(_erro!),
+            ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _rodape(_Pergunta p) {
+    final continuar = FilledButton(onPressed: () => _continuar(p), child: const Text('Continuar'));
+    if (p.textoPular == null) return continuar;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        continuar,
+        const SizedBox(height: Espaco.p),
+        TextButton(onPressed: () => _pular(p), child: Text(p.textoPular!)),
+      ],
     );
   }
 }

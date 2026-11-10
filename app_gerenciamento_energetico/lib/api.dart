@@ -1,4 +1,4 @@
-// Comunicacao com a API do iamp (FastAPI em src/main.py).
+// Comunicacao com a API do Iamp (FastAPI em src/main.py).
 //
 // Endereco padrao: http://localhost:8000
 // No emulador Android, "localhost" e o proprio celular; o computador e 10.0.2.2.
@@ -164,58 +164,6 @@ class CategoriaEstimavel {
       uso = PerguntaDeUso.fromJson(j['uso']);
 }
 
-class Fogao {
-  final int id;
-  final String marca;
-  final String modelo;
-  final String detalhe;
-
-  Fogao.fromJson(Map<String, dynamic> j)
-    : id = j['id'],
-      marca = j['marca'],
-      modelo = j['modelo'],
-      detalhe = j['detalhe'] ?? '';
-
-  String get nome => '$marca $modelo';
-}
-
-class PrecoGlp {
-  final String uf;
-  final int ano;
-  final double precoKg;
-
-  PrecoGlp.fromJson(Map<String, dynamic> j) : uf = j['uf'], ano = j['ano'], precoKg = _real(j['preco_kg']);
-
-  double get precoBotijao => precoKg * 13;
-}
-
-class ResultadoGas {
-  final String nome;
-  final String detalhe;
-  final double kgMes;
-  final double botijoesMes;
-  final int? diasPorBotijao;
-  final double precoBotijao;
-  final String origemPreco;
-  final double custoMes;
-  final double custoAno;
-  final String metodo;
-  final List<String> avisos;
-
-  ResultadoGas.fromJson(Map<String, dynamic> j)
-    : nome = '${j['marca']} ${j['modelo']}',
-      detalhe = j['detalhe'] ?? '',
-      kgMes = _real(j['kg_mes']),
-      botijoesMes = _real(j['botijoes_mes']),
-      diasPorBotijao = j['dias_por_botijao'],
-      precoBotijao = _real(j['preco_botijao']),
-      origemPreco = j['origem_preco'],
-      custoMes = _real(j['custo_mes']),
-      custoAno = _real(j['custo_ano']),
-      metodo = j['metodo'],
-      avisos = List<String>.from(j['avisos'] ?? const []);
-}
-
 class Dicas {
   final String texto;
   final List<FonteCitada> fontes;
@@ -361,7 +309,7 @@ class Api {
     try {
       resposta = await chamada().timeout(limite);
     } catch (_) {
-      throw ApiErro('Nao consegui falar com a API em $apiUrl. Ela esta rodando? (docker compose up -d)');
+      throw ApiErro('Não consegui me conectar ao Iamp. Confira a internet e tente de novo.');
     }
     final corpo = jsonDecode(utf8.decode(resposta.bodyBytes));
     if (resposta.statusCode >= 400) {
@@ -412,15 +360,6 @@ class Api {
       'metodo': r.metodo,
     }, limite: const Duration(seconds: 60)),
   );
-
-  static Future<List<Fogao>> fogoes(String busca) async =>
-      [for (final j in await _get('/fogoes', {'busca': busca})) Fogao.fromJson(j)];
-
-  static Future<List<PrecoGlp>> precosGlp() async =>
-      [for (final j in await _get('/gas/precos')) PrecoGlp.fromJson(j)];
-
-  static Future<ResultadoGas> calcularGas(Map<String, dynamic> corpo) async =>
-      ResultadoGas.fromJson(await _post('/calcular/gas', corpo));
 
   static Future<List<CategoriaEstimavel>> categoriasEstimaveis() async =>
       [for (final j in await _get('/estimativa/categorias')) CategoriaEstimavel.fromJson(j)];
@@ -482,7 +421,7 @@ class Api {
       );
 }
 
-/// Troca ja calculada em "Vale a pena trocar?" (vai para o Eco-Coach usar os numeros do iamp).
+/// Troca ja calculada em "Vale a pena trocar?" (vai para o Eco-Coach usar os numeros do Iamp).
 class TrocaAvaliada {
   final String aparelho;
   final String alternativa;
@@ -536,7 +475,7 @@ class MaiorConsumo {
       percentual = _real(j['percentual']);
 }
 
-/// Resposta de POST /eco-coach: numeros calculados pelo iamp + plano escrito pelo LLM com fontes [n].
+/// Resposta de POST /eco-coach: numeros calculados pelo Iamp + plano escrito pelo LLM com fontes [n].
 class EcoCoach {
   final String perfil;
   final double kwhTotal;

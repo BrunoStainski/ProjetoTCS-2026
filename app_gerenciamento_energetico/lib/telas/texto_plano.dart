@@ -1,6 +1,7 @@
 // Mostra o plano do Eco-Coach (markdown simples vindo do Gemini) no visual do app,
 // sem pacote extra. Entende: titulos (#), linhas inteiras em **negrito** como titulo,
 // listas (-, *, •, 1.), **negrito** no meio do texto e citacoes [n] / [1, 2] em amarelo.
+// Titulos ficam em letras normais (nao em CAIXA ALTA), que sao mais faceis de ler.
 
 import 'package:flutter/material.dart';
 
@@ -34,7 +35,7 @@ List<TextSpan> _comCitacoes(String texto, TextStyle estilo) {
     pedacos.add(
       TextSpan(
         text: '[$numeros]',
-        style: estilo.copyWith(color: Cores.amarelo, fontWeight: FontWeight.bold, fontSize: 13),
+        style: estilo.copyWith(color: Cores.amarelo, fontWeight: FontWeight.bold),
       ),
     );
     inicio = m.end;
@@ -53,6 +54,7 @@ class TextoPlano extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = Iamp.de(context);
     final blocos = <Widget>[];
     for (final linhaCrua in markdown.split('\n')) {
       final recuo = linhaCrua.length - linhaCrua.trimLeft().length;
@@ -69,10 +71,13 @@ class TextoPlano extends StatelessWidget {
       if (titulo != null) {
         blocos.add(
           Padding(
-            padding: const EdgeInsets.only(top: Espaco.p, bottom: 4),
-            child: Text(
-              titulo.replaceAll('*', '').replaceAll(RegExp(r':$'), '').toUpperCase(),
-              style: Estilos.rotulo.copyWith(color: Cores.amarelo, letterSpacing: 0.8),
+            padding: const EdgeInsets.only(top: Espaco.p, bottom: Espaco.pp),
+            child: Semantics(
+              header: true,
+              child: Text(
+                titulo.replaceAll('*', '').replaceAll(RegExp(r':$'), ''),
+                style: t.forte.copyWith(color: t.destaque),
+              ),
             ),
           ),
         );
@@ -88,16 +93,16 @@ class TextoPlano extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 28,
+                Padding(
+                  padding: const EdgeInsets.only(right: Espaco.p),
                   child: numerada != null
-                      ? Text('${numerada.group(1)}.', style: Estilos.forte.copyWith(color: Cores.amarelo))
-                      : const Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: Icon(Icons.bolt, size: 18, color: Cores.amarelo),
+                      ? Text('${numerada.group(1)}.', style: t.forte.copyWith(color: t.destaque))
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(Icons.bolt, size: t.icone - 4, color: t.destaque),
                         ),
                 ),
-                Expanded(child: Text.rich(TextSpan(children: pedacosDoTexto(texto, Estilos.corpo)))),
+                Expanded(child: Text.rich(TextSpan(children: pedacosDoTexto(texto, t.corpo)))),
               ],
             ),
           ),
@@ -107,7 +112,7 @@ class TextoPlano extends StatelessWidget {
       blocos.add(
         Padding(
           padding: const EdgeInsets.only(bottom: Espaco.p),
-          child: Text.rich(TextSpan(children: pedacosDoTexto(linha, Estilos.corpo))),
+          child: Text.rich(TextSpan(children: pedacosDoTexto(linha, t.corpo))),
         ),
       );
     }

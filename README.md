@@ -1,8 +1,8 @@
-# iamp
+# Iamp
 
 Copiloto de eficiência energética residencial.
 
-O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da casa. O iamp mostra quanto esse aparelho gasta por mês, em kWh e em reais, soma os aparelhos da casa, classifica o perfil de consumo e sugere modelos mais econômicos, com o tempo que a troca leva para se pagar.
+O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da casa. O Iamp mostra quanto esse aparelho gasta por mês, em kWh e em reais, soma os aparelhos da casa, classifica o perfil de consumo e sugere modelos mais econômicos, com o tempo que a troca leva para se pagar.
 
 ---
 
@@ -334,33 +334,41 @@ Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
 ## 8. O app Flutter
 
-Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco, pensada primeiro para celular Android. Cores, tamanhos de texto e espaçamentos ficam todos em `lib/tema.dart`.
+O **Iamp** é para quem paga as contas de casa e quer economizar, incluindo pessoas mais velhas ou com pouca familiaridade com tecnologia. A interface é moderna, mas acessível por padrão.
+
+Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco, pensada primeiro para celular Android. Cores, tamanhos de texto, espaçamentos e medidas ficam todos no tema (`lib/tema.dart`); as telas não usam valores soltos.
 
 | Regra | Como aparece no app |
 |---|---|
 | 60/30/10 | 60% preto, 30% branco e superfícies escuras, 10% amarelo (botões e o valor principal) |
 | Detalhes amarelos | Ícones, bordas, divisórias e contornos são amarelos; o branco fica só para o texto |
-| Cores com significado | Verde = economia ou resultado bom; vermelho = alerta ou erro |
-| Hierarquia | 4 tamanhos de texto e 2 pesos; o valor é maior que o rótulo; texto secundário em branco 60% |
-| Zona do polegar | O botão principal de cada tela fica fixo embaixo |
-| Toque | Áreas de toque de no mínimo 48dp (padrão do Android) |
-| Momento de pico | Valores "contam" até o resultado; adicionar à casa e o payback têm animação |
+| Cores com significado | Verde = economia ou resultado bom; vermelho = alerta ou erro. A cor sempre vem com um texto ou ícone |
+| Texto legível | Texto base de 18, nada abaixo de 16; texto secundário em branco 80% (contraste AA no preto) |
+| Fonte do sistema | O app respeita o tamanho de fonte do celular; até 2x nada quebra (o que ficaria lado a lado vai um embaixo do outro) |
+| Reais primeiro | O valor em R$ é a informação principal; kWh e a fórmula aparecem como detalhe |
+| Uma decisão por tela | O cálculo vai em etapas ("Etapa 2 de 6"), com botões grandes |
+| Toque | Áreas de toque de no mínimo 48dp; o botão principal fica fixo embaixo (zona do polegar) |
+| Leitor de tela | Cartões e botões têm descrição para TalkBack e VoiceOver (ex.: "Remover Chuveiro Lorenzetti da casa") |
 
 Ícone do app: raio amarelo em fundo preto (`assets/icone/`). Depois de mudar a imagem, rode `dart run flutter_launcher_icons`.
 
+A barra de baixo tem 3 abas, com ícone e texto: **Calcular**, **Minha casa** e **Economizar**.
+
 | Tela | O que faz |
 |---|---|
-| Busca | Procura o aparelho por marca e/ou modelo, com filtro por tipo. Os resultados vêm separados por tipo (geladeiras, ar-condicionado...) em seções que abrem ao tocar |
-| Uso | Pergunta horas por dia, lavagens por mês ou velocidade, só quando precisa |
-| Distribuidora | Estado + distribuidora, ou a tarifa da conta de luz. Oferece repetir a última escolhida |
-| Resultado | Gasto por mês e por ano, como foi calculado e os avisos |
-| Minha casa | Soma os aparelhos (com quantidade), mostra o que mais pesa e o perfil da casa |
-| Modelos mais econômicos | Lista modelos equivalentes que gastam menos |
-| Vale a pena trocar? | Compara os dois modelos e calcula o payback com o preço digitado |
-| Eco-Coach | Plano de economia escrito por IA com dicas oficiais (Inmetro e Cemig) para os aparelhos que mais pesam, com as fontes citadas. Os números são calculados pelo iamp |
+| 1. Qual aparelho? | Botões grandes com os tipos (geladeira, chuveiro, TV...), "Procurar pela marca" e "Não achou? Estime o gasto" |
+| 2. Marca e modelo | Busca dentro do tipo escolhido; os resultados vêm separados por tipo em seções que abrem ao tocar |
+| 3. Como você usa | Tempo por dia, lavagens por mês ou velocidade, só quando precisa |
+| 4. Estado | Lista dos estados pelo nome. Oferece repetir a conta de luz usada antes, ou digitar a tarifa da conta |
+| 5. Distribuidora | Empresas do estado, com busca pelo nome |
+| 6. Quanto custa | Gasto por mês e por ano; consumo, tarifa e fórmula como detalhe |
+| Estimar o gasto | Aparelho fora do catálogo, uma pergunta por tela ("Não sei" e "Não tenho" nas opcionais) |
+| Minha casa | Total da conta, o que mais pesa, quantidade de cada aparelho e comparação com casas parecidas |
+| Gastar menos | Modelos equivalentes que gastam menos |
+| Vale a pena trocar? | Compara os dois modelos e mostra em quanto tempo a troca se paga, com o preço digitado |
+| Economizar | Plano de economia escrito por IA com dicas oficiais (Inmetro e Cemig), com as fontes citadas. Os números são calculados pelo Iamp |
 
-O botão de casa no topo de todas as telas abre "Minha casa" e mostra quantos aparelhos já foram adicionados.
-A lista fica só na memória: ao fechar o app, ela recomeça vazia.
+A lista da casa fica só na memória: ao fechar o app, ela recomeça vazia.
 
 ### Gerar o APK e publicar uma versão nova
 
@@ -436,7 +444,7 @@ instalar sem App Store é preciso uma conta Apple. Sem Mac, a alternativa é a v
 
 ## 10. Sugestão de troca e payback
 
-O iamp só compara modelos que fazem o mesmo serviço, com o **mesmo uso** e a **mesma tarifa** do aparelho do usuário:
+O Iamp só compara modelos que fazem o mesmo serviço, com o **mesmo uso** e a **mesma tarifa** do aparelho do usuário:
 
 | Aparelho | É equivalente quando tem |
 |---|---|
