@@ -9,6 +9,7 @@ import '../casa.dart';
 import '../navegacao.dart';
 import 'busca.dart';
 import 'eco_coach.dart';
+import 'menu.dart';
 import 'minha_casa.dart';
 
 class TelaInicio extends StatelessWidget {
@@ -59,6 +60,7 @@ class TelaInicio extends StatelessWidget {
             ],
           ),
           bottomNavigationBar: const _BarraDeAbas(),
+          drawer: const MenuIamp(), // menu de acesso rapido (botao no topo da 1a tela de cada aba)
         ),
       ),
     );

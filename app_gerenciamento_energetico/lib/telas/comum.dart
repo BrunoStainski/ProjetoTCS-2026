@@ -198,6 +198,55 @@ class LogoIamp extends StatelessWidget {
   }
 }
 
+/// Marca do app no menu e nas boas-vindas: o icone (quadrado preto com o raio) com contorno
+/// amarelo esmaecido e brilho suave, e o nome ao lado.
+class MarcaIamp extends StatelessWidget {
+  final double tamanho; // lado do quadrado do icone
+  final double? tamanhoNome; // padrao: o titulo do app (22)
+
+  const MarcaIamp({super.key, this.tamanho = 48, this.tamanhoNome});
+
+  static const imagem = 'assets/icone/icone.png';
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    final raio = BorderRadius.circular(tamanho * 0.22);
+    final icone = Container(
+      width: tamanho,
+      height: tamanho,
+      decoration: BoxDecoration(
+        color: Cores.preto,
+        borderRadius: raio,
+        border: Border.all(color: t.destaque.withValues(alpha: 0.35), width: tamanho >= 72 ? 2 : 1.5),
+        boxShadow: [BoxShadow(color: t.destaque.withValues(alpha: 0.18), blurRadius: tamanho * 0.4)],
+      ),
+      child: ClipRRect(
+        borderRadius: raio,
+        child: Image.asset(
+          imagem,
+          fit: BoxFit.cover,
+          cacheWidth: (tamanho * MediaQuery.devicePixelRatioOf(context)).round(),
+        ),
+      ),
+    );
+    final nome = Text('Iamp', style: t.titulo.copyWith(fontSize: tamanhoNome, letterSpacing: 1));
+    return Semantics(
+      label: 'Iamp',
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icone,
+          SizedBox(width: tamanho * 0.25),
+          // com a fonte do sistema muito grande o nome encolhe em vez de passar da tela
+          Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: nome)),
+        ],
+      ),
+    );
+  }
+}
+
 /// Em qual etapa do fluxo a pessoa esta (ex.: 2 de 6). Aparece em texto e na barra.
 class Etapa {
   final int atual;
@@ -230,9 +279,14 @@ class Pagina extends StatelessWidget {
     // com fonte grande a barra de cima cresce junto (ate 1,75x) para o titulo nao cortar
     final alturaBarra = MediaQuery.textScalerOf(context).scale(kToolbarHeight).clamp(kToolbarHeight, kToolbarHeight * 1.75);
     final e = etapa;
+    // botao do menu de acesso rapido na primeira tela de cada aba (nas outras fica a seta de voltar).
+    // O menu mora na casca das abas (inicio.dart); fora dela (testes de uma tela so) nao aparece.
+    final casca = Scaffold.maybeOf(context);
+    final comMenu = (casca?.hasDrawer ?? false) && (ModalRoute.of(context)?.isFirst ?? false);
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: alturaBarra,
+        leading: comMenu ? IconButton(icon: const Icon(Icons.menu), tooltip: 'Menu', onPressed: casca!.openDrawer) : null,
         title: tituloWidget ?? Text(titulo, maxLines: 2, overflow: TextOverflow.ellipsis),
       ),
       body: SafeArea(

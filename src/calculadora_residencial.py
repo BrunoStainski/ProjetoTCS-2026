@@ -16,6 +16,7 @@ from estimativa import tempo_por_dia
 
 DIAS_MES = 30
 LIMITE_BUSCA = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
+LIMITE_MODELOS_MARCA = 50  # modelos de uma marca na lista de marcas do app (o resto: digitar o modelo)
 
 # Padroes de uso para aparelhos em que o Inmetro so informa potencia ou consumo por ciclo.
 # ATENCAO: valores escolhidos pelo grupo, ainda sem fonte. O app mostra como "estimativa"
