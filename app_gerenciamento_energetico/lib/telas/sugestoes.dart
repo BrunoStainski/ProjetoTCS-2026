@@ -90,8 +90,7 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
               if (s.suspeitosDescartados > 0) ...[
                 const SizedBox(height: Espaco.p),
                 ListaAvisos([
-                  '${s.suspeitosDescartados} modelo(s) com consumo baixo demais para ser real '
-                      '(provável erro no dado do Inmetro) ficaram de fora.',
+                  '${s.suspeitosDescartados} modelo(s) com consumo irreal (erro do Inmetro) ficaram de fora.',
                 ]),
               ],
             ],

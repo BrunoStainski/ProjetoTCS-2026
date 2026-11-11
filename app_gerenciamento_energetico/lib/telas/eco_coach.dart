@@ -184,8 +184,7 @@ class _PensandoState extends State<_Pensando> with SingleTickerProviderStateMixi
             Semantics(liveRegion: true, child: Text('Montando seu plano', style: t.titulo)),
             const SizedBox(height: Espaco.p),
             Text(
-              'O Eco-Coach está lendo as dicas oficiais do Inmetro e da Cemig para os aparelhos que mais pesam na '
-              'sua conta. Pode levar alguns segundos.',
+              'Lendo as dicas do Inmetro e da Cemig. Leva alguns segundos.',
               textAlign: TextAlign.center,
               style: t.corpo,
             ),
@@ -239,7 +238,7 @@ class _Conteudo extends StatelessWidget {
         ),
         if (p.fontes.isNotEmpty) ...[const Titulo('Fontes citadas'), for (final f in p.fontes) CartaoFonte(f)],
         const SizedBox(height: Espaco.m),
-        ListaAvisos([p.aviso, 'Texto escrito por inteligência artificial (${p.modelo}). Ela pode errar: confira nas fontes.']),
+        ListaAvisos([p.aviso, 'Escrito por inteligência artificial (${p.modelo}): pode errar, confira as fontes.']),
       ],
     );
   }
