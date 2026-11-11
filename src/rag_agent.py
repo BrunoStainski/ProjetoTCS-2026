@@ -5,6 +5,8 @@ Divisao de trabalho (regra do projeto: o LLM nao calcula):
   - Python calcula tudo: perfil (K-Means), totais, maiores consumos e o payback (vem do /comparar).
   - A busca vetorial (rag.py, pgvector) traz dicas oficiais dos aparelhos que mais pesam na conta.
   - O LLM (Gemini, plano gratuito da API) so escreve o plano em portugues, citando as fontes [n].
+  - Com o app em ingles (idioma.py), o prompt pede o texto em ingles. A busca e as fontes continuam
+    em portugues (os documentos sao brasileiros); o LLM traduz as dicas e mantem as citacoes [n].
 
 Configuracao no .env: GEMINI_API_KEY (obrigatoria) e GEMINI_MODELOS (opcional, lista separada por
 virgula; o primeiro e o principal, os outros sao reserva se ele estiver indisponivel).
@@ -15,6 +17,7 @@ melhorar os produtos. Enviamos so numeros de consumo e trechos de documentos pub
 import re
 
 import config
+import idioma
 import ml_pipeline
 import rag
 from calculadora_residencial import ESTIMAVEIS
@@ -75,8 +78,26 @@ Regras obrigatórias:
 """
 
 
+# Com o app em ingles: o texto sai em ingles e os numeros no formato americano (o LLM copia como recebe).
+IDIOMA_EN = """
+IDIOMA DA RESPOSTA: escreva tudo em inglês (en-US), em tom simples, inclusive os títulos (use "How to spend less"
+no lugar de "Como gastar menos" e "Recommended actions" no lugar de "Ações recomendadas"). As FONTES estão em
+português: traduza as dicas para o inglês e mantenha as citações [n]. Valores em reais continuam com "R$".
+"""
+
+
 def _br(v, casas=1):
-    return f"{v:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    """Numero no formato do idioma da requisicao ("1.234,5" em portugues, "1,234.5" em ingles)."""
+    return idioma.numero(v, casas)
+
+
+def _por_mes():
+    """Unidade "por mes" dos dados do prompt: o LLM copia como recebe ("R$ 86,50/mês" ou "R$ 86.50/month")."""
+    return idioma.tr("/mês", "/month")
+
+
+def _no_idioma(instrucoes):
+    return instrucoes + IDIOMA_EN if idioma.em_ingles() else instrucoes
 
 
 def _modelos():
@@ -119,31 +140,31 @@ def buscar_fontes(con, maiores):
 def montar_prompt(inventario, perfil, maiores, custo_total, fontes, trocas):
     linhas = [f"Moradores: {inventario['moradores']}",
               f"Perfil de consumo (K-Means): {perfil['perfil']}",
-              f"Consumo total: {_br(perfil['kwh_total'])} kWh/mês ({_br(perfil['kwh_por_morador'])} kWh por morador; "
+              f"Consumo total: {_br(perfil['kwh_total'])} kWh{_por_mes()} ({_br(perfil['kwh_por_morador'])} kWh por morador; "
               f"{perfil['comparacao_media']['texto']})"]
     if custo_total is not None:
-        linhas.append(f"Custo total estimado: R$ {_br(custo_total, 2)}/mês")
+        linhas.append(f"Custo total estimado: R$ {_br(custo_total, 2)}{_por_mes()}")
     linhas.append("Aparelhos, do maior para o menor consumo:")
     for m in maiores:
-        custo = f", R$ {_br(m['custo_mes'], 2)}/mês" if m["custo_mes"] else ""
-        linhas.append(f"- {m['nome']}: {_br(m['kwh_mes'])} kWh/mês ({_br(m['percentual'])}% do total{custo})")
+        custo = f", R$ {_br(m['custo_mes'], 2)}{_por_mes()}" if m["custo_mes"] else ""
+        linhas.append(f"- {m['nome']}: {_br(m['kwh_mes'])} kWh{_por_mes()} ({_br(m['percentual'])}% do total{custo})")
     if trocas:
         linhas.append("\nTROCAS AVALIADAS (calculadas pelo iamp):")
         for t in trocas:
-            pay = (f", payback de {_br(t['payback_meses'], 0)} meses" if t.get("payback_meses") else "")
+            pay = (f", payback de {_br(t['payback_meses'], 0)} {idioma.tr('meses', 'months')}" if t.get("payback_meses") else "")
             linhas.append(f"- trocar {t['aparelho']} por {t['alternativa']}: economia de "
-                          f"R$ {_br(t['economia_mes'], 2)}/mês{pay}")
+                          f"R$ {_br(t['economia_mes'], 2)}{_por_mes()}{pay}")
     texto_fontes = "\n\n".join(
         f"[{n}] {f['orgao']} - {f['documento']}" + (f" ({f['secao']})" if f.get("secao") else "") + f"\n{f['texto']}"
         for n, f in enumerate(fontes, 1))
-    return f"{INSTRUCOES}\nDADOS DA CASA:\n" + "\n".join(linhas) + f"\n\nFONTES:\n{texto_fontes}"
+    return f"{_no_idioma(INSTRUCOES)}\nDADOS DA CASA:\n" + "\n".join(linhas) + f"\n\nFONTES:\n{texto_fontes}"
 
 
 def chamar_llm(prompt):
     """Gemini com modelos de reserva. Devolve (texto, modelo usado)."""
     chave = config._ENV.get("GEMINI_API_KEY")
     if not chave:
-        raise RuntimeError("GEMINI_API_KEY nao configurada no .env")
+        raise RuntimeError(idioma.tr("GEMINI_API_KEY nao configurada no .env", "GEMINI_API_KEY is not set in .env"))
     from google import genai
     from google.genai import types
     cliente = genai.Client(api_key=chave)
@@ -158,10 +179,10 @@ def chamar_llm(prompt):
             fim = str(r.candidates[0].finish_reason) if r.candidates else ""
             if r.text and r.text.strip() and "MAX_TOKENS" not in fim:
                 return r.text.strip(), modelo
-            erros.append(f"{modelo}: resposta vazia ou cortada ({fim})")
+            erros.append(idioma.tr(f"{modelo}: resposta vazia ou cortada ({fim})", f"{modelo}: empty or cut-off answer ({fim})"))
         except Exception as erro:  # modelo sobrecarregado, limite do plano gratuito etc.
             erros.append(f"{modelo}: {type(erro).__name__}")
-    raise RuntimeError("LLM indisponivel (" + "; ".join(erros) + ")")
+    raise RuntimeError(idioma.tr("LLM indisponivel (", "LLM unavailable (") + "; ".join(erros) + ")")
 
 
 def buscar_fontes_do_aparelho(con, nome):
@@ -180,8 +201,8 @@ def buscar_fontes_do_aparelho(con, nome):
 def montar_prompt_dicas(aparelho, fontes):
     nome = NOMES.get(aparelho["categoria"], aparelho["nome"])
     linhas = [f"Aparelho: {nome}",
-              f"Consumo: {_br(aparelho['kwh_mes'], 2)} kWh/mês",
-              f"Custo: R$ {_br(aparelho['custo_mes'], 2)}/mês"]
+              f"Consumo: {_br(aparelho['kwh_mes'], 2)} kWh{_por_mes()}",
+              f"Custo: R$ {_br(aparelho['custo_mes'], 2)}{_por_mes()}"]
     if aparelho.get("metodo"):
         linhas.append(f"Como o iamp calculou: {aparelho['metodo']}")
     if aparelho["categoria"] not in ESTIMAVEIS:
@@ -189,7 +210,7 @@ def montar_prompt_dicas(aparelho, fontes):
     texto_fontes = "\n\n".join(
         f"[{n}] {f['orgao']} - {f['documento']}" + (f" ({f['secao']})" if f.get("secao") else "") + f"\n{f['texto']}"
         for n, f in enumerate(fontes, 1))
-    return f"{INSTRUCOES_DICAS}\nAPARELHO:\n" + "\n".join(linhas) + f"\n\nFONTES:\n{texto_fontes}"
+    return f"{_no_idioma(INSTRUCOES_DICAS)}\nAPARELHO:\n" + "\n".join(linhas) + f"\n\nFONTES:\n{texto_fontes}"
 
 
 def _secao(fonte):
@@ -212,13 +233,19 @@ def _fontes_citadas(texto, fontes):
 
 def gerar_dicas_do_aparelho(con, aparelho):
     if aparelho["kwh_mes"] < 0 or aparelho["custo_mes"] < 0:
-        raise ValueError("consumo e custo nao podem ser negativos")
+        raise ValueError(idioma.tr("consumo e custo nao podem ser negativos", "consumption and cost cannot be negative"))
     nome = NOMES.get(aparelho["categoria"], aparelho["nome"])
     fontes = buscar_fontes_do_aparelho(con, nome) if rag.base_carregada(con) else []
     if not fontes:
-        raise LookupError("base do Eco-Coach vazia: rode python scripts/carregar_rag.py")
+        raise LookupError(_base_vazia())
     texto, modelo = chamar_llm(montar_prompt_dicas(aparelho, fontes))
-    return {"dicas": texto, "fontes": _fontes_citadas(texto, fontes), "modelo": modelo, "aviso": AVISO_DICAS}
+    return {"dicas": texto, "fontes": _fontes_citadas(texto, fontes), "modelo": modelo, "aviso": idioma.t(AVISO_DICAS)}
+
+
+def _base_vazia():
+    """Mensagem do erro 503 quando a base vetorial nao foi carregada."""
+    return idioma.tr("base do Eco-Coach vazia: rode python scripts/carregar_rag.py",
+                     "Eco-Coach knowledge base is empty: run python scripts/carregar_rag.py")
 
 
 def gerar_plano(con, inventario, trocas=None):
@@ -226,7 +253,7 @@ def gerar_plano(con, inventario, trocas=None):
     perfil, maiores, custo_total = resumo_da_casa(inventario)
     fontes = buscar_fontes(con, maiores) if rag.base_carregada(con) else []
     if not fontes:
-        raise LookupError("base do Eco-Coach vazia: rode python scripts/carregar_rag.py")
+        raise LookupError(_base_vazia())
     texto, modelo = chamar_llm(montar_prompt(inventario, perfil, maiores, custo_total, fontes, trocas or []))
     # aceita [2], [5, 6] e [5][6]
     numeros = (n for grupo in re.findall(r"\[(\d+(?:\s*,\s*\d+)*)\]", texto) for n in grupo.split(","))
@@ -246,12 +273,13 @@ def gerar_plano(con, inventario, trocas=None):
         "perfil": perfil["perfil"],
         "kwh_total": perfil["kwh_total"],
         "custo_total": custo_total,
-        "maiores_consumos": maiores[:3],
+        # o nome em portugues serve para a busca e o prompt; na resposta vai no idioma do app
+        "maiores_consumos": [{**m, "nome": idioma.t(m["nome"])} for m in maiores[:3]],
         "plano": texto,
         "fontes": [{"n": n, "documento": fontes[n - 1]["documento"], "orgao": fontes[n - 1]["orgao"],
                     "url": fontes[n - 1]["url"], "secao": secao(fontes[n - 1]),
                     "pagina": pagina(fontes[n - 1])}
                    for n in citadas],
         "modelo": modelo,
-        "aviso": AVISO_ECO,
+        "aviso": idioma.t(AVISO_ECO),
     }

@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 
@@ -41,44 +42,63 @@ String _primeiraMaiuscula(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.su
 
 /// Nome de um aparelho do tipo (ex.: botoes da escolha do tipo, linha do item na casa).
 String nomeDaCategoria(String categoria) => switch (categoria) {
-  'refrigerador' => 'Geladeira ou freezer',
-  'televisor' => 'Televisão',
-  'ar_condicionado' => 'Ar-condicionado',
-  'ventilador_de_mesa' => 'Ventilador de mesa',
-  'ventilador_de_teto' => 'Ventilador de teto',
-  'chuveiro' => 'Chuveiro elétrico',
-  'lampada_led' => 'Lâmpada LED',
-  'lampada_fluorescente' => 'Lâmpada fluorescente',
-  'lampada_vapor_sodio' => 'Lâmpada de vapor de sódio',
-  'microondas' => 'Micro-ondas',
-  'maquina_de_lavar' => 'Máquina de lavar',
-  'bomba' => "Bomba d'água",
+  'refrigerador' => tr('Geladeira ou freezer', 'Fridge or freezer'),
+  'televisor' => tr('Televisão', 'TV'),
+  'ar_condicionado' => tr('Ar-condicionado', 'Air conditioner'),
+  'ventilador_de_mesa' => tr('Ventilador de mesa', 'Desk fan'),
+  'ventilador_de_teto' => tr('Ventilador de teto', 'Ceiling fan'),
+  'chuveiro' => tr('Chuveiro elétrico', 'Electric shower'),
+  'lampada_led' => tr('Lâmpada LED', 'LED bulb'),
+  'lampada_fluorescente' => tr('Lâmpada fluorescente', 'Fluorescent bulb'),
+  'lampada_vapor_sodio' => tr('Lâmpada de vapor de sódio', 'Sodium vapor lamp'),
+  'microondas' => tr('Micro-ondas', 'Microwave'),
+  'maquina_de_lavar' => tr('Máquina de lavar', 'Washing machine'),
+  'bomba' => tr("Bomba d'água", 'Water pump'),
+  // eletroportateis (tabela portateis da API)
+  'air_fryer' => 'Air fryer',
+  'secador_cabelo' => tr('Secador de cabelo', 'Hair dryer'),
+  'ferro_passar' => tr('Ferro de passar', 'Clothes iron'),
+  'sanduicheira' => tr('Sanduicheira', 'Sandwich maker'),
+  'liquidificador' => tr('Liquidificador', 'Blender'),
+  'cafeteira_eletrica' => tr('Cafeteira elétrica', 'Coffee maker'),
+  'chaleira_eletrica' => tr('Chaleira elétrica', 'Electric kettle'),
+  'forno_eletrico' => tr('Forno elétrico de bancada', 'Countertop electric oven'),
+  'aspirador_po' => tr('Aspirador de pó', 'Vacuum cleaner'),
+  'torradeira' => tr('Torradeira', 'Toaster'),
   _ => _primeiraMaiuscula(categoria),
 };
 
 /// Nome do tipo de aparelho para titulos (ex.: secoes da busca).
 String tituloDaCategoria(String categoria) => switch (categoria) {
-  'refrigerador' => 'Geladeiras',
-  'televisor' => 'Televisores',
-  'ar_condicionado' => 'Ar-condicionado',
-  'ventilador_de_mesa' => 'Ventiladores de mesa',
-  'ventilador_de_teto' => 'Ventiladores de teto',
-  'chuveiro' => 'Chuveiros',
-  'lampada_led' => 'Lâmpadas LED',
-  'lampada_fluorescente' => 'Lâmpadas fluorescentes',
-  'lampada_vapor_sodio' => 'Lâmpadas de vapor de sódio',
-  'microondas' => 'Micro-ondas',
-  'maquina_de_lavar' => 'Máquinas de lavar',
-  'bomba' => "Bombas d'água",
+  'refrigerador' => tr('Geladeiras', 'Fridges'),
+  'televisor' => tr('Televisores', 'TVs'),
+  'ar_condicionado' => tr('Ar-condicionado', 'Air conditioners'),
+  'ventilador_de_mesa' => tr('Ventiladores de mesa', 'Desk fans'),
+  'ventilador_de_teto' => tr('Ventiladores de teto', 'Ceiling fans'),
+  'chuveiro' => tr('Chuveiros', 'Electric showers'),
+  'lampada_led' => tr('Lâmpadas LED', 'LED bulbs'),
+  'lampada_fluorescente' => tr('Lâmpadas fluorescentes', 'Fluorescent bulbs'),
+  'lampada_vapor_sodio' => tr('Lâmpadas de vapor de sódio', 'Sodium vapor lamps'),
+  'microondas' => tr('Micro-ondas', 'Microwaves'),
+  'maquina_de_lavar' => tr('Máquinas de lavar', 'Washing machines'),
+  'bomba' => tr("Bombas d'água", 'Water pumps'),
   _ => _primeiraMaiuscula(categoria),
 };
 
 /// Velocidade do ventilador como a API manda ("media") para a tela ("Média").
 String nomeDaVelocidade(String velocidade) => switch (velocidade) {
-  'baixa' => 'Baixa',
-  'media' => 'Média',
-  'alta' => 'Alta',
+  'baixa' => tr('Baixa', 'Low'),
+  'media' => tr('Média', 'Medium'),
+  'alta' => tr('Alta', 'High'),
   _ => _primeiraMaiuscula(velocidade),
+};
+
+/// Perfil do K-Means como a API manda ("Consciente", a chave do perfil) para a tela.
+String nomeDoPerfil(String perfil) => switch (perfil) {
+  'Consciente' => tr('Consciente', 'Efficient'),
+  'Moderado' => tr('Moderado', 'Moderate'),
+  'Ineficiente' => tr('Ineficiente', 'Inefficient'),
+  _ => perfil,
 };
 
 class ControleTempo {
@@ -135,8 +155,8 @@ class CampoTempo extends StatelessWidget {
       onSubmitted: (_) => aoConfirmar?.call(),
       decoration: InputDecoration(labelText: nome, suffixText: sufixo),
     );
-    final horas = parte(controle.horas, 'Horas', 'h');
-    final minutos = parte(controle.minutos, 'Minutos', 'min');
+    final horas = parte(controle.horas, tr('Horas', 'Hours'), 'h');
+    final minutos = parte(controle.minutos, tr('Minutos', 'Minutes'), 'min');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -180,7 +200,7 @@ void avisarAdicionado(ScaffoldMessengerState avisos, String texto) {
         content: Text(texto),
         duration: duracaoAviso,
         persist: false,
-        action: SnackBarAction(label: 'Ver', onPressed: () => irPara(Aba.casa, fecharAtual: true)),
+        action: SnackBarAction(label: tr('Ver', 'View'), onPressed: () => irPara(Aba.casa, fecharAtual: true)),
       ),
     );
 }
@@ -307,11 +327,13 @@ class Pagina extends StatelessWidget {
                 LinearProgressIndicator(
                   value: e.atual / e.total,
                   minHeight: t.barraProgresso / 2,
-                  semanticsLabel: 'Etapa ${e.atual} de ${e.total}',
+                  semanticsLabel: tr('Etapa ${e.atual} de ${e.total}', 'Step ${e.atual} of ${e.total}'),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, 0),
-                  child: ExcludeSemantics(child: Text('Etapa ${e.atual} de ${e.total}', style: t.rotulo)),
+                  child: ExcludeSemantics(
+                    child: Text(tr('Etapa ${e.atual} de ${e.total}', 'Step ${e.atual} of ${e.total}'), style: t.rotulo),
+                  ),
                 ),
               ],
               Expanded(
@@ -617,7 +639,7 @@ class MensagemErro extends StatelessWidget {
                   child: TextButton.icon(
                     onPressed: tentarDeNovo,
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Tentar de novo'),
+                    label: Text(tr('Tentar de novo', 'Try again')),
                   ),
                 ),
             ],
@@ -630,9 +652,9 @@ class MensagemErro extends StatelessWidget {
 
 /// Carregando, com uma frase do que esta acontecendo (nao so a rodinha).
 class Carregando extends StatelessWidget {
-  final String texto;
+  final String? texto; // padrao: "Carregando..."
 
-  const Carregando({super.key, this.texto = 'Carregando...'});
+  const Carregando({super.key, this.texto});
 
   @override
   Widget build(BuildContext context) {
@@ -645,7 +667,7 @@ class Carregando extends StatelessWidget {
           children: [
             const CircularProgressIndicator(),
             const SizedBox(height: Espaco.m),
-            Text(texto, style: t.secundario, textAlign: TextAlign.center),
+            Text(texto ?? tr('Carregando...', 'Loading...'), style: t.secundario, textAlign: TextAlign.center),
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comparar.dart';
 import 'comum.dart';
@@ -38,12 +39,12 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
     final aparelho = widget.consulta.aparelho;
     final nome = widget.atual?.nome ?? aparelho.nome;
     return Pagina(
-      titulo: 'Gastar menos',
+      titulo: tr('Gastar menos', 'Spend less'),
       filho: FutureBuilder<Sugestoes>(
         future: _sugestoes,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Carregando(texto: 'Procurando modelos que gastam menos...');
+            return Carregando(texto: tr('Procurando modelos que gastam menos...', 'Looking for models that use less...'));
           }
           if (snap.hasError) {
             return MensagemErro(
@@ -56,20 +57,31 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
           final s = snap.data!;
           return ListView(
             children: [
-              const CabecalhoPergunta(
-                'Modelos parecidos que gastam menos',
-                ajuda: 'Mesmo tamanho, mesmo uso e a mesma tarifa do seu aparelho. Toque num modelo para comparar.',
+              CabecalhoPergunta(
+                tr('Modelos parecidos que gastam menos', 'Similar models that use less'),
+                ajuda: tr(
+                  'Mesmo tamanho, mesmo uso e a mesma tarifa do seu aparelho. Toque num modelo para comparar.',
+                  'Same size, same use and the same rate as your appliance. Tap a model to compare.',
+                ),
               ),
               MergeSemantics(
                 child: Card(
                   child: ListTile(
                     leading: Icon(iconeDaCategoria(aparelho.categoria)),
-                    title: Text('Seu aparelho: $nome'),
-                    subtitle: Text('${reais(s.custoAtual)} por mês · ${numero(s.kwhAtual)} kWh'),
+                    title: Text(tr('Seu aparelho: $nome', 'Your appliance: $nome')),
+                    subtitle: Text(
+                      tr(
+                        '${reais(s.custoAtual)} por mês · ${numero(s.kwhAtual)} kWh',
+                        '${reais(s.custoAtual)} per month · ${numero(s.kwhAtual)} kWh',
+                      ),
+                    ),
                   ),
                 ),
               ),
-              if (s.criterio != null) ...[const Titulo('Comparando com modelos de'), Text(s.criterio!, style: t.corpo)],
+              if (s.criterio != null) ...[
+                Titulo(tr('Comparando com modelos de', 'Comparing with models of')),
+                Text(s.criterio!, style: t.corpo),
+              ],
               const SizedBox(height: Espaco.pm),
               if (s.mensagem != null)
                 Card(
@@ -90,7 +102,10 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
               if (s.suspeitosDescartados > 0) ...[
                 const SizedBox(height: Espaco.p),
                 ListaAvisos([
-                  '${s.suspeitosDescartados} modelo(s) com consumo irreal (erro do Inmetro) ficaram de fora.',
+                  tr(
+                    '${s.suspeitosDescartados} modelo(s) com consumo irreal (erro do Inmetro) ficaram de fora.',
+                    '${s.suspeitosDescartados} model(s) with unrealistic consumption (Inmetro data error) were left out.',
+                  ),
                 ]),
               ],
             ],
@@ -121,7 +136,7 @@ class _CartaoSugestao extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     final a = s.aparelho;
-    final economia = '${reais(s.economiaMes)} a menos por mês';
+    final economia = tr('${reais(s.economiaMes)} a menos por mês', '${reais(s.economiaMes)} less per month');
     return MergeSemantics(
       child: Card(
         clipBehavior: Clip.antiAlias,
@@ -152,14 +167,14 @@ class _CartaoSugestao extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: Espaco.p, vertical: 2),
                             decoration: t.selo(t.economia),
                             child: Text(
-                              '${numero(s.economiaPercentual, casas: 0)}% menos',
+                              tr('${numero(s.economiaPercentual, casas: 0)}% menos', '${numero(s.economiaPercentual, casas: 0)}% less'),
                               style: t.rotulo.copyWith(color: t.economia),
                             ),
                           ),
-                          Text('Gasta ${reais(s.custoMes)} por mês', style: t.secundario),
+                          Text(tr('Gasta ${reais(s.custoMes)} por mês', 'Costs ${reais(s.custoMes)} per month'), style: t.secundario),
                         ],
                       ),
-                      Text('${numero(s.kwhMes)} kWh por mês', style: t.secundario),
+                      Text(tr('${numero(s.kwhMes)} kWh por mês', '${numero(s.kwhMes)} kWh per month'), style: t.secundario),
                     ],
                   ),
                 ),

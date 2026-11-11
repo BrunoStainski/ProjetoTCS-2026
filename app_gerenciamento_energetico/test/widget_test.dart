@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 
 import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
+import 'package:app_gerenciamento_energetico/idioma.dart';
 import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/navegacao.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
@@ -46,8 +47,9 @@ Consulta consulta(String categoria, {int id = 1}) =>
 final _json = {'content-type': 'application/json; charset=utf-8'};
 
 /// API falsa com o caminho completo do calculo de um aparelho do catalogo.
-MockClient apiFalsa({List<Uri>? pedidos}) => MockClient((r) async {
+MockClient apiFalsa({List<Uri>? pedidos, List<String?>? idiomas}) => MockClient((r) async {
   pedidos?.add(r.url);
+  idiomas?.add(r.headers['Accept-Language']);
   final corpo = switch (r.url.path) {
     '/categorias' => ['refrigerador', 'chuveiro', 'televisor'],
     '/aparelhos' => [
@@ -90,6 +92,7 @@ void main() {
   setUp(() {
     casa.limpar();
     abaAtual.value = Aba.calcular;
+    idioma.value = Idioma.pt; // o app sempre abre em portugues
   });
 
   /// Celular de 360dp de largura. `alta`: tela comprida, para ver tudo sem rolar com fonte grande
@@ -198,7 +201,8 @@ void main() {
         expect(find.byType(TelaEstimar), findsOneWidget);
         expect(find.byTooltip('Menu'), findsNothing); // tela de dentro: seta de voltar no lugar do menu
 
-        await tester.pageBack();
+        // a seta de voltar segue o idioma do app (textos do Flutter em portugues: "Voltar", nao "Back")
+        await tester.tap(find.byTooltip('Voltar'));
         await tester.pumpAndSettle();
         await abrirMenu(tester);
         await tester.tap(noMenu(find.text('Início')));
@@ -209,6 +213,133 @@ void main() {
         await tester.pumpAndSettle();
       }, apiFalsa);
       expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
+    });
+  });
+
+  group('Idioma', () {
+    Finder noMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+
+    Future<void> escolherIdioma(WidgetTester tester, String nome) async {
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      expect(noMenu(find.text('Idioma · Language')), findsOneWidget);
+      await tester.tap(noMenu(find.text(nome)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('abre em português e o menu troca o app inteiro para o inglês e de volta', (tester) async {
+      telaDeCelular(tester);
+      final idiomas = <String?>[];
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsOneWidget);
+        await tester.tap(find.text('Comece a economizar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
+        expect(idiomas, everyElement('pt-BR')); // a API responde em portugues
+
+        await escolherIdioma(tester, 'English');
+        expect(idioma.value, Idioma.en);
+        expect(find.byType(Drawer), findsNothing); // o menu fecha
+        expect(find.text('Which appliance do you want to calculate?'), findsOneWidget);
+        expect(find.text('Step 1 of 6'), findsOneWidget);
+        expect(find.text('Fridge or freezer'), findsOneWidget);
+        for (final aba in ['Calculate', 'My home', 'Save']) {
+          expect(find.text(aba), findsWidgets);
+        }
+        expect(find.text('Qual aparelho você quer calcular?'), findsNothing);
+
+        // o pedido seguinte vai para a API em ingles e a seta de voltar e do Flutter em ingles
+        idiomas.clear();
+        await tester.tap(find.text('Fridge or freezer'));
+        await tester.pumpAndSettle();
+        expect(find.text('What is the brand and model?'), findsOneWidget);
+        expect(idiomas, isNotEmpty);
+        expect(idiomas, everyElement('en'));
+        await tester.tap(find.byTooltip('Back'));
+        await tester.pumpAndSettle();
+
+        await escolherIdioma(tester, 'Português');
+        expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
+        expect(find.text('Etapa 1 de 6'), findsOneWidget);
+      }, () => apiFalsa(idiomas: idiomas));
+      expect(idioma.value, Idioma.pt);
+    });
+
+    testWidgets('o idioma escolhido aparece marcado (não só pela cor)', (tester) async {
+      telaDeCelular(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Menu'));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(
+        tester.getSemantics(noMenu(find.text('Português'))),
+        isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true, isButton: true),
+      );
+      expect(tester.getSemantics(noMenu(find.text('English'))), isSemantics(isSelected: false));
+      expect(noMenu(find.byIcon(Icons.check_circle)), findsOneWidget);
+    });
+
+    testWidgets('trocar o idioma volta as abas para o começo e mantém a casa', (tester) async {
+      telaDeCelular(tester);
+      casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        // Calcular fica no meio do fluxo (etapa 2), com respostas da API em portugues
+        await tester.tap(find.text('Geladeira ou freezer'));
+        await tester.pumpAndSettle();
+        expect(find.text('Qual é a marca e o modelo?'), findsOneWidget);
+        await tester.tap(find.text('Minha casa').last);
+        await tester.pumpAndSettle();
+
+        await escolherIdioma(tester, 'English');
+        expect(find.text('My home'), findsWidgets);
+        expect(find.text('R\$ 31.68 per month'), findsWidgets); // valores no formato americano, em reais
+        await tester.tap(find.text('Calculate').last);
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(find.text('Which appliance do you want to calculate?'), findsOneWidget);
+      expect(casa.totalAparelhos, 1);
+    });
+
+    testWidgets('com o app em inglês a tela continua sem estouro com fonte 2x', (tester) async {
+      telaDeCelular(tester, fonte: 2, alta: true);
+      idioma.value = Idioma.en;
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byTooltip('Menu'));
+        await tester.pumpAndSettle();
+      }, apiFalsa);
+      expect(tester.takeException(), isNull);
+      expect(find.text('English'), findsOneWidget);
+    });
+
+    test('reais, números e números digitados seguem o idioma', () {
+      expect(reais(1234.5), 'R\$ 1.234,50');
+      expect(numero(41.25), '41,25');
+      idioma.value = Idioma.en;
+      expect(reais(1234.5), 'R\$ 1,234.50');
+      expect(reais(0.76789, casas: 4), 'R\$ 0.7679');
+      expect(numero(41.25), '41.25');
+      expect(lerNumero('2,499.90'), 2499.9);
+      expect(lerNumero('1,299'), 1299);
+      expect(lerNumero('0.85'), 0.85);
+      // quem digita do jeito brasileiro continua certo
+      expect(lerNumero('0,85'), 0.85);
+      expect(lerNumero('2.499,90'), 2499.9);
+      expect(lerNumero('R\$ 1,299.90'), 1299.9);
+    });
+
+    test('tarifa da conta de luz segue o idioma mesmo escolhida antes da troca', () {
+      final tarifa = EscolhaTarifa.manual(0.85);
+      expect(tarifa.descricao, 'Tarifa da conta de luz');
+      idioma.value = Idioma.en;
+      expect(tarifa.descricao, 'Rate from your electricity bill');
     });
   });
 

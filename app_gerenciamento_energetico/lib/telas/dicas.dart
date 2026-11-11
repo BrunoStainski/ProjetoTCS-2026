@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'eco_coach.dart';
@@ -31,12 +32,17 @@ class _TelaDicasState extends State<TelaDicas> {
     final t = Iamp.de(context);
     final r = widget.resultado;
     return Pagina(
-      titulo: 'Como gastar menos',
+      titulo: tr('Como gastar menos', 'How to spend less'),
       filho: FutureBuilder<Dicas>(
         future: _dicas,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return const Carregando(texto: 'O Eco-Coach está preparando dicas para o seu aparelho...');
+            return Carregando(
+              texto: tr(
+                'O Eco-Coach está preparando dicas para o seu aparelho...',
+                'The Eco-Coach is preparing tips for your appliance...',
+              ),
+            );
           }
           if (snap.hasError) {
             return MensagemErro(
@@ -54,14 +60,20 @@ class _TelaDicasState extends State<TelaDicas> {
                   child: ListTile(
                     leading: Icon(iconeDaCategoria(r.categoria)),
                     title: Text(r.nome),
-                    subtitle: Text('${reais(r.custoMes)} por mês · ${numero(r.kwhMes)} kWh'),
+                    subtitle: Text(
+                      tr(
+                        '${reais(r.custoMes)} por mês · ${numero(r.kwhMes)} kWh',
+                        '${reais(r.custoMes)} per month · ${numero(r.kwhMes)} kWh',
+                      ),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: Espaco.m),
               TextoPlano(d.texto),
               if (d.fontes.isNotEmpty) ...[
-                const Titulo('Fontes'),
+                Titulo(tr('Fontes', 'Sources')),
+                if (emIngles) Text('The sources are Brazilian documents in Portuguese.', style: t.secundario),
                 for (final f in d.fontes) CartaoFonte(f),
               ],
               const SizedBox(height: Espaco.m),

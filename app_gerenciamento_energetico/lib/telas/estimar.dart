@@ -8,18 +8,19 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'distribuidora.dart';
 
 enum Grupo { pesado, portatil }
 
-const tiposDeGeladeira = {
-  'duplex': 'Geladeira duplex (2 portas)',
-  '1_porta': 'Geladeira 1 porta',
-  'frigobar': 'Frigobar',
-  'freezer_vertical': 'Freezer vertical',
-  'freezer_horizontal': 'Freezer horizontal',
+Map<String, String> get tiposDeGeladeira => {
+  'duplex': tr('Geladeira duplex (2 portas)', 'Two-door fridge (top freezer)'),
+  '1_porta': tr('Geladeira 1 porta', 'One-door fridge'),
+  'frigobar': tr('Frigobar', 'Mini fridge'),
+  'freezer_vertical': tr('Freezer vertical', 'Upright freezer'),
+  'freezer_horizontal': tr('Freezer horizontal', 'Chest freezer'),
 };
 
 /// Uma pergunta da estimativa. Sem `validar`, e uma escolha: tocar numa opcao ja avanca.
@@ -117,7 +118,10 @@ class _TelaEstimarState extends State<TelaEstimar> {
       if (mounted) {
         setState(() {
           _falhouCarga = true;
-          _erro = 'Não consegui carregar a lista de aparelhos. Confira a internet e tente de novo.';
+          _erro = tr(
+            'Não consegui carregar a lista de aparelhos. Confira a internet e tente de novo.',
+            'Could not load the list of appliances. Check your internet connection and try again.',
+          );
         });
       }
     }
@@ -239,7 +243,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
   Consulta _consultaGeladeira() {
     final (marca, modelo) = _marcaEModelo();
     return Consulta(
-      Aparelho(id: 0, categoria: 'refrigerador', marca: marca ?? 'Geladeira', modelo: modelo ?? ''),
+      Aparelho(id: 0, categoria: 'refrigerador', marca: marca ?? tr('Geladeira', 'Fridge'), modelo: modelo ?? ''),
       estimativa: Estimativa(rotaGeladeira, {
         'tipo': _tipoGeladeira,
         'frost_free': _frostFree ?? false,
@@ -301,22 +305,31 @@ class _TelaEstimarState extends State<TelaEstimar> {
   }
 
   _Pergunta _perguntaGrupo() => _Pergunta(
-    'Que tipo de aparelho é?',
-    ajuda:
-        'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
-        'com o que você souber.',
+    tr('Que tipo de aparelho é?', 'What kind of appliance is it?'),
+    ajuda: tr(
+      'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
+          'com o que você souber.',
+      "For appliances that are not in Inmetro's catalog. We calculate an approximate cost "
+          'with whatever you know.',
+    ),
     campos: [
       CartaoOpcao(
         icone: Icons.kitchen,
-        titulo: 'Eletrodoméstico grande',
-        subtitulo: 'Geladeira, máquina de lavar, ar-condicionado, chuveiro, TV...',
+        titulo: tr('Eletrodoméstico grande', 'Large appliance'),
+        subtitulo: tr(
+          'Geladeira, máquina de lavar, ar-condicionado, chuveiro, TV...',
+          'Fridge, washing machine, air conditioner, electric shower, TV...',
+        ),
         selecionada: _grupo == Grupo.pesado,
         onTap: () => _escolherGrupo(Grupo.pesado),
       ),
       CartaoOpcao(
         icone: Icons.blender_outlined,
-        titulo: 'Eletroportátil',
-        subtitulo: 'Air fryer, secador de cabelo, ferro de passar, cafeteira...',
+        titulo: tr('Eletroportátil', 'Small appliance'),
+        subtitulo: tr(
+          'Air fryer, secador de cabelo, ferro de passar, cafeteira...',
+          'Air fryer, hair dryer, clothes iron, coffee maker...',
+        ),
         selecionada: _grupo == Grupo.portatil,
         onTap: () => _escolherGrupo(Grupo.portatil),
       ),
@@ -324,7 +337,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
   );
 
   _Pergunta _perguntaAparelhoPesado() => _Pergunta(
-    'Qual é o aparelho?',
+    tr('Qual é o aparelho?', 'Which appliance is it?'),
     campos: [
       for (final c in _categorias!)
         CartaoOpcao(
@@ -338,7 +351,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   List<_Pergunta> _perguntasGeladeira() => [
     _Pergunta(
-      'Qual é o tipo?',
+      tr('Qual é o tipo?', 'What type is it?'),
       campos: [
         for (final MapEntry(key: tipo, value: nome) in tiposDeGeladeira.entries)
           CartaoOpcao(
@@ -349,67 +362,111 @@ class _TelaEstimarState extends State<TelaEstimar> {
       ],
     ),
     _Pergunta(
-      'Ela forma gelo nas paredes?',
-      ajuda: 'Quem não forma gelo é "frost-free" e não precisa degelar.',
+      tr('Ela forma gelo nas paredes?', 'Does ice build up on the walls?'),
+      ajuda: tr(
+        'Quem não forma gelo é "frost-free" e não precisa degelar.',
+        'If no ice builds up, it is "frost-free" and never needs defrosting.',
+      ),
       campos: [
         CartaoOpcao(
-          titulo: 'Não forma gelo (frost-free)',
-          subtitulo: 'Não precisa degelar.',
+          titulo: tr('Não forma gelo (frost-free)', 'No ice builds up (frost-free)'),
+          subtitulo: tr('Não precisa degelar.', 'No defrosting needed.'),
           selecionada: _frostFree == true,
           onTap: () => _escolher(() => _frostFree = true),
         ),
         CartaoOpcao(
-          titulo: 'Forma gelo',
-          subtitulo: 'Precisa degelar de vez em quando.',
+          titulo: tr('Forma gelo', 'Ice builds up'),
+          subtitulo: tr('Precisa degelar de vez em quando.', 'Needs defrosting now and then.'),
           selecionada: _frostFree == false,
           onTap: () => _escolher(() => _frostFree = false),
         ),
       ],
     ),
     _Pergunta(
-      'Qual é a capacidade total?',
-      ajuda: 'Em litros. Está na etiqueta dentro da porta ou no manual.',
-      campos: [_campo(_medida, 'Capacidade total', sufixo: 'litros', exemplo: 'Ex.: 407')],
+      tr('Qual é a capacidade total?', 'What is the total capacity?'),
+      ajuda: tr(
+        'Em litros. Está na etiqueta dentro da porta ou no manual.',
+        'In liters. It is on the label inside the door or in the manual.',
+      ),
+      campos: [
+        _campo(
+          _medida,
+          tr('Capacidade total', 'Total capacity'),
+          sufixo: tr('litros', 'liters'),
+          exemplo: tr('Ex.: 407', 'E.g.: 407'),
+        ),
+      ],
       validar: () {
         final volume = lerNumero(_medida.text);
         return volume == null || volume <= 0 || volume > 1000
-            ? 'Digite a capacidade total em litros (está na etiqueta ou no manual).'
+            ? tr(
+                'Digite a capacidade total em litros (está na etiqueta ou no manual).',
+                'Enter the total capacity in liters (it is on the label or in the manual).',
+              )
             : null;
       },
     ),
     if (!_soFreezer)
       _Pergunta(
-        'Quantos litros tem o freezer?',
-        ajuda: 'Melhora a estimativa. Se não souber, toque em "Não sei".',
-        campos: [_campo(_congelador, 'Litros do freezer', sufixo: 'litros', exemplo: 'Ex.: 90')],
+        tr('Quantos litros tem o freezer?', 'How many liters is the freezer?'),
+        ajuda: tr(
+          'Melhora a estimativa. Se não souber, toque em "Não sei".',
+          'It improves the estimate. If you are not sure, tap "I don\'t know".',
+        ),
+        campos: [
+          _campo(
+            _congelador,
+            tr('Litros do freezer', 'Freezer liters'),
+            sufixo: tr('litros', 'liters'),
+            exemplo: tr('Ex.: 90', 'E.g.: 90'),
+          ),
+        ],
         validar: () {
           final volume = lerNumero(_medida.text) ?? 0;
           final congelador = _opcional(_congelador);
           return _invalido(_congelador, minimo: -1) || (congelador ?? 0) > volume
-              ? 'Os litros do freezer precisam ser menores que a capacidade total.'
+              ? tr(
+                  'Os litros do freezer precisam ser menores que a capacidade total.',
+                  'The freezer liters must be less than the total capacity.',
+                )
               : null;
         },
-        textoPular: 'Não sei',
+        textoPular: tr('Não sei', "I don't know"),
         aoPular: _congelador.clear,
       ),
     _Pergunta(
-      'Em que ano você comprou?',
-      ajuda: 'Geladeiras mais antigas costumam gastar mais.',
-      campos: [_campo(_ano, 'Ano de compra', exemplo: 'Ex.: 2014', inteiro: true)],
+      tr('Em que ano você comprou?', 'What year did you buy it?'),
+      ajuda: tr('Geladeiras mais antigas costumam gastar mais.', 'Older fridges usually use more energy.'),
+      campos: [_campo(_ano, tr('Ano de compra', 'Year of purchase'), exemplo: tr('Ex.: 2014', 'E.g.: 2014'), inteiro: true)],
       validar: () {
         final ano = int.tryParse(_ano.text.trim());
         final anoAtual = DateTime.now().year;
         return ano == null || ano < 1980 || ano > anoAtual
-            ? 'Digite o ano de compra entre 1980 e $anoAtual. Ex.: 2014.'
+            ? tr(
+                'Digite o ano de compra entre 1980 e $anoAtual. Ex.: 2014.',
+                'Enter a year of purchase between 1980 and $anoAtual. E.g.: 2014.',
+              )
             : null;
       },
     ),
     _Pergunta(
-      'Tem a etiqueta amarela do Inmetro?',
-      ajuda: 'É o número em kWh por mês da etiqueta colada no aparelho. Com ele o resultado fica bem mais preciso.',
-      campos: [_campo(_etiqueta, 'Consumo da etiqueta', sufixo: 'kWh/mês', exemplo: 'Ex.: 52,5')],
-      validar: () => _invalido(_etiqueta, maximo: 300) ? 'Digite o número em kWh por mês. Ex.: 52,5.' : null,
-      textoPular: 'Não tenho a etiqueta',
+      tr('Tem a etiqueta amarela do Inmetro?', "Does it have Inmetro's yellow energy label?"),
+      ajuda: tr(
+        'É o número em kWh por mês da etiqueta colada no aparelho. Com ele o resultado fica bem mais preciso.',
+        'It is the kWh per month number on the label stuck to the appliance. With it the result is much more accurate.',
+      ),
+      campos: [
+        _campo(
+          _etiqueta,
+          tr('Consumo da etiqueta', 'Consumption on the label'),
+          sufixo: tr('kWh/mês', 'kWh/month'),
+          exemplo: tr('Ex.: 52,5', 'E.g.: 52.5'),
+        ),
+      ],
+      validar: () => _invalido(_etiqueta, maximo: 300)
+          ? tr('Digite o número em kWh por mês. Ex.: 52,5.', 'Enter the number in kWh per month. E.g.: 52.5.')
+          : null,
+      textoPular: tr('Não tenho a etiqueta', "I don't have the label"),
       aoPular: _etiqueta.clear,
     ),
   ];
@@ -419,7 +476,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
     return [
       if (c.tipos.isNotEmpty)
         _Pergunta(
-          'Qual destes é o seu?',
+          tr('Qual destes é o seu?', 'Which of these is yours?'),
           campos: [
             for (final tipo in c.tipos)
               CartaoOpcao(
@@ -433,11 +490,17 @@ class _TelaEstimarState extends State<TelaEstimar> {
       if (c.medida != null) _perguntaTamanho(c),
       if (c.medida != null && _outroTamanho)
         _Pergunta(
-          'Digite o tamanho',
-          ajuda: '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+          tr('Digite o tamanho', 'Enter the size'),
+          ajuda: tr(
+            '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+            '${legivel(c.medida!)}. It is usually written on the appliance, the box or in the manual.',
+          ),
           campos: [_campo(_medida, legivel(c.medida!).split(' (').first, sufixo: c.unidadeMedida)],
           validar: () => _opcional(_medida) == null || _invalido(_medida)
-              ? 'Digite o número, como está escrito. Se não souber, volte e escolha um dos tamanhos.'
+              ? tr(
+                  'Digite o número, como está escrito. Se não souber, volte e escolha um dos tamanhos.',
+                  'Enter the number as it is written. If you are not sure, go back and pick one of the sizes.',
+                )
               : null,
         ),
       if (!c.valorObrigatorio) _perguntaForma(c),
@@ -447,8 +510,11 @@ class _TelaEstimarState extends State<TelaEstimar> {
   }
 
   _Pergunta _perguntaForma(CategoriaEstimavel c) => _Pergunta(
-    'Você consegue ver algum destes no aparelho?',
-    ajuda: 'Com o número do próprio aparelho o cálculo fica certo, mesmo se ele for antigo.',
+    tr('Você consegue ver algum destes no aparelho?', 'Can you see any of these on the appliance?'),
+    ajuda: tr(
+      'Com o número do próprio aparelho o cálculo fica certo, mesmo se ele for antigo.',
+      "With the appliance's own number the calculation is accurate, even if it is old.",
+    ),
     campos: [
       for (final f in c.formas)
         CartaoOpcao(
@@ -460,10 +526,16 @@ class _TelaEstimarState extends State<TelaEstimar> {
         ),
       CartaoOpcao(
         icone: Icons.help_outline,
-        titulo: 'Não consigo ver nenhum',
+        titulo: tr('Não consigo ver nenhum', "I can't see any"),
         subtitulo: c.medida == null
-            ? 'Tudo bem: calculamos com os modelos do catálogo do Inmetro.'
-            : 'Tudo bem: calculamos com os modelos parecidos do Inmetro.',
+            ? tr(
+                'Tudo bem: calculamos com os modelos do catálogo do Inmetro.',
+                "That's fine: we calculate with the models in Inmetro's catalog.",
+              )
+            : tr(
+                'Tudo bem: calculamos com os modelos parecidos do Inmetro.',
+                "That's fine: we calculate with similar models from Inmetro.",
+              ),
         selecionada: _semNumero,
         onTap: () => _escolherForma(null),
       ),
@@ -471,20 +543,28 @@ class _TelaEstimarState extends State<TelaEstimar> {
   );
 
   _Pergunta _perguntaValor(FormaDeInformar f) => _Pergunta(
-    'Qual é ${f.campo == 'potencia_w' ? 'a potência' : 'o consumo de energia'}?',
+    f.campo == 'potencia_w'
+        ? tr('Qual é a potência?', 'What is the power?')
+        : tr('Qual é o consumo de energia?', 'What is the energy consumption?'),
     ajuda: [f.onde, if (f.dica != null) f.dica!].join(' '),
     campos: [_campo(_etiqueta, f.rotulo, sufixo: f.unidade, exemplo: f.exemplo)],
     validar: () {
       final v = _opcional(_etiqueta);
       return v == null || _invalido(_etiqueta, maximo: f.maximo)
-          ? 'Digite o número em ${f.unidade}, como está escrito. ${f.exemplo}.'
+          ? tr(
+              'Digite o número em ${f.unidade}, como está escrito. ${f.exemplo}.',
+              'Enter the number in ${f.unidade}, as it is written. ${f.exemplo}.',
+            )
           : null;
     },
   );
 
   _Pergunta _perguntaTamanho(CategoriaEstimavel c) => _Pergunta(
-    'Qual é o tamanho?',
-    ajuda: '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+    tr('Qual é o tamanho?', 'What size is it?'),
+    ajuda: tr(
+      '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+      '${legivel(c.medida!)}. It is usually written on the appliance, the box or in the manual.',
+    ),
     campos: [
       for (final t in c.tamanhos)
         CartaoOpcao(
@@ -494,8 +574,8 @@ class _TelaEstimarState extends State<TelaEstimar> {
         ),
       CartaoOpcao(
         icone: Icons.edit_outlined,
-        titulo: 'Outro tamanho',
-        subtitulo: 'Digitar o número',
+        titulo: tr('Outro tamanho', 'Another size'),
+        subtitulo: tr('Digitar o número', 'Type the number'),
         selecionada: _outroTamanho,
         onTap: () => _escolherTamanho(null),
       ),
@@ -507,40 +587,62 @@ class _TelaEstimarState extends State<TelaEstimar> {
   List<_Pergunta> _perguntasUso(PerguntaDeUso uso, {bool horasObrigatorias = false, bool semVelocidade = false}) {
     final opcional = uso.opcional && !horasObrigatorias;
     final horas = _Pergunta(
-      'Quanto tempo por dia ele fica ligado?',
+      tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
       ajuda: uso.perguntarHoras
-          ? 'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.'
+          ? tr(
+              'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
+              'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
+            )
           : opcional
-          ? 'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.'
+          ? tr(
+              'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.',
+              'If you are not sure, tap "I don\'t know": we use the consumption from Inmetro\'s test.',
+            )
           : uso.padrao != null
-          ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
-          : 'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
+          ? tr(
+              'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+              'We filled in a typical value. Change it to your own use if it is different.',
+            )
+          : tr(
+              'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
+              'Add up every use in the day. E.g.: 0 h and 15 min.',
+            ),
       campos: [CampoTempo(controle: _tempo)],
       validar: () {
-        if (!_tempo.valido) return 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.';
-        if (_tempo.horasDia == null && !opcional) return 'Digite o tempo de uso por dia.';
+        if (!_tempo.valido) {
+          return tr(
+            'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
+            'Check the time: minutes from 0 to 59 and at most 24 hours per day.',
+          );
+        }
+        if (_tempo.horasDia == null && !opcional) return tr('Digite o tempo de uso por dia.', 'Enter the time of use per day.');
         return null;
       },
-      textoPular: opcional ? 'Não sei, usar o valor do Inmetro' : null,
+      textoPular: opcional ? tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value") : null,
       aoPular: _tempo.limpar,
     );
     return switch (uso.pergunta) {
       'horas' => [horas],
       'ciclos' => [
         _Pergunta(
-          'Quantas vezes por mês você lava roupa?',
-          ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
-          campos: [_campo(_ciclos, 'Lavagens por mês', sufixo: 'vezes', inteiro: true)],
+          tr('Quantas vezes por mês você lava roupa?', 'How many loads of laundry do you do per month?'),
+          ajuda: tr(
+            'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+            'We filled in a typical value. Change it to your own use if it is different.',
+          ),
+          campos: [_campo(_ciclos, tr('Lavagens por mês', 'Loads per month'), sufixo: tr('vezes', 'times'), inteiro: true)],
           validar: () {
             final ciclos = lerNumero(_ciclos.text);
-            return ciclos == null || ciclos < 0 ? 'Digite quantas lavagens por mês. Ex.: 12.' : null;
+            return ciclos == null || ciclos < 0
+                ? tr('Digite quantas lavagens por mês. Ex.: 12.', 'Enter how many loads per month. E.g.: 12.')
+                : null;
           },
         ),
       ],
       'velocidade' => [
         if (!semVelocidade)
           _Pergunta(
-            'Em qual velocidade você costuma usar?',
+            tr('Em qual velocidade você costuma usar?', 'Which speed do you usually use?'),
             campos: [
               for (final o in uso.opcoes)
                 CartaoOpcao(
@@ -557,11 +659,14 @@ class _TelaEstimarState extends State<TelaEstimar> {
   }
 
   _Pergunta _perguntaNome() => _Pergunta(
-    'Qual é a marca e o modelo?',
-    ajuda: 'Opcional. Serve só para você reconhecer o aparelho na sua casa.',
-    campos: [_campo(_nome, 'Marca e modelo', exemplo: 'Ex.: Consul CRM45', texto: true)],
+    tr('Qual é a marca e o modelo?', 'What is the brand and model?'),
+    ajuda: tr(
+      'Opcional. Serve só para você reconhecer o aparelho na sua casa.',
+      'Optional. It only helps you recognize the appliance in your home.',
+    ),
+    campos: [_campo(_nome, tr('Marca e modelo', 'Brand and model'), exemplo: tr('Ex.: Consul CRM45', 'E.g.: Consul CRM45'), texto: true)],
     validar: () => null,
-    textoPular: 'Pular',
+    textoPular: tr('Pular', 'Skip'),
     aoPular: _nome.clear,
   );
 
@@ -569,13 +674,13 @@ class _TelaEstimarState extends State<TelaEstimar> {
     final r = _resistivo;
     return [
       _Pergunta(
-        'Qual é o aparelho?',
+        tr('Qual é o aparelho?', 'Which appliance is it?'),
         campos: [
           for (final x in _resistivos!)
             CartaoOpcao(
               icone: iconeDaCategoria(x.categoria),
               titulo: x.nome,
-              subtitulo: 'Típica: ${numero(x.potenciaW, casas: 0)} W',
+              subtitulo: tr('Típica: ${numero(x.potenciaW, casas: 0)} W', 'Typical: ${numero(x.potenciaW, casas: 0)} W'),
               selecionada: _resistivo?.categoria == x.categoria,
               onTap: () => _escolherResistivo(x),
             ),
@@ -583,24 +688,48 @@ class _TelaEstimarState extends State<TelaEstimar> {
       ),
       if (r != null) ...[
         _Pergunta(
-          'Qual é a potência?',
-          ajuda: 'Em watts (W). Está na etiqueta embaixo ou atrás do aparelho.',
-          campos: [_campo(_potencia, 'Potência', sufixo: 'W', exemplo: 'Típica: ${numero(r.potenciaW, casas: 0)} W')],
-          validar: () => _invalido(_potencia, maximo: 10000) ? 'Digite a potência em watts. Ex.: 1500.' : null,
-          textoPular: 'Não sei, usar a típica (${numero(r.potenciaW, casas: 0)} W)',
+          tr('Qual é a potência?', 'What is the power?'),
+          ajuda: tr(
+            'Em watts (W). Está na etiqueta embaixo ou atrás do aparelho.',
+            'In watts (W). It is on the label under or behind the appliance.',
+          ),
+          campos: [
+            _campo(
+              _potencia,
+              tr('Potência', 'Power'),
+              sufixo: 'W',
+              exemplo: tr('Típica: ${numero(r.potenciaW, casas: 0)} W', 'Typical: ${numero(r.potenciaW, casas: 0)} W'),
+            ),
+          ],
+          validar: () => _invalido(_potencia, maximo: 10000)
+              ? tr('Digite a potência em watts. Ex.: 1500.', 'Enter the power in watts. E.g.: 1500.')
+              : null,
+          textoPular: tr(
+            'Não sei, usar a típica (${numero(r.potenciaW, casas: 0)} W)',
+            "I don't know, use the typical one (${numero(r.potenciaW, casas: 0)} W)",
+          ),
           aoPular: _potencia.clear,
         ),
         _Pergunta(
-          'Quanto tempo por dia você usa?',
-          ajuda: 'Sugerido: ${duracao(r.horasDia)}. Troque pelo seu uso real.',
+          tr('Quanto tempo por dia você usa?', 'How long do you use it per day?'),
+          ajuda: tr(
+            'Sugerido: ${duracao(r.horasDia)}. Troque pelo seu uso real.',
+            'Suggested: ${duracao(r.horasDia)}. Change it to your real use.',
+          ),
           campos: [CampoTempo(controle: _tempoPortatil)],
-          validar: () =>
-              _tempoPortatil.valido ? null : 'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
+          validar: () => _tempoPortatil.valido
+              ? null
+              : tr(
+                  'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
+                  'Check the time: minutes from 0 to 59 and at most 24 hours per day.',
+                ),
         ),
         _Pergunta(
-          'Em quantos dias do mês você usa?',
-          campos: [_campo(_dias, 'Dias de uso no mês', sufixo: 'dias', inteiro: true)],
-          validar: () => _invalido(_dias, minimo: -1, maximo: 31) ? 'Digite um número de dias entre 0 e 31.' : null,
+          tr('Em quantos dias do mês você usa?', 'On how many days a month do you use it?'),
+          campos: [_campo(_dias, tr('Dias de uso no mês', 'Days of use per month'), sufixo: tr('dias', 'days'), inteiro: true)],
+          validar: () => _invalido(_dias, minimo: -1, maximo: 31)
+              ? tr('Digite um número de dias entre 0 e 31.', 'Enter a number of days between 0 and 31.')
+              : null,
         ),
       ],
     ];
@@ -629,7 +758,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
     final carregado = _categorias != null && _resistivos != null;
     if (!carregado) {
       return Pagina(
-        titulo: 'Estimar o gasto',
+        titulo: tr('Estimar o gasto', 'Estimate the cost'),
         filho: _falhouCarga ? MensagemErro(_erro!, tentarDeNovo: _carregar) : const Carregando(),
       );
     }
@@ -642,7 +771,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
         if (!saiu) _voltar();
       },
       child: Pagina(
-        titulo: 'Estimar o gasto',
+        titulo: tr('Estimar o gasto', 'Estimate the cost'),
         etapa: Etapa(indice + 1, perguntas.length),
         rodape: p.validar == null ? null : _rodape(p),
         filho: ListView(
@@ -661,7 +790,7 @@ class _TelaEstimarState extends State<TelaEstimar> {
   }
 
   Widget _rodape(_Pergunta p) {
-    final continuar = FilledButton(onPressed: () => _continuar(p), child: const Text('Continuar'));
+    final continuar = FilledButton(onPressed: () => _continuar(p), child: Text(tr('Continuar', 'Continue')));
     if (p.textoPular == null) return continuar;
     return Column(
       mainAxisSize: MainAxisSize.min,

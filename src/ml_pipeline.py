@@ -23,6 +23,8 @@ from pathlib import Path
 
 import numpy as np
 
+from idioma import t, tr
+
 MODELO = Path(__file__).resolve().parents[1] / "models" / "kmeans.pkl"
 AVISO_ML = ("Perfil estimado por um modelo treinado com residencias sinteticas; "
             "serve como referencia, nao como avaliacao oficial.")
@@ -40,20 +42,21 @@ def variaveis_da_residencia(inventario):
     """Inventario -> kwh_total e as variaveis por morador usadas pelo K-Means."""
     moradores = inventario.get("moradores")
     if not isinstance(moradores, (int, float)) or moradores < 1:
-        raise ValueError("informe quantos moradores (1 ou mais)")
+        raise ValueError(tr("informe quantos moradores (1 ou mais)", "enter how many residents (1 or more)"))
     itens = inventario.get("itens") or []
     if not itens:
-        raise ValueError("informe pelo menos um aparelho com categoria e kwh_mes")
+        raise ValueError(tr("informe pelo menos um aparelho com categoria e kwh_mes",
+                            "enter at least one appliance with categoria and kwh_mes"))
 
     por_categoria = {}
     for item in itens:
         kwh = float(item["kwh_mes"])
         if kwh < 0:
-            raise ValueError("kwh_mes nao pode ser negativo")
+            raise ValueError(tr("kwh_mes nao pode ser negativo", "kwh_mes cannot be negative"))
         por_categoria[item["categoria"]] = por_categoria.get(item["categoria"], 0.0) + kwh
     total = sum(por_categoria.values())
     if total <= 0:
-        raise ValueError("o consumo total precisa ser maior que zero")
+        raise ValueError(tr("o consumo total precisa ser maior que zero", "the total consumption must be greater than zero"))
 
     return total, {
         "kwh_por_morador": total / moradores,
@@ -86,9 +89,12 @@ def classificar_residencia(inventario):
         "comparacao_media": {
             "mediana_kwh_por_morador": round(media, 2),
             "diferenca_percentual": round(diferenca, 1),
-            "texto": f"{abs(diferenca):.0f}% {'acima' if diferenca > 0 else 'abaixo'} da mediana por morador (residencias sinteticas)",
+            "texto": tr(f"{abs(diferenca):.0f}% {'acima' if diferenca > 0 else 'abaixo'} da mediana por morador "
+                        "(residencias sinteticas)",
+                        f"{abs(diferenca):.0f}% {'above' if diferenca > 0 else 'below'} the median per resident "
+                        "(synthetic homes)"),
         },
         "fracoes": {k: round(v, 3) for k, v in variaveis.items() if k.startswith("frac_")},
-        "aviso": AVISO_ML,
+        "aviso": t(AVISO_ML),
         "fonte": modelo["fonte"],
     }

@@ -28,7 +28,8 @@ ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py ->
 
 Python 3.12 (o mesmo do Dockerfile; não usar 3.14), Pandas, SQLAlchemy **Core** com SQL
 parametrizado (não há ORM; `banco.py` troca `?` por parâmetros nomeados), psycopg2,
-FastAPI + Uvicorn, PostgreSQL 15 com pgvector (imagem `pgvector/pgvector:pg15`), Docker Compose, Flutter (Dart, só o pacote `http`).
+FastAPI + Uvicorn, PostgreSQL 15 com pgvector (imagem `pgvector/pgvector:pg15`), Docker Compose, Flutter (Dart, só o pacote `http`
++ `flutter_localizations`, que vem com o SDK).
 
 ## Como rodar
 
@@ -143,6 +144,29 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
   potência e uso típicos são premissas do grupo). kWh = W/1000 × tempo/dia × dias. Sem sugestão de modelos (não têm
   etiqueta do Inmetro): o app mostra as dicas do Eco-Coach (`POST /eco-coach/aparelho`).
 - Tempo de uso no app em horas e minutos (`ControleTempo`/`CampoTempo`); o `metodo` da API também ("15 min/dia").
+
+## Idioma: português (nativo) e inglês
+
+Para apresentar a estrangeiros, o app inteiro troca para o inglês no menu (☰), seção "Idioma · Language".
+Sempre abre em português; a escolha não é gravada.
+- App: `lib/idioma.dart` (`idioma` = ValueNotifier, `tr('pt', 'en')`, `mudarIdioma`). Todo texto de tela é
+  `tr('...', '...')`, com as duas versões lado a lado. `mudarIdioma` marca todas as telas para reconstruir; o
+  menu também volta as abas para a 1ª tela (`recomecarAba`) e apaga perfil e plano (`casa.esquecerTextosDaApi`),
+  porque eles vieram da API no outro idioma. `MaterialApp.locale` + `GlobalMaterialLocalizations`: textos do
+  Flutter ("Voltar"/"Back") seguem o idioma. Nos testes, `pageBack()` só acha "Back": no `IampApp` em português,
+  tocar em `find.byTooltip('Voltar')`. `reais`/`numero`/`lerNumero` seguem o idioma (inglês: "R$ 1,234.50"; quem
+  digita "0,85" continua certo). O `setUp` dos testes volta o idioma para `Idioma.pt`.
+- API: `Accept-Language` (o app manda `pt-BR` ou `en`) -> middleware `IdiomaDaRequisicao` (main.py) guarda o
+  idioma numa ContextVar (`src/idioma.py`). Texto montado com números: `tr(pt, en)` no lugar. Texto fixo
+  (constantes, ESTIMAVEIS, NOMES_DOS_TIPOS, nomes dos eletroportáteis, rag_agent.NOMES): `t(texto)` com o
+  dicionário `src/traducoes.py` (chave = texto em português). `tests/test_idioma.py` falha se faltar tradução ou
+  sobrar chave antiga. Sem cabeçalho = português (APK antigo e testes antigos iguais). Chaves (categoria,
+  perfil "Consciente", velocidade) não mudam: o app traduz o nome. `unidades()`/`medida()` trocam pol/cv/litros
+  e os separadores ("7.500 BTU/h" -> "7,500 BTU/h").
+- Eco-Coach em inglês: a busca vetorial continua em português (documentos brasileiros); o prompt ganha
+  `IDIOMA_EN` (escrever em inglês, traduzir as dicas, manter [n]) e os números vão no formato americano.
+  As fontes citadas continuam com o título em português (o app avisa).
+- O histórico (`consultas`) guarda `metodo` no idioma em que a pessoa viu.
 
 ## Gás de cozinha: removido
 
@@ -294,7 +318,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
 - Versão do app em `pubspec.yaml` (hoje `2.0.0+6`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.4.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
+  `main.py` (`0.5.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
   Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
   `terraform apply` + `docker compose up -d --build`) -> APK -> tag -> Release (o usuário faz; `gh` sem login).

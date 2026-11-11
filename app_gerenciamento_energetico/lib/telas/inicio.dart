@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import 'busca.dart';
 import 'eco_coach.dart';
@@ -89,11 +90,11 @@ class _BarraDeAbas extends StatelessWidget {
                 irPara(aba, recomecar: aba == abaAtual.value);
               },
               destinations: [
-                const NavigationDestination(
-                  icon: Icon(Icons.calculate_outlined),
-                  selectedIcon: Icon(Icons.calculate),
-                  label: 'Calcular',
-                  tooltip: 'Calcular o gasto de um aparelho',
+                NavigationDestination(
+                  icon: const Icon(Icons.calculate_outlined),
+                  selectedIcon: const Icon(Icons.calculate),
+                  label: tr('Calcular', 'Calculate'),
+                  tooltip: tr('Calcular o gasto de um aparelho', 'Calculate what an appliance costs'),
                 ),
                 NavigationDestination(
                   icon: Badge(
@@ -106,16 +107,19 @@ class _BarraDeAbas extends StatelessWidget {
                     label: Text('${casa.totalAparelhos}'),
                     child: const Icon(Icons.home),
                   ),
-                  label: 'Minha casa',
+                  label: tr('Minha casa', 'My home'),
                   tooltip: casa.vazia
-                      ? 'Minha casa, nenhum aparelho'
-                      : 'Minha casa, ${casa.totalAparelhos} ${casa.totalAparelhos == 1 ? 'aparelho' : 'aparelhos'}',
+                      ? tr('Minha casa, nenhum aparelho', 'My home, no appliances')
+                      : tr(
+                          'Minha casa, ${casa.totalAparelhos} ${casa.totalAparelhos == 1 ? 'aparelho' : 'aparelhos'}',
+                          'My home, ${casa.totalAparelhos} ${casa.totalAparelhos == 1 ? 'appliance' : 'appliances'}',
+                        ),
                 ),
-                const NavigationDestination(
-                  icon: Icon(Icons.savings_outlined),
-                  selectedIcon: Icon(Icons.savings),
-                  label: 'Economizar',
-                  tooltip: 'Dicas para gastar menos',
+                NavigationDestination(
+                  icon: const Icon(Icons.savings_outlined),
+                  selectedIcon: const Icon(Icons.savings),
+                  label: tr('Economizar', 'Save'),
+                  tooltip: tr('Dicas para gastar menos', 'Tips to spend less'),
                 ),
               ],
             ),

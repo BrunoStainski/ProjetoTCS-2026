@@ -4,25 +4,29 @@
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'idioma.dart';
 
 /// Tarifa escolhida: distribuidora da ANEEL ou o valor da conta de luz.
 class EscolhaTarifa {
   final int? distribuidoraId;
   final double? tarifaManual;
-  final String descricao;
+  final String? _distribuidora;
   final double tarifaKwh;
 
   EscolhaTarifa.daDistribuidora(Distribuidora d)
     : distribuidoraId = d.id,
       tarifaManual = null,
-      descricao = d.uf == null ? d.nome : '${d.nome} - ${d.uf}',
+      _distribuidora = d.uf == null ? d.nome : '${d.nome} - ${d.uf}',
       tarifaKwh = d.tarifaKwh;
 
   EscolhaTarifa.manual(double tarifa)
     : distribuidoraId = null,
       tarifaManual = tarifa,
-      descricao = 'Tarifa da conta de luz',
+      _distribuidora = null,
       tarifaKwh = tarifa;
+
+  /// Calculada na hora: segue o idioma, mesmo se a tarifa foi escolhida antes da troca.
+  String get descricao => _distribuidora ?? tr('Tarifa da conta de luz', 'Rate from your electricity bill');
 
   Map<String, dynamic> paraApi() => {'distribuidora_id': distribuidoraId, 'tarifa_manual': tarifaManual};
 }
@@ -175,6 +179,13 @@ class Casa extends ChangeNotifier {
 
   void guardarPlano(EcoCoach p) {
     plano = p;
+    notifyListeners();
+  }
+
+  /// Trocou o idioma: o perfil e o plano vieram da API no idioma anterior e precisam ser pedidos de novo.
+  void esquecerTextosDaApi() {
+    perfil = null;
+    plano = null;
     notifyListeners();
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'distribuidora.dart';
@@ -85,7 +86,12 @@ class _TelaUsoState extends State<TelaUso> {
         if (_pergunta!.perguntarHoras) {
           final horas = _tempo.horasDia;
           if (horas == null) {
-            setState(() => _erro = 'Informe quanto tempo por dia ele fica ligado. Ex.: 8 h e 0 min.');
+            setState(
+              () => _erro = tr(
+                'Informe quanto tempo por dia ele fica ligado. Ex.: 8 h e 0 min.',
+                'Enter how long it stays on per day. E.g.: 8 h and 0 min.',
+              ),
+            );
             return;
           }
           c.horasDia = horas;
@@ -98,14 +104,19 @@ class _TelaUsoState extends State<TelaUso> {
         if (_pergunta!.opcional && _tempo.vazio) break;
         final horas = _tempo.horasDia;
         if (horas == null) {
-          setState(() => _erro = 'Informe quanto tempo por dia, em horas e minutos. Ex.: 0 h e 15 min.');
+          setState(
+            () => _erro = tr(
+              'Informe quanto tempo por dia, em horas e minutos. Ex.: 0 h e 15 min.',
+              'Enter how long per day, in hours and minutes. E.g.: 0 h and 15 min.',
+            ),
+          );
           return;
         }
         c.horasDia = horas;
       case 'ciclos':
         final ciclos = lerNumero(_valor.text);
         if (ciclos == null || ciclos < 0) {
-          setState(() => _erro = 'Informe quantas vezes por mês. Ex.: 12.');
+          setState(() => _erro = tr('Informe quantas vezes por mês. Ex.: 12.', 'Enter how many times per month. E.g.: 12.'));
           return;
         }
         c.ciclosMes = ciclos;
@@ -116,7 +127,7 @@ class _TelaUsoState extends State<TelaUso> {
 
   Widget? _rodape(PerguntaDeUso? p) {
     if (p == null || (p.pergunta == 'velocidade' && !_horasDoVentilador)) return null;
-    final continuar = FilledButton(onPressed: _confirmar, child: const Text('Continuar'));
+    final continuar = FilledButton(onPressed: _confirmar, child: Text(tr('Continuar', 'Continue')));
     if (!(p.pergunta == 'horas' && p.opcional)) return continuar;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -124,7 +135,10 @@ class _TelaUsoState extends State<TelaUso> {
       children: [
         continuar,
         const SizedBox(height: Espaco.p),
-        TextButton(onPressed: () => _confirmar(pular: true), child: const Text('Não sei, usar o valor do Inmetro')),
+        TextButton(
+          onPressed: () => _confirmar(pular: true),
+          child: Text(tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value")),
+        ),
       ],
     );
   }
@@ -135,7 +149,7 @@ class _TelaUsoState extends State<TelaUso> {
     final p = _pergunta;
     final aparelho = widget.consulta.aparelho;
     final pagina = Pagina(
-      titulo: 'Como você usa',
+      titulo: tr('Como você usa', 'How you use it'),
       etapa: etapaDoCalculo(widget.consulta, 3),
       rodape: _rodape(p),
       filho: ListView(
@@ -166,7 +180,10 @@ class _TelaUsoState extends State<TelaUso> {
           const SizedBox(height: Espaco.g),
           if (p == null && _erro == null) const Carregando(),
           if (p?.pergunta == 'velocidade' && !_horasDoVentilador) ...[
-            const CabecalhoPergunta('Em qual velocidade você costuma usar?', ajuda: 'Toque na opção.'),
+            CabecalhoPergunta(
+              tr('Em qual velocidade você costuma usar?', 'Which speed do you usually use?'),
+              ajuda: tr('Toque na opção.', 'Tap an option.'),
+            ),
             for (final o in p!.opcoes)
               CartaoOpcao(
                 titulo: nomeDaVelocidade(o),
@@ -175,35 +192,56 @@ class _TelaUsoState extends State<TelaUso> {
               ),
           ],
           if (_horasDoVentilador) ...[
-            const CabecalhoPergunta(
-              'Quanto tempo por dia ele fica ligado?',
-              ajuda: 'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
+            CabecalhoPergunta(
+              tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
+              ajuda: tr(
+                'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
+                'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
+              ),
             ),
             CampoTempo(controle: _tempo, aoConfirmar: _confirmar),
           ],
           if (p?.pergunta == 'horas') ...[
             CabecalhoPergunta(
-              'Quanto tempo por dia ele fica ligado?',
+              tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
               ajuda: p!.opcional
-                  ? 'Se não souber, toque em "Não sei" embaixo: usamos o consumo medido pelo Inmetro.'
+                  ? tr(
+                      'Se não souber, toque em "Não sei" embaixo: usamos o consumo medido pelo Inmetro.',
+                      'If you are not sure, tap "I don\'t know" below: we use the consumption measured by Inmetro.',
+                    )
                   : p.padrao != null
-                  ? 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.'
+                  ? tr(
+                      'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+                      'We filled in a typical value. Change it to your own use if it is different.',
+                    )
                   : aparelho.categoria == 'chuveiro'
-                  ? 'Some o tempo de todos os usos do dia. Ex.: dois banhos de 10 min = 0 h e 20 min.'
-                  : 'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
+                  ? tr(
+                      'Some o tempo de todos os usos do dia. Ex.: dois banhos de 10 min = 0 h e 20 min.',
+                      'Add up every use in the day. E.g.: two 10-minute showers = 0 h and 20 min.',
+                    )
+                  : tr(
+                      'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
+                      'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
+                    ),
             ),
             CampoTempo(controle: _tempo, aoConfirmar: _confirmar),
           ],
           if (p?.pergunta == 'ciclos') ...[
-            const CabecalhoPergunta(
-              'Quantas vezes por mês você lava roupa?',
-              ajuda: 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+            CabecalhoPergunta(
+              tr('Quantas vezes por mês você lava roupa?', 'How many loads of laundry do you do per month?'),
+              ajuda: tr(
+                'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
+                'We filled in a typical value. Change it to your own use if it is different.',
+              ),
             ),
             TextField(
               controller: _valor,
               keyboardType: TextInputType.number,
               onSubmitted: (_) => _confirmar(),
-              decoration: const InputDecoration(labelText: 'Lavagens por mês', suffixText: 'vezes'),
+              decoration: InputDecoration(
+                labelText: tr('Lavagens por mês', 'Loads per month'),
+                suffixText: tr('vezes', 'times'),
+              ),
             ),
           ],
           const SizedBox(height: Espaco.m),

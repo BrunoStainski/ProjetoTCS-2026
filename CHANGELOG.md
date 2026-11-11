@@ -6,6 +6,16 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Idioma: o app pode ficar todo em inglês, para apresentar a quem não fala português. No menu (☰), seção
+  "Idioma · Language" com "Português" e "English" (cada um escrito na própria língua). O app sempre abre em
+  português; a troca não fica gravada. Ao trocar, as abas voltam para a primeira tela (respostas antigas da API
+  estavam no outro idioma) e a casa continua. Valores seguem em reais, no formato do idioma ("R$ 1,234.50").
+  Os textos do próprio Flutter (voltar, copiar, colar) também seguem o idioma (`flutter_localizations`, do SDK):
+  antes ficavam sempre em inglês, inclusive para o leitor de tela.
+- API 0.5.0: com o cabeçalho `Accept-Language: en`, os textos das respostas (método, avisos, mensagens, nomes
+  dos tipos, erros e o plano do Eco-Coach) vêm em inglês; sem ele, em português, como antes (o APK antigo
+  continua igual). A resposta traz `Content-Language` e `Vary: Accept-Language`. Os números e as chaves
+  (categoria, perfil, velocidade) não mudam.
 - Ventiladores: o consumo mensal do Inmetro é de 1 hora por dia e o app não perguntava as horas (um ventilador
   ligado a noite toda saía 8 vezes menor). Agora pergunta a velocidade e as horas, no catálogo e na estimativa.
 - Estimativa de eletro grande (antigo ou fora do catálogo) refeita: tipo com nome conhecido ("Automática que

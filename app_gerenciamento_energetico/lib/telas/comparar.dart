@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
 
@@ -50,7 +51,7 @@ class _TelaCompararState extends State<TelaComparar> {
   Future<void> _calcularPayback() async {
     final preco = lerNumero(_preco.text);
     if (preco == null || preco <= 0) {
-      setState(() => _erroPreco = 'Digite o preço em reais. Ex.: 2.499,90.');
+      setState(() => _erroPreco = tr('Digite o preço em reais. Ex.: 2.499,90.', 'Enter the price in reais. E.g.: 2,499.90.'));
       return;
     }
     FocusScope.of(context).unfocus();
@@ -88,31 +89,35 @@ class _TelaCompararState extends State<TelaComparar> {
     if (widget.item != null) {
       casa.trocar(widget.item!, nova, c.novo);
       navegador.popUntil((rota) => rota.isFirst); // volta para Minha casa
-      avisos.showSnackBar(SnackBar(content: Text('Trocado por ${c.novo.nome}.'), duration: duracaoAviso));
+      avisos.showSnackBar(
+        SnackBar(content: Text(tr('Trocado por ${c.novo.nome}.', 'Replaced with ${c.novo.nome}.')), duration: duracaoAviso),
+      );
       return;
     }
     casa.adicionar(nova, c.novo);
     setState(() => _feito = true);
-    avisarAdicionado(avisos, '${c.novo.nome} foi para a sua casa.');
+    avisarAdicionado(avisos, tr('${c.novo.nome} foi para a sua casa.', '${c.novo.nome} was added to your home.'));
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Pagina(
-      titulo: 'Vale a pena trocar?',
+      titulo: tr('Vale a pena trocar?', 'Is it worth replacing?'),
       rodape: FilledButton.icon(
         onPressed: _calculandoPayback ? null : _calcularPayback,
         icon: _calculandoPayback
             ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
             : const Icon(Icons.timer_outlined),
-        label: Text(_calculandoPayback ? 'Calculando...' : 'Ver em quanto tempo se paga'),
+        label: Text(
+          _calculandoPayback ? tr('Calculando...', 'Calculating...') : tr('Ver em quanto tempo se paga', 'See how long it takes to pay off'),
+        ),
       ),
       filho: FutureBuilder<Comparacao>(
         future: _comparacao,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done && !snap.hasData) {
-            return const Carregando(texto: 'Comparando...');
+            return Carregando(texto: tr('Comparando...', 'Comparing...'));
           }
           if (snap.hasError && !snap.hasData) {
             return MensagemErro(
@@ -127,25 +132,34 @@ class _TelaCompararState extends State<TelaComparar> {
           return ListView(
             children: [
               LadoALado(
-                _Coluna('Seu modelo', c.atual, destaque: false),
-                _Coluna('Modelo novo', c.novo, destaque: true),
+                _Coluna(tr('Seu modelo', 'Your model'), c.atual, destaque: false),
+                _Coluna(tr('Modelo novo', 'New model'), c.novo, destaque: true),
                 meio: Padding(
                   padding: const EdgeInsets.all(Espaco.pp),
-                  child: Icon(Icons.arrow_forward, color: t.destaque, semanticLabel: 'trocar por'),
+                  child: Icon(Icons.arrow_forward, color: t.destaque, semanticLabel: tr('trocar por', 'replace with')),
                 ),
               ),
               const SizedBox(height: Espaco.p),
               CartaoDestaque(
-                titulo: economiza ? 'Você economiza por mês' : 'Não há economia por mês',
+                titulo: economiza
+                    ? tr('Você economiza por mês', 'You save per month')
+                    : tr('Não há economia por mês', 'No savings per month'),
                 valor: c.economiaMes,
                 formatar: reais,
                 cor: economiza ? t.economia : t.alerta,
-                rodape: '${reais(c.economiaAno)} por ano · ${numero(c.economiaKwhMes)} kWh a menos por mês',
+                rodape: tr(
+                  '${reais(c.economiaAno)} por ano · ${numero(c.economiaKwhMes)} kWh a menos por mês',
+                  '${reais(c.economiaAno)} per year · ${numero(c.economiaKwhMes)} kWh less per month',
+                ),
               ),
-              const Titulo('Em quanto tempo a troca se paga?'),
+              Titulo(tr('Em quanto tempo a troca se paga?', 'How long until it pays off?')),
               Text(
-                'Digite o preço do modelo novo que você encontrou na loja. '
-                'Calculamos em quantos meses a economia na conta paga a compra.',
+                tr(
+                  'Digite o preço do modelo novo que você encontrou na loja. '
+                      'Calculamos em quantos meses a economia na conta paga a compra.',
+                  'Enter the price of the new model you found in the store. '
+                      'We calculate how many months of bill savings it takes to pay for it.',
+                ),
                 style: t.secundario,
               ),
               const SizedBox(height: Espaco.pm),
@@ -154,8 +168,8 @@ class _TelaCompararState extends State<TelaComparar> {
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 onSubmitted: (_) => _calcularPayback(),
                 decoration: InputDecoration(
-                  labelText: 'Preço do modelo novo',
-                  hintText: 'Ex.: 2.499,90',
+                  labelText: tr('Preço do modelo novo', 'Price of the new model'),
+                  hintText: tr('Ex.: 2.499,90', 'E.g.: 2,499.90'),
                   prefixText: 'R\$ ',
                   errorText: _erroPreco,
                 ),
@@ -180,7 +194,11 @@ class _TelaCompararState extends State<TelaComparar> {
                 OutlinedButton.icon(
                   onPressed: () => _levarParaCasa(c),
                   icon: Icon(widget.item != null ? Icons.swap_horiz : Icons.add_home_outlined),
-                  label: Text(widget.item != null ? 'Trocar na minha casa' : 'Adicionar este modelo à minha casa'),
+                  label: Text(
+                    widget.item != null
+                        ? tr('Trocar na minha casa', 'Replace it in my home')
+                        : tr('Adicionar este modelo à minha casa', 'Add this model to my home'),
+                  ),
                 ),
               const SizedBox(height: Espaco.m),
               ListaAvisos(c.avisos),
@@ -219,7 +237,7 @@ class _Coluna extends StatelessWidget {
               if (r.detalhe.isNotEmpty) Text(r.detalhe, style: t.secundario),
               const SizedBox(height: Espaco.p),
               Text(reais(r.custoMes), style: t.valorMedio),
-              Text('por mês · ${numero(r.kwhMes)} kWh', style: t.secundario),
+              Text(tr('por mês · ${numero(r.kwhMes)} kWh', 'per month · ${numero(r.kwhMes)} kWh'), style: t.secundario),
             ],
           ),
         ),
@@ -240,10 +258,10 @@ class CartaoPayback extends StatelessWidget {
     final t = Iamp.de(context);
     final meses = p.meses;
     final (cor, veredito, icone) = meses == null
-        ? (t.alerta, 'Não se paga', Icons.money_off)
+        ? (t.alerta, tr('Não se paga', 'Does not pay off'), Icons.money_off)
         : meses <= 60
-        ? (t.economia, 'Se paga rápido', Icons.savings_outlined)
-        : (t.destaque, 'Demora para se pagar', Icons.hourglass_bottom);
+        ? (t.economia, tr('Se paga rápido', 'Pays off quickly'), Icons.savings_outlined)
+        : (t.destaque, tr('Demora para se pagar', 'Takes a long time to pay off'), Icons.hourglass_bottom);
     return MergeSemantics(
       child: Container(
         width: double.infinity,
@@ -257,19 +275,28 @@ class CartaoPayback extends StatelessWidget {
             const SizedBox(height: Espaco.pp),
             if (meses != null) ...[
               if (meses < 1)
-                Text('em menos de 1 mês', style: t.valor.copyWith(color: cor), textAlign: TextAlign.center)
+                Text(
+                  tr('em menos de 1 mês', 'in less than 1 month'),
+                  style: t.valor.copyWith(color: cor),
+                  textAlign: TextAlign.center,
+                )
               else
                 ValorAnimado(
                   meses,
-                  formatar: (v) => 'em ${numero(v, casas: 0)} meses',
+                  formatar: (v) => tr('em ${numero(v, casas: 0)} meses', 'in ${numero(v, casas: 0)} months'),
                   estilo: t.valor.copyWith(color: cor),
                 ),
-              if (p.anos != null && meses >= 12) Text('cerca de ${numero(p.anos!, casas: 1)} anos', style: t.forte),
+              if (p.anos != null && meses >= 12)
+                Text(tr('cerca de ${numero(p.anos!, casas: 1)} anos', 'about ${numero(p.anos!, casas: 1)} years'), style: t.forte),
               const SizedBox(height: Espaco.p),
             ],
             Text(p.texto, textAlign: TextAlign.center, style: t.corpo),
             const SizedBox(height: Espaco.pp),
-            Text('Preço considerado: ${reais(p.precoNovo)}', style: t.secundario, textAlign: TextAlign.center),
+            Text(
+              tr('Preço considerado: ${reais(p.precoNovo)}', 'Price used: ${reais(p.precoNovo)}'),
+              style: t.secundario,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

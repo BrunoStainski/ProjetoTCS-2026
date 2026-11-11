@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
@@ -42,7 +43,7 @@ class _TelaEcoCoachState extends State<TelaEcoCoach> {
       listenable: casa,
       builder: (context, _) {
         final plano = casa.plano;
-        return Pagina(titulo: 'Economizar', rodape: _rodape(plano), filho: _corpo(plano));
+        return Pagina(titulo: tr('Economizar', 'Save energy'), rodape: _rodape(plano), filho: _corpo(plano));
       },
     );
   }
@@ -53,16 +54,20 @@ class _TelaEcoCoachState extends State<TelaEcoCoach> {
       return FilledButton.icon(
         onPressed: () => irPara(Aba.calcular, recomecar: true),
         icon: const Icon(Icons.calculate_outlined),
-        label: const Text('Calcular um aparelho'),
+        label: Text(tr('Calcular um aparelho', 'Calculate an appliance')),
       );
     }
     if (plano != null) {
-      return OutlinedButton.icon(onPressed: _gerar, icon: const Icon(Icons.refresh), label: const Text('Montar outro plano'));
+      return OutlinedButton.icon(
+        onPressed: _gerar,
+        icon: const Icon(Icons.refresh),
+        label: Text(tr('Montar outro plano', 'Build another plan')),
+      );
     }
     return FilledButton.icon(
       onPressed: _gerar,
       icon: const Icon(Icons.auto_awesome),
-      label: const Text('Montar meu plano'),
+      label: Text(tr('Montar meu plano', 'Build my plan')),
     );
   }
 
@@ -93,12 +98,20 @@ class _SemAparelhos extends StatelessWidget {
             const SizedBox(height: Espaco.m),
             Semantics(
               header: true,
-              child: Text('Primeiro, calcule seus aparelhos', style: t.titulo, textAlign: TextAlign.center),
+              child: Text(
+                tr('Primeiro, calcule seus aparelhos', 'First, calculate your appliances'),
+                style: t.titulo,
+                textAlign: TextAlign.center,
+              ),
             ),
             const SizedBox(height: Espaco.p),
             Text(
-              'Com os aparelhos da sua casa, o Eco-Coach monta um plano para gastar menos, '
-              'com dicas oficiais do Inmetro e da Cemig.',
+              tr(
+                'Com os aparelhos da sua casa, o Eco-Coach monta um plano para gastar menos, '
+                    'com dicas oficiais do Inmetro e da Cemig.',
+                'With the appliances in your home, the Eco-Coach builds a plan to spend less, '
+                    'with official tips from Inmetro and Cemig.',
+              ),
               style: t.corpo,
               textAlign: TextAlign.center,
             ),
@@ -119,28 +132,45 @@ class _Apresentacao extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const CabecalhoPergunta(
-          'Seu plano para gastar menos',
-          ajuda: 'O Eco-Coach lê as dicas oficiais do Inmetro e da Cemig e monta um plano '
-              'para os aparelhos que mais pesam na sua conta.',
+        CabecalhoPergunta(
+          tr('Seu plano para gastar menos', 'Your plan to spend less'),
+          ajuda: tr(
+            'O Eco-Coach lê as dicas oficiais do Inmetro e da Cemig e monta um plano '
+                'para os aparelhos que mais pesam na sua conta.',
+            'The Eco-Coach reads the official tips from Inmetro and Cemig and builds a plan '
+                'for the appliances that weigh most on your bill.',
+          ),
         ),
         CartaoDestaque(
-          titulo: 'Sua conta com estes aparelhos',
+          titulo: tr('Sua conta com estes aparelhos', 'Your bill with these appliances'),
           valor: casa.custoMes,
-          formatar: (v) => '${reais(v)} por mês',
-          rodape: '$n ${n == 1 ? 'aparelho' : 'aparelhos'} · ${casa.moradores} '
-              '${casa.moradores == 1 ? 'morador' : 'moradores'}',
+          formatar: (v) => tr('${reais(v)} por mês', '${reais(v)} per month'),
+          rodape: tr(
+            '$n ${n == 1 ? 'aparelho' : 'aparelhos'} · ${casa.moradores} '
+                '${casa.moradores == 1 ? 'morador' : 'moradores'}',
+            '$n ${n == 1 ? 'appliance' : 'appliances'} · ${casa.moradores} '
+                '${casa.moradores == 1 ? 'resident' : 'residents'}',
+          ),
         ),
         if (casa.trocas.isNotEmpty) ...[
           const SizedBox(height: Espaco.p),
           Text(
-            'O plano também considera ${casa.trocas.length == 1 ? 'a troca' : 'as ${casa.trocas.length} trocas'} '
-            'de aparelho que você avaliou.',
+            tr(
+              'O plano também considera ${casa.trocas.length == 1 ? 'a troca' : 'as ${casa.trocas.length} trocas'} '
+                  'de aparelho que você avaliou.',
+              'The plan also considers the ${casa.trocas.length == 1 ? 'appliance replacement' : '${casa.trocas.length} appliance replacements'} '
+                  'you evaluated.',
+            ),
             style: t.secundario,
           ),
         ],
         const SizedBox(height: Espaco.m),
-        const ListaAvisos(['O texto é escrito por inteligência artificial e pode levar alguns segundos.']),
+        ListaAvisos([
+          tr(
+            'O texto é escrito por inteligência artificial e pode levar alguns segundos.',
+            'The text is written by artificial intelligence and may take a few seconds.',
+          ),
+        ]),
       ],
     );
   }
@@ -181,10 +211,10 @@ class _PensandoState extends State<_Pensando> with SingleTickerProviderStateMixi
               ),
             ),
             const SizedBox(height: Espaco.g),
-            Semantics(liveRegion: true, child: Text('Montando seu plano', style: t.titulo)),
+            Semantics(liveRegion: true, child: Text(tr('Montando seu plano', 'Building your plan'), style: t.titulo)),
             const SizedBox(height: Espaco.p),
             Text(
-              'Lendo as dicas do Inmetro e da Cemig. Leva alguns segundos.',
+              tr('Lendo as dicas do Inmetro e da Cemig. Leva alguns segundos.', 'Reading the tips from Inmetro and Cemig. It takes a few seconds.'),
               textAlign: TextAlign.center,
               style: t.corpo,
             ),
@@ -214,10 +244,10 @@ class _Conteudo extends StatelessWidget {
         // resumo calculado pelo Iamp (nao pela IA)
         if (p.custoTotal != null)
           CartaoDestaque(
-            titulo: 'Sua conta com estes aparelhos',
+            titulo: tr('Sua conta com estes aparelhos', 'Your bill with these appliances'),
             valor: p.custoTotal!,
-            formatar: (v) => '${reais(v)} por mês',
-            rodape: '${numero(p.kwhTotal)} kWh por mês',
+            formatar: (v) => tr('${reais(v)} por mês', '${reais(v)} per month'),
+            rodape: tr('${numero(p.kwhTotal)} kWh por mês', '${numero(p.kwhTotal)} kWh per month'),
           ),
         const SizedBox(height: Espaco.p),
         Align(
@@ -225,20 +255,33 @@ class _Conteudo extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: Espaco.pm, vertical: Espaco.pp),
             decoration: t.selo(cor),
-            child: Text('Perfil da casa: ${p.perfil}', style: t.rotulo.copyWith(color: cor)),
+            child: Text(
+              tr('Perfil da casa: ${nomeDoPerfil(p.perfil)}', 'Home profile: ${nomeDoPerfil(p.perfil)}'),
+              style: t.rotulo.copyWith(color: cor),
+            ),
           ),
         ),
-        const Titulo('O que mais pesa'),
+        Titulo(tr('O que mais pesa', 'What weighs most')),
         for (final m in p.maioresConsumos) _LinhaConsumo(m),
-        const Titulo('Seu plano de economia'),
+        Titulo(tr('Seu plano de economia', 'Your savings plan')),
         Container(
           padding: const EdgeInsets.all(Espaco.m),
           decoration: t.cartaoDestaque(t.destaque),
           child: TextoPlano(p.plano),
         ),
-        if (p.fontes.isNotEmpty) ...[const Titulo('Fontes citadas'), for (final f in p.fontes) CartaoFonte(f)],
+        if (p.fontes.isNotEmpty) ...[
+          Titulo(tr('Fontes citadas', 'Sources cited')),
+          if (emIngles) Text('The sources are Brazilian documents in Portuguese.', style: t.secundario),
+          for (final f in p.fontes) CartaoFonte(f),
+        ],
         const SizedBox(height: Espaco.m),
-        ListaAvisos([p.aviso, 'Escrito por inteligência artificial (${p.modelo}): pode errar, confira as fontes.']),
+        ListaAvisos([
+          p.aviso,
+          tr(
+            'Escrito por inteligência artificial (${p.modelo}): pode errar, confira as fontes.',
+            'Written by artificial intelligence (${p.modelo}): it can make mistakes, check the sources.',
+          ),
+        ]),
       ],
     );
   }
@@ -266,10 +309,12 @@ class _LinhaConsumo extends StatelessWidget {
                 Expanded(child: Text(_maiuscula(m.nome), style: t.forte)),
               ],
             ),
-            if (m.custoMes != null) Text('${reais(m.custoMes!)} por mês', style: t.numero),
-            Text('$parte do consumo · ${numero(m.kwhMes)} kWh', style: t.secundario),
+            if (m.custoMes != null) Text(tr('${reais(m.custoMes!)} por mês', '${reais(m.custoMes!)} per month'), style: t.numero),
+            Text(tr('$parte do consumo · ${numero(m.kwhMes)} kWh', '$parte of consumption · ${numero(m.kwhMes)} kWh'), style: t.secundario),
             const SizedBox(height: Espaco.pp),
-            ExcludeSemantics(child: BarraParte(m.percentual / 100, descricao: '$parte do consumo')),
+            ExcludeSemantics(
+              child: BarraParte(m.percentual / 100, descricao: tr('$parte do consumo', '$parte of consumption')),
+            ),
           ],
         ),
       ),
@@ -290,7 +335,7 @@ class CartaoFonte extends StatelessWidget {
     final t = Iamp.de(context);
     final onde = [
       if (f.secao != null && f.secao!.isNotEmpty) f.secao!,
-      if (f.pagina != null) 'página ${f.pagina}',
+      if (f.pagina != null) tr('página ${f.pagina}', 'page ${f.pagina}'),
     ].join(' · ');
     return Card(
       child: Padding(
@@ -303,7 +348,11 @@ class CartaoFonte extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: Espaco.p),
               alignment: Alignment.center,
               decoration: t.selo(t.destaque),
-              child: Text('${f.n}', style: t.forte.copyWith(color: t.destaque), semanticsLabel: 'Fonte ${f.n}'),
+              child: Text(
+                '${f.n}',
+                style: t.forte.copyWith(color: t.destaque),
+                semanticsLabel: tr('Fonte ${f.n}', 'Source ${f.n}'),
+              ),
             ),
             const SizedBox(width: Espaco.pm),
             Expanded(

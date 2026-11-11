@@ -6,6 +6,9 @@ Documentacao e testes pelo navegador: http://localhost:8000/docs
 
 Na primeira subida, se o banco estiver vazio, a API carrega os CSVs limpos sozinha.
 Para forcar uma nova carga: RECARREGAR_BANCO=1.
+
+Idioma: com o cabecalho "Accept-Language: en" os textos da resposta (metodo, avisos, mensagens,
+erros, plano do Eco-Coach) vem em ingles; sem ele, em portugues (ver idioma.py).
 """
 
 import os
@@ -21,6 +24,7 @@ from pydantic import BaseModel, Field, model_validator
 
 import banco
 import estimativa
+import idioma
 import ml_pipeline
 import rag_agent
 import servico
@@ -81,9 +85,39 @@ async def ciclo_de_vida(app):
 app = FastAPI(
     title="iamp API",
     description="Estima o consumo e o custo mensal de energia de aparelhos eletricos residenciais.",
-    version="0.4.0",
+    version="0.5.0",
     lifespan=ciclo_de_vida,
 )
+
+
+class IdiomaDaRequisicao:
+    """Le o Accept-Language de cada requisicao e deixa o idioma valendo enquanto ela roda.
+    Middleware ASGI puro (e nao @app.middleware): o valor da ContextVar chega ate as rotas e a resposta
+    avisa o idioma (Content-Language) e que ele depende do cabecalho (Vary), para caches nao misturarem."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        cabecalhos = dict(scope.get("headers") or [])
+        escolhido = idioma.do_cabecalho(cabecalhos.get(b"accept-language", b"").decode("latin-1"))
+
+        async def enviar(mensagem):
+            if mensagem["type"] == "http.response.start":
+                extras = [(b"content-language", b"en" if escolhido == "en" else b"pt-BR"), (b"vary", b"Accept-Language")]
+                mensagem = {**mensagem, "headers": [*mensagem.get("headers", []), *extras]}
+            await send(mensagem)
+
+        token = idioma.definir(escolhido)
+        try:
+            await self.app(scope, receive, enviar)
+        finally:
+            idioma.restaurar(token)
+
+
+app.add_middleware(IdiomaDaRequisicao)
 
 app.add_middleware(
     CORSMiddleware,
@@ -358,7 +392,7 @@ def conexao():
     try:
         con = banco.conectar()
     except ConnectionError as erro:
-        raise HTTPException(status_code=503, detail="banco de dados indisponivel") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr("banco de dados indisponivel", "database unavailable")) from erro
     try:
         yield con
     finally:
@@ -367,7 +401,8 @@ def conexao():
 
 def erro_do_servico(erro):
     mensagem = str(erro)
-    nao_achou = "nao existe" in mensagem or "sem tarifa vigente" in mensagem
+    nao_achou = any(trecho in mensagem for trecho in
+                    ("nao existe", "sem tarifa vigente", "does not exist", "has no current tariff"))
     return HTTPException(status_code=404 if nao_achou else 422, detail=mensagem)
 
 
@@ -457,7 +492,8 @@ def calcular_refrigerador_antigo(entrada: RefrigeradorAntigoEntrada, con=Depends
         return servico.calcular_estimado(con, consumo, marca=entrada.marca, modelo=entrada.modelo,
                                          registrar=entrada.registrar, **entrada.tarifa())
     except FileNotFoundError as erro:
-        raise HTTPException(status_code=503, detail="modelo de estimativa indisponivel") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de estimativa indisponivel",
+                                                              "estimation model unavailable")) from erro
     except ValueError as erro:
         raise erro_do_servico(erro) from erro
 
@@ -545,7 +581,8 @@ def classificar(entrada: ClassificacaoEntrada):
     try:
         return ml_pipeline.classificar_residencia(entrada.model_dump())
     except FileNotFoundError as erro:
-        raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponivel",
+                                                              "profile model unavailable")) from erro
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
 
@@ -608,9 +645,11 @@ def eco_coach(entrada: EcoCoachEntrada, con=Depends(conexao)):
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
     except FileNotFoundError as erro:
-        raise HTTPException(status_code=503, detail="modelo de perfil indisponivel") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponivel",
+                                                              "profile model unavailable")) from erro
     except (LookupError, RuntimeError) as erro:
-        raise HTTPException(status_code=503, detail=f"Eco-Coach indisponivel: {erro}") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponivel: {erro}",
+                                                              f"Eco-Coach unavailable: {erro}")) from erro
 
 
 class DicasEntrada(BaseModel):
@@ -636,4 +675,5 @@ def eco_coach_aparelho(entrada: DicasEntrada, con=Depends(conexao)):
     except ValueError as erro:
         raise HTTPException(status_code=422, detail=str(erro)) from erro
     except (LookupError, RuntimeError) as erro:
-        raise HTTPException(status_code=503, detail=f"Eco-Coach indisponivel: {erro}") from erro
+        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponivel: {erro}",
+                                                              f"Eco-Coach unavailable: {erro}")) from erro

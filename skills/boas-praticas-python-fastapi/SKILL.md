@@ -49,6 +49,14 @@ Ao criar, alterar ou revisar código Python neste repositório, siga estas conve
 - Mudanças na API só **acrescentam** campos ou rotas: o APK já instalado precisa continuar funcionando. Mudou a API, suba `version` em `main.py` e anote no `CHANGELOG.md`.
 - Toda estimativa, premissa ou conversão aparece em `avisos` e em `metodo` na resposta; o app mostra isso ao usuário.
 
+## Idioma das respostas
+
+- A API responde em português por padrão e em inglês com `Accept-Language: en` (`src/idioma.py`; o middleware `IdiomaDaRequisicao` em `main.py` guarda o idioma numa ContextVar).
+- Texto para o usuário montado com números (`metodo`, mensagens de erro, payback): `tr("pt", "en")` no próprio lugar, com o português idêntico ao de antes.
+- Texto fixo (constante `AVISO_*`, `ESTIMAVEIS`, `NOMES_DOS_TIPOS`, `SEM_SUGESTAO`, nomes de eletroportáteis): continua em português no código e passa por `t(texto)` quando entra na resposta; a tradução vai em `src/traducoes.py` (chave = texto em português). `tests/test_idioma.py` falha se faltar tradução ou sobrar chave antiga.
+- Chaves e números não se traduzem (categoria, perfil, velocidade, `kwh_mes`); o app traduz os nomes.
+- Mensagem de erro que decide 404 em `erro_do_servico` precisa do trecho nas duas línguas ("nao existe"/"does not exist").
+
 ## Testes
 
 - `pytest` na raiz. Testes de regra pura não precisam de banco; os que precisam usam os fixtures `con` ou `api` e a marca `@pytest.mark.banco` (são pulados sem o PostgreSQL).

@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
@@ -54,7 +55,7 @@ class TelaBoasVindas extends StatelessWidget {
                   child: FilledButton.icon(
                     onPressed: () => _comecar(context),
                     icon: const Icon(Icons.bolt),
-                    label: const Text('Comece a economizar'),
+                    label: Text(tr('Comece a economizar', 'Start saving')),
                   ),
                 ),
               ),
