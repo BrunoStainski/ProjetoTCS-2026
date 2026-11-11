@@ -11,71 +11,71 @@ from pathlib import Path
 
 import pandas as pd
 
-RAIZ_PROJETO = Path(__file__).resolve().parent.parent
-PASTA_RAW = RAIZ_PROJETO / "datasets" / "raw"
-PASTA_PROCESSED = RAIZ_PROJETO / "datasets" / "processed"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+RAW_FOLDER = PROJECT_ROOT / "datasets" / "raw"
+PROCESSED_FOLDER = PROJECT_ROOT / "datasets" / "processed"
 
 
-def carregar_env() -> None:
+def load_env() -> None:
     """Carrega variáveis do arquivo .env da raiz (sem sobrescrever as já definidas)."""
-    arquivo_env = RAIZ_PROJETO / ".env"
-    if not arquivo_env.exists():
+    env_file = PROJECT_ROOT / ".env"
+    if not env_file.exists():
         return
-    for linha in arquivo_env.read_text(encoding="utf-8").splitlines():
-        linha = linha.strip()
-        if not linha or linha.startswith("#") or "=" not in linha:
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        chave, valor = linha.split("=", 1)
-        os.environ.setdefault(chave.strip(), valor.strip().strip('"').strip("'"))
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
 
 def database_url() -> str:
     """Monta a URL do PostgreSQL a partir das variáveis de ambiente."""
-    carregar_env()
+    load_env()
     if os.getenv("DATABASE_URL"):
         return os.environ["DATABASE_URL"]
-    usuario = os.environ["POSTGRES_USER"]
-    senha = os.environ["POSTGRES_PASSWORD"]
-    banco = os.environ["POSTGRES_DB"]
+    user = os.environ["POSTGRES_USER"]
+    password = os.environ["POSTGRES_PASSWORD"]
+    database = os.environ["POSTGRES_DB"]
     host = os.getenv("POSTGRES_HOST", "localhost")
-    porta = os.getenv("POSTGRES_PORT", "5434")
-    return f"postgresql+psycopg2://{usuario}:{senha}@{host}:{porta}/{banco}"
+    port = os.getenv("POSTGRES_PORT", "5434")
+    return f"postgresql+psycopg2://{user}:{password}@{host}:{port}/{database}"
 
 
-def caminho_raw(nome_arquivo: str) -> Path:
-    caminho = PASTA_RAW / nome_arquivo
-    if not caminho.is_file():
-        raise FileNotFoundError(f"Arquivo bruto não encontrado: {caminho}")
-    return caminho
+def raw_path(file_name: str) -> Path:
+    path = RAW_FOLDER / file_name
+    if not path.is_file():
+        raise FileNotFoundError(f"Arquivo bruto não encontrado: {path}")
+    return path
 
 
-def ler_csv_inmetro(nome_arquivo: str) -> pd.DataFrame:
+def read_csv_inmetro(file_name: str) -> pd.DataFrame:
     """Lê um CSV bruto do INMETRO (UTF-8 com BOM, separador vírgula)."""
-    return pd.read_csv(caminho_raw(nome_arquivo), encoding="utf-8-sig")
+    return pd.read_csv(raw_path(file_name), encoding="utf-8-sig")
 
 
-def filtrar_modelos_incluidos(df: pd.DataFrame, coluna: str = "Status do Modelo") -> pd.DataFrame:
+def filter_included_models(df: pd.DataFrame, column: str = "Status do Modelo") -> pd.DataFrame:
     """Mantém apenas modelos com status 'Incluido' (os demais saíram do programa PBE)."""
-    if coluna not in df.columns:
+    if column not in df.columns:
         return df
-    status = df[coluna].astype(str).str.strip().str.lower()
+    status = df[column].astype(str).str.strip().str.lower()
     return df[status == "incluido"].copy()
 
 
-def para_snake_case(nome: str) -> str:
+def to_snake_case(name: str) -> str:
     """'Potência (W)' -> 'potencia_w'; 'Eficiência (%)' -> 'eficiencia_pct'."""
-    nome = nome.replace("﻿", "").replace("%", " pct ").replace("²", "2").replace("³", "3")
-    nome = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode("ascii")
-    nome = re.sub(r"[^0-9a-zA-Z]+", "_", nome).strip("_").lower()
-    return re.sub(r"_+", "_", nome)
+    name = name.replace("﻿", "").replace("%", " pct ").replace("²", "2").replace("³", "3")
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii")
+    name = re.sub(r"[^0-9a-zA-Z]+", "_", name).strip("_").lower()
+    return re.sub(r"_+", "_", name)
 
 
-def salvar_processado(df: pd.DataFrame, nome_arquivo: str) -> Path:
+def save_processed(df: pd.DataFrame, file_name: str) -> Path:
     """Padroniza colunas em snake_case e salva em datasets/processed (UTF-8, vírgula)."""
     df = df.copy()
-    df.columns = [para_snake_case(str(c)) for c in df.columns]
-    PASTA_PROCESSED.mkdir(parents=True, exist_ok=True)
-    caminho = PASTA_PROCESSED / nome_arquivo
-    df.to_csv(caminho, index=False, encoding="utf-8")
-    print(f"✓ {len(df)} linhas salvas em: {caminho}")
-    return caminho
+    df.columns = [to_snake_case(str(c)) for c in df.columns]
+    PROCESSED_FOLDER.mkdir(parents=True, exist_ok=True)
+    path = PROCESSED_FOLDER / file_name
+    df.to_csv(path, index=False, encoding="utf-8")
+    print(f"✓ {len(df)} linhas salvas em: {path}")
+    return path

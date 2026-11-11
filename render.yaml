@@ -1,0 +1,25 @@
+# Publicacao da API do Iamp no Render (plano gratuito), lido pelo Render como "Blueprint".
+# Banco: PostgreSQL do Neon (DATABASE_URL). Passo a passo no README, secao "Publicar na nuvem".
+#
+# - Cada push na branch abaixo publica a API de novo (autoDeploy).
+# - Primeira subida com o banco vazio: a API carrega sozinha o catalogo e a base do Eco-Coach (~1 min).
+# - No plano gratuito o servidor dorme depois de 15 min sem uso e leva ~1 min para acordar; o app avisa.
+services:
+  - type: web
+    name: iamp-api
+    runtime: docker
+    plan: free
+    region: virginia  # perto do Neon em AWS us-east-1: cada calculo faz varias consultas ao banco
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /saude
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false  # segredo: cole no painel do Render o endereco do Neon (postgresql://...?sslmode=require)
+      - key: GEMINI_API_KEY
+        sync: false  # segredo: a mesma chave do .env
+      - key: GEMINI_MODELOS
+        value: gemini-3.5-flash,gemini-3.5-flash-lite
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001

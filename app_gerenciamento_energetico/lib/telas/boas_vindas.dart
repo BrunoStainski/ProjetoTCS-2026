@@ -10,14 +10,14 @@ import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
 
-class TelaBoasVindas extends StatelessWidget {
+class WelcomeScreen extends StatelessWidget {
   /// Aberta junto com o app: o voltar do Android fecha o app (em vez de mostrar as abas por baixo).
-  final bool aoAbrir;
+  final bool onOpen;
 
-  const TelaBoasVindas({super.key, this.aoAbrir = false});
+  const WelcomeScreen({super.key, this.onOpen = false});
 
-  void _comecar(BuildContext context) {
-    irPara(Aba.calcular, recomecar: true);
+  void _start(BuildContext context) {
+    goTo(AppTab.calculate, restart: true);
     Navigator.pop(context); // as abas ja estao embaixo desta tela
   }
 
@@ -25,16 +25,16 @@ class TelaBoasVindas extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return PopScope(
-      canPop: !aoAbrir,
-      onPopInvokedWithResult: (saiu, _) {
-        if (!saiu) SystemNavigator.pop();
+      canPop: !onOpen,
+      onPopInvokedWithResult: (left, _) {
+        if (!left) SystemNavigator.pop();
       },
       child: Scaffold(
         body: const SafeArea(
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(Espaco.g),
-              child: MarcaIamp(tamanho: 120, tamanhoNome: 56),
+              padding: EdgeInsets.all(Spacing.g),
+              child: IampBrand(size: 120, nameSize: 56),
             ),
           ),
         ),
@@ -42,18 +42,18 @@ class TelaBoasVindas extends StatelessWidget {
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            border: Border(top: BorderSide(color: t.borda)),
+            border: Border(top: BorderSide(color: t.border)),
           ),
           child: SafeArea(
             top: false,
             child: Center(
               heightFactor: 1,
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: t.larguraMaxima),
+                constraints: BoxConstraints(maxWidth: t.maxWidth),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, Espaco.m),
+                  padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.m),
                   child: FilledButton.icon(
-                    onPressed: () => _comecar(context),
+                    onPressed: () => _start(context),
                     icon: const Icon(Icons.bolt),
                     label: Text(tr('Comece a economizar', 'Start saving')),
                   ),

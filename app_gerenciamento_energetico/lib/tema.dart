@@ -14,28 +14,28 @@
 
 import 'package:flutter/material.dart';
 
-class Cores {
-  static const preto = Color(0xFF000000);
-  static const superficie = Color(0xFF141414); // cartoes
-  static const superficieAlta = Color(0xFF1F1F1F); // campos, menus
+class AppColors {
+  static const black = Color(0xFF000000);
+  static const surface = Color(0xFF141414); // cartoes
+  static const highSurface = Color(0xFF1F1F1F); // campos, menus
   // detalhes (bordas, contornos, icones) em amarelo; o texto continua branco
-  static const borda = Color(0x8CFFD000); // amarelo 55%: contraste 4,5:1 no preto (minimo 3:1 para bordas)
-  static const divisoria = Color(0x40FFD000); // amarelo 25%: linhas entre itens de lista
-  static const trilho = Color(0xFF2A2A2A); // fundo das barras de progresso
-  static const amarelo = Color(0xFFFFD000);
-  static const amareloEscuro = Color(0xFF2B2300); // fundo de destaque suave
-  static const verde = Color(0xFF3DDC84); // economia
-  static const vermelho = Color(0xFFFF5C5C); // alerta
-  static const fundoErro = Color(0xFF1F0E0E);
+  static const border = Color(0x8CFFD000); // amarelo 55%: contraste 4,5:1 no preto (minimo 3:1 para bordas)
+  static const divider = Color(0x40FFD000); // amarelo 25%: linhas entre itens de lista
+  static const track = Color(0xFF2A2A2A); // fundo das barras de progresso
+  static const yellow = Color(0xFFFFD000);
+  static const yellowDark = Color(0xFF2B2300); // fundo de destaque suave
+  static const green = Color(0xFF3DDC84); // economia
+  static const red = Color(0xFFFF5C5C); // alerta
+  static const errorBackground = Color(0xFF1F0E0E);
   // texto: hierarquia por opacidade do branco (sem cinza escuro sobre o preto)
-  static const branco = Color(0xFFFFFFFF); // titulos e valores (100%)
-  static const corpo = Color(0xE6FFFFFF); // texto corrido (90%)
-  static const secundario = Color(0xCCFFFFFF); // texto de apoio (80%, contraste ~13:1)
-  static const exemplo = Color(0xB3FFFFFF); // exemplo dentro do campo (70%, contraste ~10:1)
+  static const white = Color(0xFFFFFFFF); // titulos e valores (100%)
+  static const body = Color(0xE6FFFFFF); // texto corrido (90%)
+  static const secondary = Color(0xCCFFFFFF); // texto de apoio (80%, contraste ~13:1)
+  static const example = Color(0xB3FFFFFF); // exemplo dentro do campo (70%, contraste ~10:1)
 }
 
 /// Espacamentos em multiplos de 4 e 8 (grade de 8).
-class Espaco {
+class Spacing {
   static const pp = 4.0;
   static const p = 8.0;
   static const pm = 12.0;
@@ -44,118 +44,118 @@ class Espaco {
   static const gg = 32.0;
 }
 
-const _numeros = [FontFeature.tabularFigures()]; // digitos alinhados em valores
+const _numbers = [FontFeature.tabularFigures()]; // digitos alinhados em valores
 
 /// Estilos, cores com significado e medidas do app, guardados no ThemeData.
 /// Uso nas telas: `final t = Iamp.de(context);` e depois `t.forte`, `t.economia`, `t.raio`...
 @immutable
 class Iamp extends ThemeExtension<Iamp> {
   // textos: 4 tamanhos (34, 22, 18, 16) e 2 pesos
-  final TextStyle valor; // valor principal da tela (R$ por mes)
-  final TextStyle valorMedio; // valores em cartoes
-  final TextStyle pergunta; // a pergunta de cada etapa
-  final TextStyle titulo;
-  final TextStyle forte;
-  final TextStyle corpo;
-  final TextStyle numero;
-  final TextStyle secundario;
-  final TextStyle rotulo;
+  final TextStyle value; // valor principal da tela (R$ por mes)
+  final TextStyle averageValue; // valores em cartoes
+  final TextStyle question; // a pergunta de cada etapa
+  final TextStyle title;
+  final TextStyle strong;
+  final TextStyle body;
+  final TextStyle number;
+  final TextStyle secondary;
+  final TextStyle label;
 
   // cores com significado
-  final Color destaque; // acao e valor principal (amarelo)
-  final Color economia; // verde
-  final Color alerta; // vermelho
-  final Color superficie;
-  final Color fundoDestaque;
-  final Color fundoErro;
-  final Color borda;
-  final Color textoForte;
-  final Color textoSecundario;
+  final Color highlight; // acao e valor principal (amarelo)
+  final Color savings; // verde
+  final Color alert; // vermelho
+  final Color surface;
+  final Color highlightBackground;
+  final Color errorBackground;
+  final Color border;
+  final Color strongText;
+  final Color secondaryText;
 
   // medidas
-  final double raio;
-  final double raioPequeno;
-  final double icone;
-  final double iconeGrande;
-  final double iconeEnorme;
-  final double alvoToque; // 48dp: minimo do Android e do iOS
-  final double barraProgresso;
-  final double larguraMaxima; // navegador e tablet: conteudo centralizado
+  final double radius;
+  final double smallRadius;
+  final double icon;
+  final double largeIcon;
+  final double hugeIcon;
+  final double touchTarget; // 48dp: minimo do Android e do iOS
+  final double progressBar;
+  final double maxWidth; // navegador e tablet: conteudo centralizado
 
   const Iamp({
-    required this.valor,
-    required this.valorMedio,
-    required this.pergunta,
-    required this.titulo,
-    required this.forte,
-    required this.corpo,
-    required this.numero,
-    required this.secundario,
-    required this.rotulo,
-    required this.destaque,
-    required this.economia,
-    required this.alerta,
-    required this.superficie,
-    required this.fundoDestaque,
-    required this.fundoErro,
-    required this.borda,
-    required this.textoForte,
-    required this.textoSecundario,
-    required this.raio,
-    required this.raioPequeno,
-    required this.icone,
-    required this.iconeGrande,
-    required this.iconeEnorme,
-    required this.alvoToque,
-    required this.barraProgresso,
-    required this.larguraMaxima,
+    required this.value,
+    required this.averageValue,
+    required this.question,
+    required this.title,
+    required this.strong,
+    required this.body,
+    required this.number,
+    required this.secondary,
+    required this.label,
+    required this.highlight,
+    required this.savings,
+    required this.alert,
+    required this.surface,
+    required this.highlightBackground,
+    required this.errorBackground,
+    required this.border,
+    required this.strongText,
+    required this.secondaryText,
+    required this.radius,
+    required this.smallRadius,
+    required this.icon,
+    required this.largeIcon,
+    required this.hugeIcon,
+    required this.touchTarget,
+    required this.progressBar,
+    required this.maxWidth,
   });
 
-  static const padrao = Iamp(
-    valor: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, fontFeatures: _numeros, color: Cores.amarelo),
-    valorMedio: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: _numeros, color: Cores.branco),
-    pergunta: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Cores.branco, height: 1.3),
-    titulo: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Cores.branco),
-    forte: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Cores.branco),
-    corpo: TextStyle(fontSize: 18, color: Cores.corpo, height: 1.4),
-    numero: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFeatures: _numeros, color: Cores.branco),
-    secundario: TextStyle(fontSize: 16, color: Cores.secundario, height: 1.35),
-    rotulo: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Cores.secundario),
-    destaque: Cores.amarelo,
-    economia: Cores.verde,
-    alerta: Cores.vermelho,
-    superficie: Cores.superficie,
-    fundoDestaque: Cores.amareloEscuro,
-    fundoErro: Cores.fundoErro,
-    borda: Cores.borda,
-    textoForte: Cores.branco,
-    textoSecundario: Cores.secundario,
-    raio: 16,
-    raioPequeno: 8,
-    icone: 24,
-    iconeGrande: 32,
-    iconeEnorme: 64,
-    alvoToque: 48,
-    barraProgresso: 8,
-    larguraMaxima: 640,
+  static const defaults = Iamp(
+    value: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.yellow),
+    averageValue: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.white),
+    question: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.white, height: 1.3),
+    title: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.white),
+    strong: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.white),
+    body: TextStyle(fontSize: 18, color: AppColors.body, height: 1.4),
+    number: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.white),
+    secondary: TextStyle(fontSize: 16, color: AppColors.secondary, height: 1.35),
+    label: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondary),
+    highlight: AppColors.yellow,
+    savings: AppColors.green,
+    alert: AppColors.red,
+    surface: AppColors.surface,
+    highlightBackground: AppColors.yellowDark,
+    errorBackground: AppColors.errorBackground,
+    border: AppColors.border,
+    strongText: AppColors.white,
+    secondaryText: AppColors.secondary,
+    radius: 16,
+    smallRadius: 8,
+    icon: 24,
+    largeIcon: 32,
+    hugeIcon: 64,
+    touchTarget: 48,
+    progressBar: 8,
+    maxWidth: 640,
   );
 
   /// Le do tema; fora do app (testes de um widget so) usa o padrao.
-  static Iamp de(BuildContext context) => Theme.of(context).extension<Iamp>() ?? padrao;
+  static Iamp de(BuildContext context) => Theme.of(context).extension<Iamp>() ?? defaults;
 
   /// Cartao do valor principal: contorno e brilho suave na cor (amarelo = gasto, verde = economia).
-  BoxDecoration cartaoDestaque(Color cor, {bool circulo = false}) => BoxDecoration(
-    color: superficie,
-    shape: circulo ? BoxShape.circle : BoxShape.rectangle,
-    borderRadius: circulo ? null : BorderRadius.circular(raio),
+  BoxDecoration highlightCard(Color cor, {bool circle = false}) => BoxDecoration(
+    color: surface,
+    shape: circle ? BoxShape.circle : BoxShape.rectangle,
+    borderRadius: circle ? null : BorderRadius.circular(radius),
     border: Border.all(color: cor.withValues(alpha: 0.7), width: 1.5),
     boxShadow: [BoxShadow(color: cor.withValues(alpha: 0.18), blurRadius: 32, spreadRadius: -4)],
   );
 
   /// Etiqueta pequena com fundo suave (ex.: "30% menos", "Perfil Moderado").
-  BoxDecoration selo(Color cor) => BoxDecoration(
+  BoxDecoration badge(Color cor) => BoxDecoration(
     color: cor.withValues(alpha: 0.12),
-    borderRadius: BorderRadius.circular(raioPequeno),
+    borderRadius: BorderRadius.circular(smallRadius),
     border: Border.all(color: cor.withValues(alpha: 0.6)),
   );
 
@@ -166,223 +166,223 @@ class Iamp extends ThemeExtension<Iamp> {
   Iamp lerp(Iamp? other, double t) => t < 0.5 || other == null ? this : other;
 }
 
-ThemeData temaIamp() {
-  const t = Iamp.padrao;
-  const esquema = ColorScheme(
+ThemeData iampTheme() {
+  const t = Iamp.defaults;
+  const schema = ColorScheme(
     brightness: Brightness.dark,
-    primary: Cores.amarelo,
-    onPrimary: Cores.preto,
-    primaryContainer: Cores.amareloEscuro,
-    onPrimaryContainer: Cores.amarelo,
-    secondary: Cores.verde,
-    onSecondary: Cores.preto,
-    secondaryContainer: Cores.superficieAlta,
-    onSecondaryContainer: Cores.branco,
-    error: Cores.vermelho,
-    onError: Cores.preto,
-    errorContainer: Cores.fundoErro,
+    primary: AppColors.yellow,
+    onPrimary: AppColors.black,
+    primaryContainer: AppColors.yellowDark,
+    onPrimaryContainer: AppColors.yellow,
+    secondary: AppColors.green,
+    onSecondary: AppColors.black,
+    secondaryContainer: AppColors.highSurface,
+    onSecondaryContainer: AppColors.white,
+    error: AppColors.red,
+    onError: AppColors.black,
+    errorContainer: AppColors.errorBackground,
     onErrorContainer: Color(0xFFFFDAD6),
-    surface: Cores.preto,
-    onSurface: Cores.branco,
-    onSurfaceVariant: Cores.secundario,
-    surfaceContainerLowest: Cores.preto,
-    surfaceContainerLow: Cores.superficie,
-    surfaceContainer: Cores.superficie,
-    surfaceContainerHigh: Cores.superficieAlta,
-    surfaceContainerHighest: Cores.superficieAlta,
-    outline: Cores.borda,
-    outlineVariant: Cores.borda,
+    surface: AppColors.black,
+    onSurface: AppColors.white,
+    onSurfaceVariant: AppColors.secondary,
+    surfaceContainerLowest: AppColors.black,
+    surfaceContainerLow: AppColors.surface,
+    surfaceContainer: AppColors.surface,
+    surfaceContainerHigh: AppColors.highSurface,
+    surfaceContainerHighest: AppColors.highSurface,
+    outline: AppColors.border,
+    outlineVariant: AppColors.border,
   );
 
-  final base = ThemeData(colorScheme: esquema, useMaterial3: true);
-  const textoBotao = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
-  final texto = base.textTheme
+  final base = ThemeData(colorScheme: schema, useMaterial3: true);
+  const buttonText = TextStyle(fontSize: 18, fontWeight: FontWeight.bold);
+  final text = base.textTheme
       .copyWith(
-        headlineSmall: t.pergunta,
-        titleLarge: t.titulo,
-        titleMedium: t.forte,
-        titleSmall: t.rotulo,
-        bodyLarge: t.corpo,
-        bodyMedium: t.corpo,
-        bodySmall: t.secundario,
-        labelLarge: textoBotao,
-        labelMedium: t.rotulo,
-        labelSmall: t.secundario,
+        headlineSmall: t.question,
+        titleLarge: t.title,
+        titleMedium: t.strong,
+        titleSmall: t.label,
+        bodyLarge: t.body,
+        bodyMedium: t.body,
+        bodySmall: t.secondary,
+        labelLarge: buttonText,
+        labelMedium: t.label,
+        labelSmall: t.secondary,
       )
-      .apply(bodyColor: Cores.corpo, displayColor: Cores.branco);
+      .apply(bodyColor: AppColors.body, displayColor: AppColors.white);
 
-  final cantos = RoundedRectangleBorder(borderRadius: BorderRadius.circular(t.raio));
-  final cantosCampo = BorderRadius.circular(t.raio - 4);
+  final corners = RoundedRectangleBorder(borderRadius: BorderRadius.circular(t.radius));
+  final fieldCorners = BorderRadius.circular(t.radius - 4);
   // botoes principais com 56dp: alvo confortavel na zona do polegar
-  const alturaBotao = Size.fromHeight(56);
-  const espacoBotao = EdgeInsets.symmetric(horizontal: Espaco.m, vertical: Espaco.pm);
+  const buttonHeight = Size.fromHeight(56);
+  const buttonSpacing = EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.pm);
 
   return base.copyWith(
-    scaffoldBackgroundColor: Cores.preto,
-    textTheme: texto,
+    scaffoldBackgroundColor: AppColors.black,
+    textTheme: text,
     extensions: const [t],
     materialTapTargetSize: MaterialTapTargetSize.padded,
     visualDensity: VisualDensity.standard,
     appBarTheme: AppBarTheme(
-      backgroundColor: Cores.preto,
-      foregroundColor: Cores.branco,
+      backgroundColor: AppColors.black,
+      foregroundColor: AppColors.white,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
-      titleTextStyle: t.titulo,
-      iconTheme: const IconThemeData(color: Cores.amarelo), // seta de voltar
-      actionsIconTheme: const IconThemeData(color: Cores.amarelo),
+      titleTextStyle: t.title,
+      iconTheme: const IconThemeData(color: AppColors.yellow), // seta de voltar
+      actionsIconTheme: const IconThemeData(color: AppColors.yellow),
     ),
-    iconTheme: IconThemeData(color: Cores.amarelo, size: t.icone),
+    iconTheme: IconThemeData(color: AppColors.yellow, size: t.icon),
     cardTheme: CardThemeData(
-      color: Cores.superficie,
+      color: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      margin: const EdgeInsets.symmetric(vertical: Espaco.pp),
+      margin: const EdgeInsets.symmetric(vertical: Spacing.pp),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(t.raio),
-        side: const BorderSide(color: Cores.borda),
+        borderRadius: BorderRadius.circular(t.radius),
+        side: const BorderSide(color: AppColors.border),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: Cores.superficie,
-      contentPadding: const EdgeInsets.symmetric(horizontal: Espaco.m, vertical: Espaco.m + 2),
-      border: OutlineInputBorder(borderRadius: cantosCampo),
+      fillColor: AppColors.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.m + 2),
+      border: OutlineInputBorder(borderRadius: fieldCorners),
       enabledBorder: OutlineInputBorder(
-        borderRadius: cantosCampo,
-        borderSide: const BorderSide(color: Cores.borda),
+        borderRadius: fieldCorners,
+        borderSide: const BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: cantosCampo,
-        borderSide: const BorderSide(color: Cores.amarelo, width: 2),
+        borderRadius: fieldCorners,
+        borderSide: const BorderSide(color: AppColors.yellow, width: 2),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: cantosCampo,
-        borderSide: const BorderSide(color: Cores.vermelho, width: 2),
+        borderRadius: fieldCorners,
+        borderSide: const BorderSide(color: AppColors.red, width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: cantosCampo,
-        borderSide: const BorderSide(color: Cores.vermelho, width: 2),
+        borderRadius: fieldCorners,
+        borderSide: const BorderSide(color: AppColors.red, width: 2),
       ),
-      labelStyle: const TextStyle(color: Cores.secundario, fontSize: 18),
-      floatingLabelStyle: const TextStyle(color: Cores.amarelo, fontSize: 18),
-      helperStyle: t.secundario,
+      labelStyle: const TextStyle(color: AppColors.secondary, fontSize: 18),
+      floatingLabelStyle: const TextStyle(color: AppColors.yellow, fontSize: 18),
+      helperStyle: t.secondary,
       helperMaxLines: 4,
-      errorStyle: t.secundario.copyWith(color: Cores.vermelho),
+      errorStyle: t.secondary.copyWith(color: AppColors.red),
       errorMaxLines: 4,
-      hintStyle: const TextStyle(color: Cores.exemplo, fontSize: 18),
-      suffixStyle: t.corpo,
+      hintStyle: const TextStyle(color: AppColors.example, fontSize: 18),
+      suffixStyle: t.body,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: Cores.amarelo,
-        foregroundColor: Cores.preto,
+        backgroundColor: AppColors.yellow,
+        foregroundColor: AppColors.black,
         disabledBackgroundColor: const Color(0x66FFD000),
-        disabledForegroundColor: Cores.preto,
-        minimumSize: alturaBotao,
-        padding: espacoBotao,
-        shape: cantos,
-        textStyle: textoBotao,
+        disabledForegroundColor: AppColors.black,
+        minimumSize: buttonHeight,
+        padding: buttonSpacing,
+        shape: corners,
+        textStyle: buttonText,
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: Cores.branco,
-        iconColor: Cores.amarelo,
-        minimumSize: alturaBotao,
-        padding: espacoBotao,
-        shape: cantos,
-        side: const BorderSide(color: Cores.borda),
-        textStyle: textoBotao,
+        foregroundColor: AppColors.white,
+        iconColor: AppColors.yellow,
+        minimumSize: buttonHeight,
+        padding: buttonSpacing,
+        shape: corners,
+        side: const BorderSide(color: AppColors.border),
+        textStyle: buttonText,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: Cores.amarelo,
-        minimumSize: Size(t.alvoToque, t.alvoToque),
-        padding: const EdgeInsets.symmetric(horizontal: Espaco.pm, vertical: Espaco.pm),
-        textStyle: textoBotao,
+        foregroundColor: AppColors.yellow,
+        minimumSize: Size(t.touchTarget, t.touchTarget),
+        padding: const EdgeInsets.symmetric(horizontal: Spacing.pm, vertical: Spacing.pm),
+        textStyle: buttonText,
       ),
     ),
     // alvo de toque minimo de 48dp em todos os botoes de icone
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
-        minimumSize: Size(t.alvoToque, t.alvoToque),
-        foregroundColor: Cores.amarelo,
+        minimumSize: Size(t.touchTarget, t.touchTarget),
+        foregroundColor: AppColors.yellow,
         disabledForegroundColor: const Color(0x66FFD000),
-        iconSize: t.icone + 4,
+        iconSize: t.icon + 4,
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(color: Cores.amarelo, linearTrackColor: Cores.trilho),
-    dividerTheme: const DividerThemeData(color: Cores.divisoria, space: 1),
+    progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.yellow, linearTrackColor: AppColors.track),
+    dividerTheme: const DividerThemeData(color: AppColors.divider, space: 1),
     listTileTheme: ListTileThemeData(
-      iconColor: Cores.amarelo,
-      textColor: Cores.branco,
-      titleTextStyle: t.forte,
-      subtitleTextStyle: t.secundario,
-      minVerticalPadding: Espaco.pm,
+      iconColor: AppColors.yellow,
+      textColor: AppColors.white,
+      titleTextStyle: t.strong,
+      subtitleTextStyle: t.secondary,
+      minVerticalPadding: Spacing.pm,
       minTileHeight: 64,
-      contentPadding: const EdgeInsets.symmetric(horizontal: Espaco.m),
+      contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.m),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: Cores.superficieAlta,
-      contentTextStyle: t.corpo.copyWith(color: Cores.branco),
-      actionTextColor: Cores.amarelo,
+      backgroundColor: AppColors.highSurface,
+      contentTextStyle: t.body.copyWith(color: AppColors.white),
+      actionTextColor: AppColors.yellow,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(t.raio),
-        side: const BorderSide(color: Cores.borda),
+        borderRadius: BorderRadius.circular(t.radius),
+        side: const BorderSide(color: AppColors.border),
       ),
     ),
     // secoes que abrem (busca agrupada por tipo de aparelho): sem linhas extras, seta amarela
     expansionTileTheme: const ExpansionTileThemeData(
-      iconColor: Cores.amarelo,
-      collapsedIconColor: Cores.amarelo,
-      textColor: Cores.branco,
-      collapsedTextColor: Cores.branco,
+      iconColor: AppColors.yellow,
+      collapsedIconColor: AppColors.yellow,
+      textColor: AppColors.white,
+      collapsedTextColor: AppColors.white,
       shape: Border(),
       collapsedShape: Border(),
-      tilePadding: EdgeInsets.symmetric(horizontal: Espaco.m, vertical: Espaco.pp),
+      tilePadding: EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.pp),
       childrenPadding: EdgeInsets.zero,
     ),
     badgeTheme: BadgeThemeData(
-      backgroundColor: Cores.amarelo,
-      textColor: Cores.preto,
-      textStyle: t.rotulo.copyWith(fontSize: 13),
+      backgroundColor: AppColors.yellow,
+      textColor: AppColors.black,
+      textStyle: t.label.copyWith(fontSize: 13),
     ),
     // navegacao inferior: icone + texto; a aba escolhida tem o fundo amarelo E o texto em negrito
     // (nao depende so da cor)
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Cores.superficie,
+      backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: Cores.amarelo,
+      indicatorColor: AppColors.yellow,
       height: 80,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       iconTheme: WidgetStateProperty.resolveWith(
-        (estados) => IconThemeData(
-          color: estados.contains(WidgetState.selected) ? Cores.preto : Cores.amarelo,
-          size: t.icone + 4,
+        (states) => IconThemeData(
+          color: states.contains(WidgetState.selected) ? AppColors.black : AppColors.yellow,
+          size: t.icon + 4,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
-        (estados) => estados.contains(WidgetState.selected)
-            ? const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Cores.amarelo)
-            : const TextStyle(fontSize: 16, color: Cores.corpo),
+        (states) => states.contains(WidgetState.selected)
+            ? const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.yellow)
+            : const TextStyle(fontSize: 16, color: AppColors.body),
       ),
     ),
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith(
-        (estados) => estados.contains(WidgetState.selected) ? Cores.amarelo : Cores.secundario,
+        (states) => states.contains(WidgetState.selected) ? AppColors.yellow : AppColors.secondary,
       ),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
-        (estados) => estados.contains(WidgetState.selected) ? Cores.preto : Cores.secundario,
+        (states) => states.contains(WidgetState.selected) ? AppColors.black : AppColors.secondary,
       ),
       trackColor: WidgetStateProperty.resolveWith(
-        (estados) => estados.contains(WidgetState.selected) ? Cores.amarelo : Cores.superficieAlta,
+        (states) => states.contains(WidgetState.selected) ? AppColors.yellow : AppColors.highSurface,
       ),
     ),
-    popupMenuTheme: PopupMenuThemeData(color: Cores.superficieAlta, shape: cantos, textStyle: t.corpo),
+    popupMenuTheme: PopupMenuThemeData(color: AppColors.highSurface, shape: corners, textStyle: t.body),
   );
 }

@@ -9,21 +9,22 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 
 ## Organização
 
-- `api.dart`: modelos (`Aparelho`, `Resultado`...) e todas as chamadas HTTP. Nenhuma tela chama `http` direto. Erros de rede viram `ApiErro` com mensagem em português.
-- `casa.dart`: estado da casa (`Casa` com `ChangeNotifier`, instância global `casa`), `Consulta`, `EscolhaTarifa`. Só em memória, sem persistência (limitação conhecida).
-- `tema.dart`: `Cores`, `Estilos`, `Espaco` e `temaIamp()`. **Não** use cor, tamanho de fonte ou espaçamento solto nas telas.
-- `telas/comum.dart`: `Pagina` (com `rodape` para a ação principal), `CartaoDestaque`, `CartaoInfo`, `ListaAvisos`, `Titulo`, `MensagemErro`, `CampoTempo`/`ControleTempo`, `BotaoCasa`, `avisarAdicionado`. Reutilize antes de criar widget novo.
-- Uma tela por arquivo em `telas/`, nomes em português e snake_case no arquivo, PascalCase na classe (`TelaBusca`).
+- `api.dart`: modelos (`Appliance`, `Resultado`...) e todas as chamadas HTTP. Nenhuma tela chama `http` direto. Erros de rede viram `ApiError` com mensagem em português.
+- `casa.dart`: estado da casa (`Home` com `ChangeNotifier`, instância global `casa`), `Query`, `TariffChoice`. Só em memória, sem persistência (limitação conhecida).
+- `tema.dart`: `Cores`, `Estilos`, `Spacing` e `iampTheme()`. **Não** use cor, tamanho de fonte ou espaçamento solto nas telas.
+- `telas/comum.dart`: `AppPage` (com `footer` para a ação principal), `HighlightCard`, `InfoCard`, `NoticeList`, `SectionTitle`, `ErrorMessage`, `TimeField`/`TimeControl`, `BotaoCasa`, `notifyAdded`. Reutilize antes de criar widget novo.
+- Uma tela por arquivo em `telas/` (nome do arquivo em português e snake_case, como já está); classes, métodos e
+  variáveis em inglês, PascalCase na classe (`SearchScreen`). Textos da tela continuam com `tr('pt', 'en')`.
 - Só o pacote `http` além do Flutter (e o `flutter_localizations`, que vem com o SDK); não acrescente dependências sem necessidade clara (ex.: o markdown do Eco-Coach é renderizado por `texto_plano.dart`, sem pacote).
 - `idioma.dart`: idioma do app (português nativo, inglês pelo menu). Ver "Idioma" abaixo.
 
 ## Identidade visual (regra 60/30/10)
 
 - Fundo preto; amarelo `#FFD000` só na ação principal e no valor principal; branco para texto em três opacidades (100/80/60%).
-- Detalhes nunca em branco: ícones, bordas (`Cores.borda`), divisórias (`Cores.divisoria`) e contornos são amarelos.
+- Detalhes nunca em branco: ícones, bordas (`Cores.border`), divisórias (`Cores.divider`) e contornos são amarelos.
 - Verde `#3DDC84` só para economia ou resultado bom; vermelho `#FF5C5C` só para alerta ou erro. Payback: verde até 60 meses, amarelo acima, vermelho se não se paga.
-- Quatro tamanhos de texto (32/20/16/13) e dois pesos; valores com dígitos tabulares (`Estilos.valor`, `Estilos.numero`). Grade de 8 (`Espaco`).
-- Ação principal fixa no rodapé (zona do polegar); toque mínimo de 48dp; valor principal em `CartaoDestaque`.
+- Quatro tamanhos de texto (32/20/16/13) e dois pesos; valores com dígitos tabulares (`Estilos.valor`, `Estilos.number`). Grade de 8 (`Spacing`).
+- Ação principal fixa no rodapé (zona do polegar); toque mínimo de 48dp; valor principal em `HighlightCard`.
 
 ## Integração com a API
 
@@ -37,16 +38,16 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 ## Idioma (português e inglês)
 
 - Todo texto que aparece na tela (título, botão, aviso, tooltip, rótulo do leitor de tela, mensagem de erro) é escrito com as duas versões no lugar: `tr('Gasto por mês', 'Cost per month')`. Nada de texto solto: um teste de widget do grupo "Idioma" troca o app inteiro para o inglês.
-- O app sempre abre em português; a troca é no menu (`mudarIdioma`), que redesenha todas as telas. Por isso, texto não pode ser calculado só uma vez e guardado (`const` com texto, campo `final` montado no construtor, mapa `static const`): use getter ou função que chame `tr()` no `build`.
-- Valores: `reais`, `numero` e `lerNumero` já seguem o idioma. Hint de exemplo também: `tr('Ex.: 0,85', 'E.g.: 0.85')`.
-- Texto que vem da API já chega no idioma (o app manda `Accept-Language`). Chaves da API (categoria, perfil, velocidade) não mudam: traduza o nome na tela (`nomeDaCategoria`, `nomeDoPerfil`, `nomeDaVelocidade`).
+- O app sempre abre em português; a troca é no menu (`changeLanguage`), que redesenha todas as telas. Por isso, texto não pode ser calculado só uma vez e guardado (`const` com texto, campo `final` montado no construtor, mapa `static const`): use getter ou função que chame `tr()` no `build`.
+- Valores: `reais`, `number` e `readNumber` já seguem o idioma. Hint de exemplo também: `tr('Ex.: 0,85', 'E.g.: 0.85')`.
+- Texto que vem da API já chega no idioma (o app manda `Accept-Language`). Chaves da API (categoria, perfil, velocidade) não mudam: traduza o nome na tela (`categoryName`, `profileName`, `speedName`).
 - Nomes de idiomas sempre na própria língua ("Português", "English"); nomes próprios (Inmetro, ANEEL, estados, marcas) não se traduzem.
 
 ## Armadilhas conhecidas
 
 - Nunca `setState(() => _f = futuro())` com arrow que devolve `Future`: guarde o future antes e chame `setState` em bloco.
-- SnackBar que navega usa o `NavigatorState` guardado antes, não o `context` da tela. Avisos somem em 5 s (`duracaoAviso`) com `persist: false`.
-- Busca: só a resposta mais recente vale (`_pedido`); acima de 30 por tipo, pedir parte do modelo.
+- SnackBar que navega usa o `NavigatorState` guardado antes, não o `context` da tela. Avisos somem em 5 s (`noticeDuration`) com `persist: false`.
+- Busca: só a resposta mais recente vale (`_request`); acima de 30 por tipo, pedir parte do modelo.
 - Teste de widget com API falsa: `http.runWithClient` + `MockClient`.
 - `tester.pageBack()` procura o tooltip "Back": dentro do `IampApp` em português a seta é "Voltar" (`find.byTooltip('Voltar')`). Em `MaterialApp` sem `locale` (teste de uma tela só) continua "Back".
 

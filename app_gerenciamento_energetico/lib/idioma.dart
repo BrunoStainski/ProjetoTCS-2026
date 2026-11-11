@@ -9,39 +9,39 @@
 
 import 'package:flutter/widgets.dart';
 
-enum Idioma {
+enum Language {
   pt(Locale('pt', 'BR'), 'pt-BR', 'Português'),
   en(Locale('en', 'US'), 'en', 'English');
 
   final Locale locale;
 
   /// Valor do cabecalho Accept-Language enviado para a API.
-  final String cabecalho;
+  final String header;
 
   /// Nome do idioma escrito nele mesmo (quem nao entende o idioma atual ainda acha o seu).
-  final String nome;
+  final String name;
 
-  const Idioma(this.locale, this.cabecalho, this.nome);
+  const Language(this.locale, this.header, this.name);
 }
 
 /// Idioma atual. O MaterialApp escuta este valor para trocar o `locale`.
-final idioma = ValueNotifier<Idioma>(Idioma.pt);
+final language = ValueNotifier<Language>(Language.pt);
 
-bool get emIngles => idioma.value == Idioma.en;
+bool get inEnglish => language.value == Language.en;
 
 /// Texto no idioma atual: tr('Gasto por mês', 'Cost per month').
-String tr(String pt, String en) => emIngles ? en : pt;
+String tr(String pt, String en) => inEnglish ? en : pt;
 
 /// Troca o idioma e desenha de novo todas as telas abertas, ja com os textos novos.
 /// Os widgets leem o idioma com tr() durante o build; marcar todos para reconstruir faz cada um
 /// chamar o tr() de novo (sem isso, so mudariam os textos das telas abertas depois da troca).
-void mudarIdioma(Idioma novo) {
-  if (idioma.value == novo) return;
-  idioma.value = novo;
-  void reconstruir(Element elemento) {
-    elemento.markNeedsBuild();
-    elemento.visitChildren(reconstruir);
+void changeLanguage(Language rewritten) {
+  if (language.value == rewritten) return;
+  language.value = rewritten;
+  void rebuild(Element element) {
+    element.markNeedsBuild();
+    element.visitChildren(rebuild);
   }
 
-  WidgetsBinding.instance.rootElement?.visitChildren(reconstruir);
+  WidgetsBinding.instance.rootElement?.visitChildren(rebuild);
 }

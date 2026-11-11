@@ -5,9 +5,9 @@ description: Regras de negócio para sugerir modelos mais econômicos equivalent
 
 # Regra de negócio: sugestão de troca e payback
 
-Use esta skill ao implementar, alterar ou revisar as rotas `POST /sugestoes`, `POST /comparar` e suas versões `/estimado`. A lógica está em `servico.sugerir_alternativas`, `servico._sugerir`, `servico.comparar` e nas constantes de `calculadora_residencial.py`. O objetivo é recomendar só trocas honestas: mesmo serviço, mesmo uso, mesma tarifa, dado confiável.
+Use esta skill ao implementar, alterar ou revisar as rotas `POST /sugestoes`, `POST /comparar` e suas versões `/estimado`. A lógica está em `servico.sugerir_alternativas`, `servico._suggest`, `servico.comparar` e nas constantes de `calculadora_residencial.py`. O objetivo é recomendar só trocas honestas: mesmo serviço, mesmo uso, mesma tarifa, dado confiável.
 
-## Equivalência (`EQUIVALENCIA`)
+## Equivalência (`EQUIVALENCE`)
 
 Um modelo só é candidato se fizer o mesmo serviço que o atual:
 
@@ -27,16 +27,16 @@ Um modelo só é candidato se fizer o mesmo serviço que o atual:
 ## Filtros obrigatórios
 
 - Só modelos com `origem_dado = 'informado'`: nada imputado na limpeza nem `convertido da metodologia antiga do Inmetro` (a conversão exagerava a economia).
-- Economia mínima de 5% (`ECONOMIA_MINIMA`) em relação ao consumo do atual, calculado com o **mesmo uso** (horas, ciclos, velocidade) e a **mesma tarifa** do atual.
-- Consumo abaixo de 40% da mediana dos equivalentes (`FRACAO_SUSPEITA`) é descartado como erro de digitação do Inmetro. Caso real que motivou a regra: HISENSE RS3P428NEDA, versão 127 V com 2,8 kWh contra 28,0 kWh da outra versão.
+- Economia mínima de 5% (`MIN_SAVINGS`) em relação ao consumo do atual, calculado com o **mesmo uso** (horas, ciclos, velocidade) e a **mesma tarifa** do atual.
+- Consumo abaixo de 40% da mediana dos equivalentes (`SUSPECT_FRACTION`) é descartado como erro de digitação do Inmetro. Caso real que motivou a regra: HISENSE RS3P428NEDA, versão 127 V com 2,8 kWh contra 28,0 kWh da outra versão.
 - Variações do mesmo modelo (marca + detalhe + kWh iguais, ex.: cor ou voltagem) aparecem uma vez.
 - Ordenar da maior para a menor economia; `limite` padrão 5.
 
-## Sem sugestão (`SEM_SUGESTAO`)
+## Sem sugestão (`NO_SUGGESTION`)
 
-Chuveiro, micro-ondas e lâmpada de vapor de sódio não recebem sugestão e a resposta traz o **motivo** para o app mostrar (eficiência parecida, só potência informada, sem lumens no dataset). Eletroportáteis também não têm sugestão (não têm etiqueta do Inmetro); o app oferece as dicas do Eco-Coach (`POST /eco-coach/aparelho`). Ao incluir uma categoria nova, decidir explicitamente entre `EQUIVALENCIA` e `SEM_SUGESTAO`.
+Chuveiro, micro-ondas e lâmpada de vapor de sódio não recebem sugestão e a resposta traz o **motivo** para o app mostrar (eficiência parecida, só potência informada, sem lumens no dataset). Eletroportáteis também não têm sugestão (não têm etiqueta do Inmetro); o app oferece as dicas do Eco-Coach (`POST /eco-coach/aparelho`). Ao incluir uma categoria nova, decidir explicitamente entre `EQUIVALENCE` e `NO_SUGGESTION`.
 
-## Comparação e payback (`servico.comparar`, `_comparacao`)
+## Comparação e payback (`servico.comparar`, `_comparison`)
 
 - Entrada: aparelho atual, `alternativa_id`, mesmo uso e tarifa, e `preco_novo` opcional em reais (o catálogo do Inmetro não tem preço; o usuário digita o que encontrou).
 - `economia_mes = custo_atual − custo_novo`; `economia_ano = × 12`.

@@ -6,6 +6,17 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Código padronizado em inglês: nomes de classes, métodos, funções e variáveis (Python e Dart). Textos para o
+  usuário, mensagens, comentários e nomes de arquivo continuam em português, e o contrato da API não muda: o
+  JSON segue com as chaves em português (`JSON_NAMES` + `ApiModel` em main.py) e os parâmetros de URL também
+  (`Query(alias="busca")`). Mesmos resultados: testes iguais e a limpeza dos dados gera arquivos idênticos.
+- Pronto para a nuvem gratuita (Render + Neon): a busca do Eco-Coach usa os embeddings do Gemini
+  (`gemini-embedding-001`, 768 dim) em vez do modelo local (~550 MB); a API caiu de ~750 MB para ~150 MB e
+  a imagem de 1,2 GB para ~530 MB. Com o banco vazio, a API carrega sozinha o catálogo e a base do Eco-Coach.
+  Porta pela variável `PORT`, endereço `postgresql://` do Neon aceito, `render.yaml` com a configuração.
+- App: chama a API ao abrir (acorda o servidor que dorme no plano grátis), espera até 75 s (Eco-Coach 120 s)
+  e, se o carregamento passar de 8 s, avisa que o servidor está acordando.
+
 - Idioma: o app pode ficar todo em inglês, para apresentar a quem não fala português. No menu (☰), seção
   "Idioma · Language" com "Português" e "English" (cada um escrito na própria língua). O app sempre abre em
   português; a troca não fica gravada. Ao trocar, as abas voltam para a primeira tela (respostas antigas da API

@@ -4,22 +4,22 @@
 
 import 'package:flutter/widgets.dart';
 
-enum Aba { calcular, casa, economizar }
+enum AppTab { calculate, home, save }
 
 /// Aba aberta agora. A barra de baixo escuta este valor.
-final abaAtual = ValueNotifier<Aba>(Aba.calcular);
+final currentTab = ValueNotifier<AppTab>(AppTab.calculate);
 
 /// Pilha de telas de cada aba.
-final chavesDasAbas = {for (final aba in Aba.values) aba: GlobalKey<NavigatorState>()};
+final tabKeys = {for (final tab in AppTab.values) tab: GlobalKey<NavigatorState>()};
 
 /// Volta a aba para a primeira tela dela.
-void recomecarAba(Aba aba) => chavesDasAbas[aba]!.currentState?.popUntil((rota) => rota.isFirst);
+void restartTab(AppTab tab) => tabKeys[tab]!.currentState?.popUntil((route) => route.isFirst);
 
 /// Abre outra aba. `recomecar` volta a aba de destino para a primeira tela;
-/// `fecharAtual` encerra o fluxo da aba de onde a pessoa saiu (ex.: depois de adicionar o aparelho).
-void irPara(Aba aba, {bool recomecar = false, bool fecharAtual = false}) {
-  final origem = abaAtual.value;
-  if (recomecar) recomecarAba(aba);
-  abaAtual.value = aba;
-  if (fecharAtual && origem != aba) recomecarAba(origem);
+/// `closeCurrent` encerra o fluxo da aba de onde a pessoa saiu (ex.: depois de adicionar o aparelho).
+void goTo(AppTab tab, {bool restart = false, bool closeCurrent = false}) {
+  final origin = currentTab.value;
+  if (restart) restartTab(tab);
+  currentTab.value = tab;
+  if (closeCurrent && origin != tab) restartTab(origin);
 }

@@ -4,10 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
-from config import ler_csv_inmetro, salvar_processado
+from config import read_csv_inmetro, save_processed
 import numpy as np
 
-df = ler_csv_inmetro("ventiladores-de-mesa-de-coluna-e-circulador-de-ar.csv")
+df = read_csv_inmetro("ventiladores-de-mesa-de-coluna-e-circulador-de-ar.csv")
 
 # Padronização dos nomes das colunas
 df.columns = (
@@ -30,22 +30,22 @@ print("Colunas:", list(df.columns))
 # %%
 # 1) Filtrar apenas modelos 'Incluido'
 if 'Status_do_Modelo' in df.columns:
-    antes = len(df)
+    before = len(df)
     df = df[df['Status_do_Modelo'].astype(str).str.strip().str.lower() == 'incluido']
-    print(f"✓ Filtro 'Incluido' aplicado: {len(df)} linhas (removidas {antes - len(df)})")
+    print(f"✓ Filtro 'Incluido' aplicado: {len(df)} linhas (removidas {before - len(df)})")
 
 # 2) Remover as 4 colunas solicitadas
-colunas_para_remover = [
+columns_to_remove = [
     'Status_do_Modelo',
     'Código_de_Barras',
     'Status_do_Registro',
     'Número_do_Registro'
 ]
 
-colunas_existentes = [col for col in colunas_para_remover if col in df.columns]
-df = df.drop(columns=colunas_existentes)
+existing_columns = [col for col in columns_to_remove if col in df.columns]
+df = df.drop(columns=existing_columns)
 
-print(f"✓ {len(colunas_existentes)} colunas irrelevantes removidas.")
+print(f"✓ {len(existing_columns)} colunas irrelevantes removidas.")
 print(f"Colunas restantes ({len(df.columns)}):", list(df.columns))
 
 # %% [markdown]
@@ -53,9 +53,9 @@ print(f"Colunas restantes ({len(df.columns)}):", list(df.columns))
 
 # %%
 # 1) Duplicatas exatas
-linhas_antes = len(df)
+lines_before = len(df)
 df = df.drop_duplicates()
-print(f"✓ Linhas duplicadas exatas removidas: {linhas_antes - len(df)}")
+print(f"✓ Linhas duplicadas exatas removidas: {lines_before - len(df)}")
 
 # 2) Duplicatas por (Marca, Modelo, Tensão) — preserva variantes 127V / 220V
 if all(c in df.columns for c in ['Marca', 'Modelo', 'Tensão']):
@@ -71,43 +71,43 @@ if all(c in df.columns for c in ['Marca', 'Modelo', 'Tensão']):
 
 # %%
 # --- Conversão de Tipos ---
-colunas_numericas = [
+numeric_columns = [
     'Diâmetro_da_Hélice_cm',
     'No._de_Pás',
     'Vazão_Média_de_Ar_m3_h_Alta',
     'Potência_Elétrica_Consumida_W_Alta',
     'Consumo_de_Energia_MensalkWh_mês_Alta',
 ]
-for col in colunas_numericas:
+for col in numeric_columns:
     if col in df.columns:
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
 # Tensão: padronizar strings e manter apenas Bivolt, 127 ou 220
 if 'Tensão' in df.columns:
     df['Tensão'] = df['Tensão'].astype(str).str.strip().str.upper()
-    mask_tensao = df['Tensão'].str.contains('127|220|BIVOLT', na=False)
-    df = df[mask_tensao]
+    mask_voltage = df['Tensão'].str.contains('127|220|BIVOLT', na=False)
+    df = df[mask_voltage]
     print(f"Após filtro de tensão: {len(df)} linhas")
 
 print("✓ Tipos convertidos e tensão padronizada.")
 
 # --- Filtros de Outliers (mantendo NaN para imputação posterior) ---
-antes = len(df)
+before = len(df)
 
-filtros = [
+filters = [
     ('Diâmetro_da_Hélice_cm', 10, 100),   # Corrige erros de digitação como 510cm
     ('Potência_Elétrica_Consumida_W_Alta', 10, 500),
     ('Consumo_de_Energia_MensalkWh_mês_Alta', 0, 20),
     ('Vazão_Média_de_Ar_m3_h_Alta', 0, 10),
 ]
 
-for col, minimo, maximo in filtros:
+for col, minimum, maximum in filters:
     if col in df.columns:
-        mask = df[col].isna() | ((df[col] >= minimo) & (df[col] <= maximo))
+        mask = df[col].isna() | ((df[col] >= minimum) & (df[col] <= maximum))
         df = df[mask]
-        print(f"Após filtro de {col} [{minimo}, {maximo}]: {len(df)} linhas")
+        print(f"Após filtro de {col} [{minimum}, {maximum}]: {len(df)} linhas")
 
-print(f"✓ Filtros aplicados. Total removido: {antes - len(df)} | Linhas restantes: {len(df)}")
+print(f"✓ Filtros aplicados. Total removido: {before - len(df)} | Linhas restantes: {len(df)}")
 
 # %% [markdown]
 # Notebook 5: Imputação Inteligente e Exportação dos Dados Limpos
@@ -116,7 +116,7 @@ print(f"✓ Filtros aplicados. Total removido: {antes - len(df)} | Linhas restan
 # ==========================================
 # 1) Conversão de Tipos e Imputação Numérica
 # ==========================================
-colunas_numericas = [
+numeric_columns = [
     'Diâmetro_da_Hélice_cm',
     'No._de_Pás',
     'Vazão_Média_de_Ar_m3_h_Alta',
@@ -128,9 +128,9 @@ colunas_numericas = [
     'Eficiência_m3_s_W_Média',
     'Eficiência_m3_s_W_Alta'
 ]
-colunas_validas = [c for c in colunas_numericas if c in df.columns]
+valid_columns = [c for c in numeric_columns if c in df.columns]
 
-for col in colunas_validas:
+for col in valid_columns:
     df[col] = pd.to_numeric(df[col], errors='coerce')
 
 # Marca as linhas em que algum consumo por velocidade vai ser estimado (o app avisa o usuário)
@@ -141,40 +141,40 @@ df['Consumo_Imputado'] = df[[
 ]].isna().any(axis=1)
 
 # --- Imputação Proporcional (Consumo e Eficiência) ---
-ratio_cons_baixa = (df['Consumo_de_Energia_MensalkWh_mês_Baixa'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()
-ratio_cons_alta = (df['Consumo_de_Energia_MensalkWh_mês_Alta'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()
-ratio_efi_baixa = (df['Eficiência_m3_s_W_Baixa'] / df['Eficiência_m3_s_W_Média']).median()
-ratio_efi_alta = (df['Eficiência_m3_s_W_Alta'] / df['Eficiência_m3_s_W_Média']).median()
+ratio_cons_low = (df['Consumo_de_Energia_MensalkWh_mês_Baixa'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()
+ratio_cons_high = (df['Consumo_de_Energia_MensalkWh_mês_Alta'] / df['Consumo_de_Energia_MensalkWh_mês_Média']).median()
+ratio_low_eff = (df['Eficiência_m3_s_W_Baixa'] / df['Eficiência_m3_s_W_Média']).median()
+ratio_high_eff = (df['Eficiência_m3_s_W_Alta'] / df['Eficiência_m3_s_W_Média']).median()
 
-ratio_cons_baixa = ratio_cons_baixa if pd.notna(ratio_cons_baixa) else 0.8
-ratio_cons_alta = ratio_cons_alta if pd.notna(ratio_cons_alta) else 1.2
-ratio_efi_baixa = ratio_efi_baixa if pd.notna(ratio_efi_baixa) else 0.9
-ratio_efi_alta = ratio_efi_alta if pd.notna(ratio_efi_alta) else 1.1
+ratio_cons_low = ratio_cons_low if pd.notna(ratio_cons_low) else 0.8
+ratio_cons_high = ratio_cons_high if pd.notna(ratio_cons_high) else 1.2
+ratio_low_eff = ratio_low_eff if pd.notna(ratio_low_eff) else 0.9
+ratio_high_eff = ratio_high_eff if pd.notna(ratio_high_eff) else 1.1
 
 mask = df['Consumo_de_Energia_MensalkWh_mês_Baixa'].isna() & df['Consumo_de_Energia_MensalkWh_mês_Média'].notna()
-df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Baixa'] = df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Média'] * ratio_cons_baixa
+df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Baixa'] = df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Média'] * ratio_cons_low
 
 mask = df['Consumo_de_Energia_MensalkWh_mês_Alta'].isna() & df['Consumo_de_Energia_MensalkWh_mês_Média'].notna()
-df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Alta'] = df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Média'] * ratio_cons_alta
+df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Alta'] = df.loc[mask, 'Consumo_de_Energia_MensalkWh_mês_Média'] * ratio_cons_high
 
 mask = df['Eficiência_m3_s_W_Baixa'].isna() & df['Eficiência_m3_s_W_Média'].notna()
-df.loc[mask, 'Eficiência_m3_s_W_Baixa'] = df.loc[mask, 'Eficiência_m3_s_W_Média'] * ratio_efi_baixa
+df.loc[mask, 'Eficiência_m3_s_W_Baixa'] = df.loc[mask, 'Eficiência_m3_s_W_Média'] * ratio_low_eff
 
 mask = df['Eficiência_m3_s_W_Alta'].isna() & df['Eficiência_m3_s_W_Média'].notna()
-df.loc[mask, 'Eficiência_m3_s_W_Alta'] = df.loc[mask, 'Eficiência_m3_s_W_Média'] * ratio_efi_alta
+df.loc[mask, 'Eficiência_m3_s_W_Alta'] = df.loc[mask, 'Eficiência_m3_s_W_Média'] * ratio_high_eff
 
 # --- Imputação Hierárquica (Para o que sobrou) ---
 if 'Marca' in df.columns and 'Tipo_de_Produto' in df.columns:
-    df[colunas_validas] = (
-        df.groupby(['Marca', 'Tipo_de_Produto'])[colunas_validas]
+    df[valid_columns] = (
+        df.groupby(['Marca', 'Tipo_de_Produto'])[valid_columns]
           .transform(lambda x: x.fillna(x.mean()))
     )
 if 'Tipo_de_Produto' in df.columns:
-    df[colunas_validas] = (
-        df.groupby(['Tipo_de_Produto'])[colunas_validas]
+    df[valid_columns] = (
+        df.groupby(['Tipo_de_Produto'])[valid_columns]
           .transform(lambda x: x.fillna(x.mean()))
     )
-df[colunas_validas] = df[colunas_validas].fillna(df[colunas_validas].median())
+df[valid_columns] = df[valid_columns].fillna(df[valid_columns].median())
 
 
 # ==========================================
@@ -190,12 +190,12 @@ if 'Tipo_de_Controle' in df.columns and 'Tipo_de_Produto' in df.columns:
 # ==========================================
 # 3) Dados Regulatórios: Classificação e Selo Procel (BLINDADO)
 # ==========================================
-colunas_regulatorias = [
+regulatory_columns = [
     'Classificação_Baixa', 'Classificação_Média', 'Classificação_Alta',
     'Selo_Procel_Baixa', 'Selo_Procel_Média', 'Selo_Procel_Alta'
 ]
 
-for col in colunas_regulatorias:
+for col in regulatory_columns:
     if col in df.columns:
         # 1. Converte para texto (objeto) e preenche os nulos reais
         df[col] = df[col].astype(object).fillna('Não Informado')
@@ -219,4 +219,4 @@ df = df.dropna(subset=['Marca', 'Tipo_de_Produto'])
 print(f"✓ Processo finalizado! Linhas prontas para uso: {len(df)}")
 print(f"Colunas finais: {list(df.columns)}")
 
-salvar_processado(df, "ventiladores_de_mesa_limpo.csv")
+save_processed(df, "ventiladores_de_mesa_limpo.csv")

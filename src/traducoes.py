@@ -10,7 +10,7 @@ fixo ficar sem traducao.
 """
 
 EN = {
-    # --- calculadora_residencial.EQUIVALENCIA (criterio da sugestao de troca) ---
+    # --- calculadora_residencial.EQUIVALENCE (criterio da sugestao de troca) ---
     "mesmo tipo e volume parecido (até 15% de diferença)": "same type and similar volume (up to 15% difference)",
     "tela do mesmo tamanho (até 5% de diferença)": "screen of the same size (up to 5% difference)",
     "mesmo tipo e mesma capacidade em BTU/h (até 5% de diferença)":
@@ -77,7 +77,7 @@ EN = {
     "Use a potência da posição que você mais usa. A de inverno é a maior.":
         "Use the power of the setting you use most. The winter setting is the highest.",
 
-    # --- calculadora_residencial.NOMES_DOS_TIPOS (nome e descricao) ---
+    # --- calculadora_residencial.TYPE_NAMES (nome e descricao) ---
     "Automática que abre por cima": "Automatic, top-loading",
     "Tampa em cima. Lava, enxágua e centrifuga sozinha.": "Lid on top. It washes, rinses and spins on its own.",
     "Tanquinho ou semiautomática": "Twin tub or semi-automatic",
@@ -112,7 +112,7 @@ EN = {
     "Frigobar": "Mini fridge",
     "Congelador Vertical": "Upright freezer",
     "Congelador Horizontal": "Chest freezer",
-    # categorias da Portaria Inmetro 20/2006 (estimativa.RETAS_2006, aparecem no "Como calculamos")
+    # categorias da Portaria Inmetro 20/2006 (estimativa.LINES_2006, aparecem no "Como calculamos")
     "Combinado": "Fridge-freezer",
     "Combinado frost free": "Frost-free fridge-freezer",
     "Congelador vertical": "Upright freezer",
@@ -175,7 +175,7 @@ EN = {
     "Dicas escritas por IA com base no Inmetro e na Cemig; valores do iamp. Confira as fontes.":
         "Tips written by AI based on Inmetro and Cemig; values from Iamp. Check the sources.",
 
-    # --- rag_agent.NOMES ("O que mais pesa" no Eco-Coach); a busca continua com o nome em portugues ---
+    # --- rag_agent.NAMES ("O que mais pesa" no Eco-Coach); a busca continua com o nome em portugues ---
     "geladeira": "fridge",
     "televisão": "TV",
     "ar-condicionado": "air conditioner",
@@ -192,7 +192,7 @@ EN = {
     "secador de cabelo": "hair dryer",
     "ferro de passar roupa": "clothes iron",
     "sanduicheira": "sandwich maker",
-    # eletroportateis sem nome em NOMES (o nome sai da categoria, sem o "_")
+    # eletroportateis sem nome em NAMES (o nome sai da categoria, sem o "_")
     "liquidificador": "blender",
     "cafeteira eletrica": "coffee maker",
     "chaleira eletrica": "electric kettle",

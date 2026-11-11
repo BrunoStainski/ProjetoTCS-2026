@@ -13,7 +13,7 @@ Use sempre o ambiente virtual `.venv` da raiz do projeto (`C:\iamp\.venv`) para 
 - Execute o pip como `.venv\Scripts\python.exe -m pip`, nunca `pip` solto.
 - Não use `python`, `python3`, `pip` ou ferramentas globais para executar, instalar, testar ou inspecionar nada do projeto. Com o `.venv` ativado (`.venv\Scripts\activate`), `python` já é o do ambiente; sem ativar, use o caminho completo.
 - Dependências em três arquivos, instale só o que a tarefa precisa:
-  - `requirements.txt`: API (pandas, SQLAlchemy, psycopg2, FastAPI, fastembed, google-genai, pypdf).
+  - `requirements.txt`: API (pandas, SQLAlchemy, psycopg2, FastAPI, google-genai, pypdf).
   - `requirements-dev.txt`: testes (pytest, httpx).
   - `requirements-ml.txt`: treino (sdv, scikit-learn, matplotlib, jupyter). É pesado (instala torch) e fica fora da imagem Docker; não acrescente essas bibliotecas ao `requirements.txt`.
 - Se o `.venv` não existir ou estiver incompleto, avise e crie na raiz com o Python 3.12 antes de continuar. Não troque silenciosamente pelo Python global.

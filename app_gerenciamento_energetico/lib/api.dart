@@ -12,589 +12,601 @@ import 'package:http/http.dart' as http;
 
 import 'idioma.dart';
 
-const String _apiUrlInformada = String.fromEnvironment('API_URL');
+const String _givenApiUrl = String.fromEnvironment('API_URL');
 
-final String apiUrl = _apiUrlInformada.isNotEmpty
-    ? _apiUrlInformada
+final String apiUrl = _givenApiUrl.isNotEmpty
+    ? _givenApiUrl
     : (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
     ? 'http://10.0.2.2:8000'
     : 'http://localhost:8000';
 
-class ApiErro implements Exception {
-  final String mensagem;
-  ApiErro(this.mensagem);
+class ApiError implements Exception {
+  final String message;
+  ApiError(this.message);
 
   @override
-  String toString() => mensagem;
+  String toString() => message;
 }
 
 double _real(dynamic v) => (v as num).toDouble();
-double? _realOuNulo(dynamic v) => v == null ? null : (v as num).toDouble();
+double? _realOrNull(dynamic v) => v == null ? null : (v as num).toDouble();
 
 /// "lampada_led" -> "lampada led"
-String legivel(String categoria) => categoria.replaceAll('_', ' ');
+String readable(String category) => category.replaceAll('_', ' ');
 
 /// Quantos modelos de cada tipo de aparelho a busca traz (GET /aparelhos?limite=).
-const limiteBuscaPorTipo = 30;
+const searchLimitPerType = 30;
 
 /// Quantos modelos de uma marca a lista de marcas mostra (GET /modelos?limite=).
-const limiteModelosDaMarca = 50;
+const brandModelLimit = 50;
 
 /// Marca de um tipo de aparelho, com a quantidade de modelos (GET /marcas).
-class Marca {
-  final String nome;
-  final int modelos;
+class Brand {
+  final String name;
+  final int models;
 
-  const Marca(this.nome, this.modelos);
+  const Brand(this.name, this.models);
 
-  Marca.fromJson(Map<String, dynamic> j) : nome = j['marca'], modelos = j['modelos'];
+  Brand.fromJson(Map<String, dynamic> j) : name = j['marca'], models = j['modelos'];
 }
 
-class Aparelho {
+class Appliance {
   final int id;
-  final String categoria;
-  final String marca;
-  final String modelo;
-  final String detalhe;
+  final String category;
+  final String brand;
+  final String model;
+  final String detail;
 
   /// Na busca: quantos modelos desse tipo bateram com o texto (a API manda no maximo `limite` por tipo).
-  final int totalCategoria;
+  final int totalCategory;
 
-  const Aparelho({
+  const Appliance({
     required this.id,
-    required this.categoria,
-    required this.marca,
-    required this.modelo,
-    this.detalhe = '',
-    this.totalCategoria = 0,
+    required this.category,
+    required this.brand,
+    required this.model,
+    this.detail = '',
+    this.totalCategory = 0,
   });
 
-  Aparelho.fromJson(Map<String, dynamic> j)
+  Appliance.fromJson(Map<String, dynamic> j)
     : id = j['id'],
-      categoria = j['categoria'],
-      marca = j['marca'],
-      modelo = j['modelo'],
-      detalhe = j['detalhe'] ?? '',
-      totalCategoria = j['total_categoria'] ?? 0;
+      category = j['categoria'],
+      brand = j['marca'],
+      model = j['modelo'],
+      detail = j['detalhe'] ?? '',
+      totalCategory = j['total_categoria'] ?? 0;
 
-  String get nome => '$marca $modelo';
-  String get categoriaLegivel => legivel(categoria);
+  String get name => '$brand $model';
+  String get readableCategory => readable(category);
 }
 
 /// O que o app precisa perguntar antes de calcular.
 /// pergunta: null (nada), "horas", "ciclos" ou "velocidade".
 /// opcional: o usuario pode deixar em branco e fica o consumo do Inmetro (TV e ar-condicionado).
-class PerguntaDeUso {
-  final String? pergunta;
-  final List<String> opcoes;
-  final dynamic padrao;
-  final bool opcional;
-  final bool perguntarHoras; // ventiladores: depois da velocidade, pergunta as horas por dia
+class UsageQuestion {
+  final String? question;
+  final List<String> options;
+  final dynamic defaults;
+  final bool optional;
+  final bool askHours; // ventiladores: depois da velocidade, pergunta as horas por dia
 
-  PerguntaDeUso.fromJson(Map<String, dynamic> j)
-    : pergunta = j['pergunta'],
-      opcoes = List<String>.from(j['opcoes'] ?? const []),
-      padrao = j['padrao'],
-      opcional = j['opcional'] ?? false,
-      perguntarHoras = j['perguntar_horas'] ?? false;
+  UsageQuestion.fromJson(Map<String, dynamic> j)
+    : question = j['pergunta'],
+      options = List<String>.from(j['opcoes'] ?? const []),
+      defaults = j['padrao'],
+      optional = j['opcional'] ?? false,
+      askHours = j['perguntar_horas'] ?? false;
 }
 
-class Distribuidora {
+class Distributor {
   final int id;
-  final String nome;
+  final String name;
   final String? uf;
-  final double tarifaKwh;
+  final double tariffKwh;
 
-  Distribuidora.fromJson(Map<String, dynamic> j)
+  Distributor.fromJson(Map<String, dynamic> j)
     : id = j['id'],
-      nome = j['nome'],
+      name = j['nome'],
       uf = j['uf'],
-      tarifaKwh = _real(j['tarifa_kwh']);
+      tariffKwh = _real(j['tarifa_kwh']);
 }
 
-class Resultado {
-  final String categoria;
-  final String marca;
-  final String modelo;
-  final String detalhe;
-  final String distribuidora;
+class Result {
+  final String category;
+  final String brand;
+  final String model;
+  final String detail;
+  final String distributor;
   final String uf;
-  final double kwhMes;
-  final String metodo;
-  final double tarifaKwh;
-  final String origemTarifa;
-  final double custoMes;
-  final double custoAno;
-  final List<String> avisos;
-  final bool aproximado;
+  final double monthlyKwh;
+  final String method;
+  final double tariffKwh;
+  final String tariffOrigin;
+  final double monthlyCost;
+  final double yearlyCost;
+  final List<String> notices;
+  final bool approximate;
   final double? kwhMin;
   final double? kwhMax;
-  final double? custoMinMes;
-  final double? custoMaxMes;
-  final String? tipo;
-  final double? capacidade;
-  final bool pelosParecidos; // gasto da mediana dos modelos parecidos (sem o numero do aparelho)
+  final double? monthlyMinCost;
+  final double? monthlyMaxCost;
+  final String? kind;
+  final double? capacity;
+  final bool bySimilar; // gasto da mediana dos modelos parecidos (sem o numero do aparelho)
 
-  Resultado.fromJson(Map<String, dynamic> j)
-    : categoria = j['categoria'],
-      marca = j['marca'],
-      modelo = j['modelo'],
-      detalhe = j['detalhe'] ?? '',
-      distribuidora = j['distribuidora'],
+  Result.fromJson(Map<String, dynamic> j)
+    : category = j['categoria'],
+      brand = j['marca'],
+      model = j['modelo'],
+      detail = j['detalhe'] ?? '',
+      distributor = j['distribuidora'],
       uf = j['uf'],
-      kwhMes = _real(j['kwh_mes']),
-      metodo = j['metodo'],
-      tarifaKwh = _real(j['tarifa_kwh']),
-      origemTarifa = j['origem_tarifa'],
-      custoMes = _real(j['custo_mes']),
-      custoAno = _real(j['custo_ano']),
-      avisos = List<String>.from(j['avisos'] ?? const []),
-      aproximado = j['aproximado'] ?? false,
-      kwhMin = _realOuNulo(j['kwh_min']),
-      kwhMax = _realOuNulo(j['kwh_max']),
-      custoMinMes = _realOuNulo(j['custo_min_mes']),
-      custoMaxMes = _realOuNulo(j['custo_max_mes']),
-      tipo = j['tipo'],
-      capacidade = _realOuNulo(j['capacidade']),
-      pelosParecidos = j['pelos_parecidos'] ?? false;
+      monthlyKwh = _real(j['kwh_mes']),
+      method = j['metodo'],
+      tariffKwh = _real(j['tarifa_kwh']),
+      tariffOrigin = j['origem_tarifa'],
+      monthlyCost = _real(j['custo_mes']),
+      yearlyCost = _real(j['custo_ano']),
+      notices = List<String>.from(j['avisos'] ?? const []),
+      approximate = j['aproximado'] ?? false,
+      kwhMin = _realOrNull(j['kwh_min']),
+      kwhMax = _realOrNull(j['kwh_max']),
+      monthlyMinCost = _realOrNull(j['custo_min_mes']),
+      monthlyMaxCost = _realOrNull(j['custo_max_mes']),
+      kind = j['tipo'],
+      capacity = _realOrNull(j['capacidade']),
+      bySimilar = j['pelos_parecidos'] ?? false;
 
-  String get nome => '$marca $modelo';
-  bool get temFaixa => custoMinMes != null && custoMaxMes != null && custoMaxMes! > custoMinMes!;
+  String get name => '$brand $model';
+  bool get hasRange => monthlyMinCost != null && monthlyMaxCost != null && monthlyMaxCost! > monthlyMinCost!;
 }
 
 /// Tipo do Inmetro com um nome que a pessoa reconhece olhando o aparelho.
-class TipoEstimavel {
-  final String valor; // vai para a API como esta
-  final String nome;
-  final String? descricao;
+class EstimableType {
+  final String value; // vai para a API como esta
+  final String name;
+  final String? description;
 
-  TipoEstimavel.fromJson(Map<String, dynamic> j) : valor = j['valor'], nome = j['nome'], descricao = j['descricao'];
+  EstimableType.fromJson(Map<String, dynamic> j) : value = j['valor'], name = j['nome'], description = j['descricao'];
 }
 
-class TamanhoComum {
-  final double valor;
-  final String nome;
+class CommonSize {
+  final double value;
+  final String name;
 
-  TamanhoComum.fromJson(Map<String, dynamic> j) : valor = (j['valor'] as num).toDouble(), nome = j['nome'];
+  CommonSize.fromJson(Map<String, dynamic> j) : value = (j['valor'] as num).toDouble(), name = j['nome'];
 }
 
 /// Numero escrito no proprio aparelho (etiqueta do Inmetro ou potencia da plaqueta).
-class FormaDeInformar {
-  final String campo; // kwh_mes, kwh_ciclo ou potencia_w
-  final String nome;
-  final String rotulo;
-  final String unidade;
-  final String onde;
-  final String? dica;
-  final String exemplo;
-  final double maximo;
+class EntryMode {
+  final String field; // kwh_mes, kwh_ciclo ou potencia_w
+  final String name;
+  final String label;
+  final String unit;
+  final String where;
+  final String? tip;
+  final String example;
+  final double maximum;
 
-  FormaDeInformar.fromJson(Map<String, dynamic> j)
-    : campo = j['campo'],
-      nome = j['nome'],
-      rotulo = j['rotulo'],
-      unidade = j['unidade'],
-      onde = j['onde'],
-      dica = j['dica'],
-      exemplo = j['exemplo'],
-      maximo = (j['maximo'] as num).toDouble();
+  EntryMode.fromJson(Map<String, dynamic> j)
+    : field = j['campo'],
+      name = j['nome'],
+      label = j['rotulo'],
+      unit = j['unidade'],
+      where = j['onde'],
+      tip = j['dica'],
+      example = j['exemplo'],
+      maximum = (j['maximo'] as num).toDouble();
 }
 
-class CategoriaEstimavel {
-  final String categoria;
-  final String nome;
-  final bool especial;
-  final String? medida;
-  final String? unidadeMedida;
-  final List<TamanhoComum> tamanhos;
-  final List<TipoEstimavel> tipos;
-  final List<FormaDeInformar> formas;
-  final bool valorObrigatorio; // sem catalogo para comparar: precisa de uma das formas
-  final PerguntaDeUso uso;
+class EstimableCategory {
+  final String category;
+  final String name;
+  final bool special;
+  final String? measure;
+  final String? measureUnit;
+  final List<CommonSize> sizes;
+  final List<EstimableType> types;
+  final List<EntryMode> shapes;
+  final bool requiredValue; // sem catalogo para comparar: precisa de uma das formas
+  final UsageQuestion usage;
 
-  CategoriaEstimavel.fromJson(Map<String, dynamic> j)
-    : categoria = j['categoria'],
-      nome = j['nome'],
-      especial = j['especial'] ?? false,
-      medida = j['medida'],
-      unidadeMedida = j['unidade_medida'],
-      tamanhos = [for (final t in j['tamanhos'] ?? const []) TamanhoComum.fromJson(t)],
-      tipos = [for (final t in j['tipos'] ?? const []) TipoEstimavel.fromJson(t)],
-      formas = [for (final f in j['formas'] ?? const []) FormaDeInformar.fromJson(f)],
-      valorObrigatorio = j['valor_obrigatorio'] ?? false,
-      uso = PerguntaDeUso.fromJson(j['uso']);
+  EstimableCategory.fromJson(Map<String, dynamic> j)
+    : category = j['categoria'],
+      name = j['nome'],
+      special = j['especial'] ?? false,
+      measure = j['medida'],
+      measureUnit = j['unidade_medida'],
+      sizes = [for (final t in j['tamanhos'] ?? const []) CommonSize.fromJson(t)],
+      types = [for (final t in j['tipos'] ?? const []) EstimableType.fromJson(t)],
+      shapes = [for (final f in j['formas'] ?? const []) EntryMode.fromJson(f)],
+      requiredValue = j['valor_obrigatorio'] ?? false,
+      usage = UsageQuestion.fromJson(j['uso']);
 }
 
-class Dicas {
-  final String texto;
-  final List<FonteCitada> fontes;
-  final String aviso;
+class Tips {
+  final String text;
+  final List<CitedSource> sources;
+  final String notice;
 
-  Dicas.fromJson(Map<String, dynamic> j)
-    : texto = j['dicas'],
-      fontes = [for (final f in j['fontes']) FonteCitada.fromJson(f)],
-      aviso = j['aviso'];
+  Tips.fromJson(Map<String, dynamic> j)
+    : text = j['dicas'],
+      sources = [for (final f in j['fontes']) CitedSource.fromJson(f)],
+      notice = j['aviso'];
 }
 
-class Resistivo {
-  final String categoria;
-  final String nome;
-  final double potenciaW;
-  final double horasDia;
-  final double diasMes;
+class Resistive {
+  final String category;
+  final String name;
+  final double powerW;
+  final double dailyHours;
+  final double daysPerMonth;
 
-  Resistivo.fromJson(Map<String, dynamic> j)
-    : categoria = j['categoria'],
-      nome = j['nome'],
-      potenciaW = _real(j['potencia_w']),
-      horasDia = _real(j['horas_dia']),
-      diasMes = _real(j['dias_mes']);
+  Resistive.fromJson(Map<String, dynamic> j)
+    : category = j['categoria'],
+      name = j['nome'],
+      powerW = _real(j['potencia_w']),
+      dailyHours = _real(j['horas_dia']),
+      daysPerMonth = _real(j['dias_mes']);
 }
 
 /// Um modelo mais economico que faz o mesmo servico (POST /sugestoes).
-class AparelhoSugerido {
-  final Aparelho aparelho;
-  final String tipo;
-  final double kwhMes;
-  final double custoMes;
-  final double economiaKwhMes;
-  final double economiaMes;
-  final double economiaAno;
-  final double economiaPercentual;
+class SuggestedAppliance {
+  final Appliance appliance;
+  final String kind;
+  final double monthlyKwh;
+  final double monthlyCost;
+  final double monthlySavingsKwh;
+  final double monthlySavings;
+  final double yearlySavings;
+  final double percentageSavings;
 
-  AparelhoSugerido.fromJson(Map<String, dynamic> j)
-    : aparelho = Aparelho.fromJson(j),
-      tipo = j['tipo'] ?? '',
-      kwhMes = _real(j['kwh_mes']),
-      custoMes = _real(j['custo_mes']),
-      economiaKwhMes = _real(j['economia_kwh_mes']),
-      economiaMes = _real(j['economia_mes']),
-      economiaAno = _real(j['economia_ano']),
-      economiaPercentual = _real(j['economia_percentual']);
+  SuggestedAppliance.fromJson(Map<String, dynamic> j)
+    : appliance = Appliance.fromJson(j),
+      kind = j['tipo'] ?? '',
+      monthlyKwh = _real(j['kwh_mes']),
+      monthlyCost = _real(j['custo_mes']),
+      monthlySavingsKwh = _real(j['economia_kwh_mes']),
+      monthlySavings = _real(j['economia_mes']),
+      yearlySavings = _real(j['economia_ano']),
+      percentageSavings = _real(j['economia_percentual']);
 }
 
-class Sugestoes {
-  final double kwhAtual;
-  final double custoAtual;
-  final String? criterio;
-  final String? mensagem;
-  final int suspeitosDescartados;
-  final List<AparelhoSugerido> sugestoes;
+class Suggestions {
+  final double currentKwh;
+  final double currentCost;
+  final String? criterion;
+  final String? message;
+  final int discardedSuspects;
+  final List<SuggestedAppliance> suggestions;
 
-  Sugestoes.fromJson(Map<String, dynamic> j)
-    : kwhAtual = _real(j['atual']['kwh_mes']),
-      custoAtual = _real(j['atual']['custo_mes']),
-      criterio = j['criterio'],
-      mensagem = j['mensagem'],
-      suspeitosDescartados = j['suspeitos_descartados'] ?? 0,
-      sugestoes = [for (final s in j['sugestoes']) AparelhoSugerido.fromJson(s)];
+  Suggestions.fromJson(Map<String, dynamic> j)
+    : currentKwh = _real(j['atual']['kwh_mes']),
+      currentCost = _real(j['atual']['custo_mes']),
+      criterion = j['criterio'],
+      message = j['mensagem'],
+      discardedSuspects = j['suspeitos_descartados'] ?? 0,
+      suggestions = [for (final s in j['sugestoes']) SuggestedAppliance.fromJson(s)];
 }
 
 class Payback {
-  final double precoNovo;
-  final double? meses;
-  final double? anos;
-  final String texto;
+  final double newPrice;
+  final double? months;
+  final double? years;
+  final String text;
 
   Payback.fromJson(Map<String, dynamic> j)
-    : precoNovo = _real(j['preco_novo']),
-      meses = _realOuNulo(j['meses']),
-      anos = _realOuNulo(j['anos']),
-      texto = j['texto'];
+    : newPrice = _real(j['preco_novo']),
+      months = _realOrNull(j['meses']),
+      years = _realOrNull(j['anos']),
+      text = j['texto'];
 }
 
-class Comparacao {
-  final Resultado atual;
-  final Resultado novo;
-  final double economiaKwhMes;
-  final double economiaMes;
-  final double economiaAno;
+class Comparison {
+  final Result current;
+  final Result rewritten;
+  final double monthlySavingsKwh;
+  final double monthlySavings;
+  final double yearlySavings;
   final Payback? payback;
-  final List<String> avisos;
+  final List<String> notices;
 
-  Comparacao.fromJson(Map<String, dynamic> j)
-    : atual = Resultado.fromJson(j['atual']),
-      novo = Resultado.fromJson(j['novo']),
-      economiaKwhMes = _real(j['economia_kwh_mes']),
-      economiaMes = _real(j['economia_mes']),
-      economiaAno = _real(j['economia_ano']),
+  Comparison.fromJson(Map<String, dynamic> j)
+    : current = Result.fromJson(j['atual']),
+      rewritten = Result.fromJson(j['novo']),
+      monthlySavingsKwh = _real(j['economia_kwh_mes']),
+      monthlySavings = _real(j['economia_mes']),
+      yearlySavings = _real(j['economia_ano']),
       payback = j['payback'] == null ? null : Payback.fromJson(j['payback']),
-      avisos = List<String>.from(j['avisos'] ?? const []);
+      notices = List<String>.from(j['avisos'] ?? const []);
 }
 
 /// Perfil da casa pelo K-Means (POST /classificar).
-class Classificacao {
-  final String perfil;
+class Classification {
+  final String profile;
   final double kwhTotal;
-  final double kwhPorMorador;
-  final double medianaKwhPorMorador;
-  final double diferencaPercentual;
-  final String comparacaoTexto;
-  final Map<String, double> fracoes;
-  final String aviso;
+  final double kwhPerResident;
+  final double medianKwhPerResident;
+  final double percentageDifference;
+  final String textComparison;
+  final Map<String, double> fractions;
+  final String notice;
 
-  Classificacao.fromJson(Map<String, dynamic> j)
-    : perfil = j['perfil'],
+  Classification.fromJson(Map<String, dynamic> j)
+    : profile = j['perfil'],
       kwhTotal = _real(j['kwh_total']),
-      kwhPorMorador = _real(j['kwh_por_morador']),
-      medianaKwhPorMorador = _real(j['comparacao_media']['mediana_kwh_por_morador']),
-      diferencaPercentual = _real(j['comparacao_media']['diferenca_percentual']),
-      comparacaoTexto = j['comparacao_media']['texto'],
-      fracoes = {for (final e in (j['fracoes'] as Map).entries) e.key as String: _real(e.value)},
-      aviso = j['aviso'];
+      kwhPerResident = _real(j['kwh_por_morador']),
+      medianKwhPerResident = _real(j['comparacao_media']['mediana_kwh_por_morador']),
+      percentageDifference = _real(j['comparacao_media']['diferenca_percentual']),
+      textComparison = j['comparacao_media']['texto'],
+      fractions = {for (final e in (j['fracoes'] as Map).entries) e.key as String: _real(e.value)},
+      notice = j['aviso'];
 }
+
+/// Tempo maximo de uma chamada comum. No Render gratis o servidor dorme depois de 15 min parado e leva
+/// ate ~1 min para acordar: com 15 s (como era) a primeira chamada depois de um tempo dava erro.
+const requestLimit = Duration(seconds: 75);
 
 class Api {
   /// A API responde no idioma do app (avisos, "Como calculamos", plano do Eco-Coach...).
-  static Map<String, String> get _idioma => {'Accept-Language': idioma.value.cabecalho};
+  static Map<String, String> get _language => {'Accept-Language': language.value.header};
 
-  static Future<dynamic> _get(String caminho, [Map<String, String>? params]) async {
-    final uri = Uri.parse('$apiUrl$caminho').replace(queryParameters: params);
-    return _tratar(() => http.get(uri, headers: _idioma));
+  /// Acorda o servidor assim que o app abre (enquanto a pessoa ainda esta nas boas-vindas).
+  /// Nao mostra nada e ignora erro: se falhar, a proxima chamada tenta de novo.
+  static Future<void> wakeUp() async {
+    try {
+      await http.get(Uri.parse('$apiUrl/saude')).timeout(requestLimit);
+    } catch (_) {}
+  }
+
+  static Future<dynamic> _get(String path, [Map<String, String>? params]) async {
+    final uri = Uri.parse('$apiUrl$path').replace(queryParameters: params);
+    return _clean(() => http.get(uri, headers: _language));
   }
 
   static Future<dynamic> _post(
-    String caminho,
-    Map<String, dynamic> corpo, {
-    Duration limite = const Duration(seconds: 15),
+    String path,
+    Map<String, dynamic> body, {
+    Duration limit = requestLimit,
   }) async {
-    final uri = Uri.parse('$apiUrl$caminho');
-    return _tratar(
-      () => http.post(uri, headers: {'Content-Type': 'application/json', ..._idioma}, body: jsonEncode(corpo)),
-      limite: limite,
+    final uri = Uri.parse('$apiUrl$path');
+    return _clean(
+      () => http.post(uri, headers: {'Content-Type': 'application/json', ..._language}, body: jsonEncode(body)),
+      limit: limit,
     );
   }
 
-  static Future<dynamic> _tratar(
-    Future<http.Response> Function() chamada, {
-    Duration limite = const Duration(seconds: 15),
+  static Future<dynamic> _clean(
+    Future<http.Response> Function() call, {
+    Duration limit = requestLimit,
   }) async {
-    final http.Response resposta;
+    final http.Response response;
     try {
-      resposta = await chamada().timeout(limite);
+      response = await call().timeout(limit);
     } catch (_) {
-      throw ApiErro(
+      throw ApiError(
         tr(
           'Não consegui me conectar ao Iamp. Confira a internet e tente de novo.',
           'Could not connect to Iamp. Check your internet connection and try again.',
         ),
       );
     }
-    final corpo = jsonDecode(utf8.decode(resposta.bodyBytes));
-    if (resposta.statusCode >= 400) {
-      final detalhe = corpo is Map ? corpo['detail'] : null;
-      if (detalhe is String) throw ApiErro(detalhe);
-      if (detalhe is List && detalhe.isNotEmpty && detalhe.first is Map) {
-        throw ApiErro('${detalhe.first['msg']}');
+    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    if (response.statusCode >= 400) {
+      final detail = body is Map ? body['detail'] : null;
+      if (detail is String) throw ApiError(detail);
+      if (detail is List && detail.isNotEmpty && detail.first is Map) {
+        throw ApiError('${detail.first['msg']}');
       }
-      throw ApiErro(tr('Erro ${resposta.statusCode} na API', 'API error ${resposta.statusCode}'));
+      throw ApiError(tr('Erro ${response.statusCode} na API', 'API error ${response.statusCode}'));
     }
-    return corpo;
+    return body;
   }
 
-  static Future<List<String>> categorias() async => List<String>.from(await _get('/categorias'));
+  static Future<List<String>> categories() async => List<String>.from(await _get('/categorias'));
 
-  static Future<List<Aparelho>> buscarAparelhos(String busca, {String? categoria}) async {
+  static Future<List<Appliance>> searchAppliances(String searchText, {String? category}) async {
     // limite por tipo de aparelho: uma marca com varios tipos traz todos
-    final lista = await _get('/aparelhos', {'busca': busca, 'categoria': ?categoria, 'limite': '$limiteBuscaPorTipo'});
-    return [for (final j in lista) Aparelho.fromJson(j)];
+    final itemList = await _get('/aparelhos', {'busca': searchText, 'categoria': ?category, 'limite': '$searchLimitPerType'});
+    return [for (final j in itemList) Appliance.fromJson(j)];
   }
 
   /// Todas as marcas de um tipo de aparelho (lista de marcas da etapa 2).
-  static Future<List<Marca>> marcas(String categoria) async {
-    final lista = await _get('/marcas', {'categoria': categoria});
-    return [for (final j in lista) Marca.fromJson(j)];
+  static Future<List<Brand>> brands(String category) async {
+    final itemList = await _get('/marcas', {'categoria': category});
+    return [for (final j in itemList) Brand.fromJson(j)];
   }
 
   /// Modelos de uma marca dentro de um tipo (abre ao tocar na marca).
-  static Future<List<Aparelho>> modelosDaMarca(String categoria, String marca) async {
-    final lista = await _get('/modelos', {'categoria': categoria, 'marca': marca, 'limite': '$limiteModelosDaMarca'});
-    return [for (final j in lista) Aparelho.fromJson(j)];
+  static Future<List<Appliance>> brandModels(String category, String brand) async {
+    final itemList = await _get('/modelos', {'categoria': category, 'marca': brand, 'limite': '$brandModelLimit'});
+    return [for (final j in itemList) Appliance.fromJson(j)];
   }
 
-  static Future<PerguntaDeUso> perguntaDeUso(int aparelhoId) async =>
-      PerguntaDeUso.fromJson(await _get('/aparelhos/$aparelhoId/uso'));
+  static Future<UsageQuestion> usageQuestion(int applianceId) async =>
+      UsageQuestion.fromJson(await _get('/aparelhos/$applianceId/uso'));
 
   static Future<List<String>> ufs() async => List<String>.from(await _get('/ufs'));
 
-  static Future<List<Distribuidora>> distribuidoras({String? uf}) async {
-    final lista = await _get('/distribuidoras', {'uf': ?uf});
-    return [for (final j in lista) Distribuidora.fromJson(j)];
+  static Future<List<Distributor>> distributors({String? uf}) async {
+    final itemList = await _get('/distribuidoras', {'uf': ?uf});
+    return [for (final j in itemList) Distributor.fromJson(j)];
   }
 
-  /// usoETarifa: distribuidora_id ou tarifa_manual, mais horas_dia, ciclos_mes ou velocidade.
-  static Future<Resultado> calcular(int aparelhoId, Map<String, dynamic> usoETarifa) async =>
-      Resultado.fromJson(await _post('/calcular', {'aparelho_id': aparelhoId, ...usoETarifa}));
+  /// usageAndTariff: distribuidora_id ou tarifa_manual, mais horas_dia, ciclos_mes ou velocidade.
+  static Future<Result> calculate(int applianceId, Map<String, dynamic> usageAndTariff) async =>
+      Result.fromJson(await _post('/calcular', {'aparelho_id': applianceId, ...usageAndTariff}));
 
-  static Future<Resultado> estimar(String rota, Map<String, dynamic> corpo) async =>
-      Resultado.fromJson(await _post(rota, corpo));
+  static Future<Result> estimate(String route, Map<String, dynamic> body) async =>
+      Result.fromJson(await _post(route, body));
 
-  static Future<List<Resistivo>> resistivos() async => [
-    for (final j in await _get('/resistivos')) Resistivo.fromJson(j),
+  static Future<List<Resistive>> resistive() async => [
+    for (final j in await _get('/resistivos')) Resistive.fromJson(j),
   ];
 
-  static Future<Dicas> dicas(Resultado r) async => Dicas.fromJson(
+  static Future<Tips> tips(Result r) async => Tips.fromJson(
     await _post('/eco-coach/aparelho', {
-      'categoria': r.categoria,
-      'nome': r.nome,
-      'kwh_mes': r.kwhMes,
-      'custo_mes': r.custoMes,
-      'metodo': r.metodo,
-    }, limite: const Duration(seconds: 60)),
+      'categoria': r.category,
+      'nome': r.name,
+      'kwh_mes': r.monthlyKwh,
+      'custo_mes': r.monthlyCost,
+      'metodo': r.method,
+    }, limit: requestLimit),
   );
 
-  static Future<List<CategoriaEstimavel>> categoriasEstimaveis() async => [
-    for (final j in await _get('/estimativa/categorias')) CategoriaEstimavel.fromJson(j),
+  static Future<List<EstimableCategory>> estimableCategories() async => [
+    for (final j in await _get('/estimativa/categorias')) EstimableCategory.fromJson(j),
   ];
 
-  static Map<String, dynamic> _atualEstimado(Resultado atual) => {
-    'categoria': atual.categoria,
-    'capacidade': atual.capacidade,
-    'tipo': atual.tipo,
-    'kwh_mes': atual.kwhMes,
-    'nome': atual.nome,
-    'pelos_parecidos': atual.pelosParecidos,
+  static Map<String, dynamic> _currentEstimated(Result current) => {
+    'categoria': current.category,
+    'capacidade': current.capacity,
+    'tipo': current.kind,
+    'kwh_mes': current.monthlyKwh,
+    'nome': current.name,
+    'pelos_parecidos': current.bySimilar,
   };
 
-  static Future<Sugestoes> sugestoesEstimado(Resultado atual, Map<String, dynamic> usoETarifa) async =>
-      Sugestoes.fromJson(await _post('/sugestoes/estimado', {..._atualEstimado(atual), ...usoETarifa}));
+  static Future<Suggestions> estimatedSuggestions(Result current, Map<String, dynamic> usageAndTariff) async =>
+      Suggestions.fromJson(await _post('/sugestoes/estimado', {..._currentEstimated(current), ...usageAndTariff}));
 
-  static Future<Comparacao> compararEstimado(
-    Resultado atual,
-    int alternativaId,
-    Map<String, dynamic> usoETarifa, {
-    double? precoNovo,
-  }) async => Comparacao.fromJson(
+  static Future<Comparison> compareEstimated(
+    Result current,
+    int alternativeId,
+    Map<String, dynamic> usageAndTariff, {
+    double? newPrice,
+  }) async => Comparison.fromJson(
     await _post('/comparar/estimado', {
-      ..._atualEstimado(atual)
+      ..._currentEstimated(current)
         ..remove('capacidade')
         ..remove('tipo')
         ..remove('pelos_parecidos'),
-      'alternativa_id': alternativaId,
-      'preco_novo': precoNovo,
-      ...usoETarifa,
+      'alternativa_id': alternativeId,
+      'preco_novo': newPrice,
+      ...usageAndTariff,
     }),
   );
 
-  static Future<Sugestoes> sugestoes(int aparelhoId, Map<String, dynamic> usoETarifa) async =>
-      Sugestoes.fromJson(await _post('/sugestoes', {'aparelho_id': aparelhoId, ...usoETarifa}));
+  static Future<Suggestions> suggestions(int applianceId, Map<String, dynamic> usageAndTariff) async =>
+      Suggestions.fromJson(await _post('/sugestoes', {'aparelho_id': applianceId, ...usageAndTariff}));
 
-  static Future<Comparacao> comparar(
-    int aparelhoId,
-    int alternativaId,
-    Map<String, dynamic> usoETarifa, {
-    double? precoNovo,
-  }) async => Comparacao.fromJson(
+  static Future<Comparison> compare(
+    int applianceId,
+    int alternativeId,
+    Map<String, dynamic> usageAndTariff, {
+    double? newPrice,
+  }) async => Comparison.fromJson(
     await _post('/comparar', {
-      'aparelho_id': aparelhoId,
-      'alternativa_id': alternativaId,
-      'preco_novo': precoNovo,
-      ...usoETarifa,
+      'aparelho_id': applianceId,
+      'alternativa_id': alternativeId,
+      'preco_novo': newPrice,
+      ...usageAndTariff,
     }),
   );
 
   /// itens: [{categoria, kwh_mes}] da casa.
-  static Future<Classificacao> classificar(int moradores, List<Map<String, dynamic>> itens) async =>
-      Classificacao.fromJson(await _post('/classificar', {'moradores': moradores, 'itens': itens}));
+  static Future<Classification> classify(int residents, List<Map<String, dynamic>> items) async =>
+      Classification.fromJson(await _post('/classificar', {'moradores': residents, 'itens': items}));
 
   /// Plano do Eco-Coach (RAG + Gemini). O LLM pode levar alguns segundos: limite maior.
-  static Future<EcoCoach> ecoCoach(int moradores, List<Map<String, dynamic>> itens, List<TrocaAvaliada> trocas) async =>
+  static Future<EcoCoach> ecoCoach(int residents, List<Map<String, dynamic>> items, List<EvaluatedSwap> swaps) async =>
       EcoCoach.fromJson(
         await _post('/eco-coach', {
-          'moradores': moradores,
-          'itens': itens,
-          'trocas': [for (final t in trocas) t.paraApi()],
-        }, limite: const Duration(seconds: 90)),
+          'moradores': residents,
+          'itens': items,
+          'trocas': [for (final t in swaps) t.toApi()],
+        }, limit: const Duration(seconds: 120)), // servidor acordando + Gemini escrevendo
       );
 }
 
 /// Troca ja calculada em "Vale a pena trocar?" (vai para o Eco-Coach usar os numeros do Iamp).
-class TrocaAvaliada {
-  final String aparelho;
-  final String alternativa;
-  final double economiaMes;
-  final double? paybackMeses;
+class EvaluatedSwap {
+  final String appliance;
+  final String alternative;
+  final double monthlySavings;
+  final double? paybackMonths;
 
-  const TrocaAvaliada({
-    required this.aparelho,
-    required this.alternativa,
-    required this.economiaMes,
-    this.paybackMeses,
+  const EvaluatedSwap({
+    required this.appliance,
+    required this.alternative,
+    required this.monthlySavings,
+    this.paybackMonths,
   });
 
-  Map<String, dynamic> paraApi() => {
-    'aparelho': aparelho,
-    'alternativa': alternativa,
-    'economia_mes': economiaMes,
-    'payback_meses': paybackMeses,
+  Map<String, dynamic> toApi() => {
+    'aparelho': appliance,
+    'alternativa': alternative,
+    'economia_mes': monthlySavings,
+    'payback_meses': paybackMonths,
   };
 }
 
-class FonteCitada {
+class CitedSource {
   final int n;
-  final String documento;
-  final String orgao;
+  final String document;
+  final String agency;
   final String url;
-  final String? secao;
-  final int? pagina;
+  final String? section;
+  final int? page;
 
-  FonteCitada.fromJson(Map<String, dynamic> j)
+  CitedSource.fromJson(Map<String, dynamic> j)
     : n = j['n'],
-      documento = j['documento'],
-      orgao = j['orgao'],
+      document = j['documento'],
+      agency = j['orgao'],
       url = j['url'],
-      secao = j['secao'],
-      pagina = j['pagina'];
+      section = j['secao'],
+      page = j['pagina'];
 }
 
-class MaiorConsumo {
-  final String categoria;
-  final String nome;
-  final double kwhMes;
-  final double? custoMes;
-  final double percentual;
+class LargestConsumption {
+  final String category;
+  final String name;
+  final double monthlyKwh;
+  final double? monthlyCost;
+  final double percentage;
 
-  MaiorConsumo.fromJson(Map<String, dynamic> j)
-    : categoria = j['categoria'],
-      nome = j['nome'],
-      kwhMes = _real(j['kwh_mes']),
-      custoMes = _realOuNulo(j['custo_mes']),
-      percentual = _real(j['percentual']);
+  LargestConsumption.fromJson(Map<String, dynamic> j)
+    : category = j['categoria'],
+      name = j['nome'],
+      monthlyKwh = _real(j['kwh_mes']),
+      monthlyCost = _realOrNull(j['custo_mes']),
+      percentage = _real(j['percentual']);
 }
 
 /// Resposta de POST /eco-coach: numeros calculados pelo Iamp + plano escrito pelo LLM com fontes [n].
 class EcoCoach {
-  final String perfil;
+  final String profile;
   final double kwhTotal;
-  final double? custoTotal;
-  final List<MaiorConsumo> maioresConsumos;
-  final String plano; // markdown
-  final List<FonteCitada> fontes;
-  final String modelo;
-  final String aviso;
+  final double? totalCost;
+  final List<LargestConsumption> largestConsumptions;
+  final String plan; // markdown
+  final List<CitedSource> sources;
+  final String model;
+  final String notice;
 
   EcoCoach.fromJson(Map<String, dynamic> j)
-    : perfil = j['perfil'],
+    : profile = j['perfil'],
       kwhTotal = _real(j['kwh_total']),
-      custoTotal = _realOuNulo(j['custo_total']),
-      maioresConsumos = [for (final m in j['maiores_consumos']) MaiorConsumo.fromJson(m)],
-      plano = j['plano'],
-      fontes = [for (final f in j['fontes']) FonteCitada.fromJson(f)],
-      modelo = j['modelo'],
-      aviso = j['aviso'];
+      totalCost = _realOrNull(j['custo_total']),
+      largestConsumptions = [for (final m in j['maiores_consumos']) LargestConsumption.fromJson(m)],
+      plan = j['plano'],
+      sources = [for (final f in j['fontes']) CitedSource.fromJson(f)],
+      model = j['modelo'],
+      notice = j['aviso'];
 }
 
 /// 1234.5 -> "R$ 1.234,50" (em ingles, "R$ 1,234.50": o valor continua em reais)
-String reais(double valor, {int casas = 2}) {
-  final (milhar, decimal) = emIngles ? (',', '.') : ('.', ',');
-  final negativo = valor < 0;
-  final partes = valor.abs().toStringAsFixed(casas).split('.');
-  final inteiro = partes[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => milhar);
-  return '${negativo ? '-' : ''}R\$ $inteiro${casas > 0 ? '$decimal${partes[1]}' : ''}';
+String reais(double value, {int homes = 2}) {
+  final (thousands, decimal) = inEnglish ? (',', '.') : ('.', ',');
+  final negative = value < 0;
+  final parts = value.abs().toStringAsFixed(homes).split('.');
+  final whole = parts[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => thousands);
+  return '${negative ? '-' : ''}R\$ $whole${homes > 0 ? '$decimal${parts[1]}' : ''}';
 }
 
-String duracao(double horas) {
-  final total = (horas * 60).round();
+String duration(double hours) {
+  final total = (hours * 60).round();
   final h = total ~/ 60;
   final m = total % 60;
   if (h == 0) return '$m min';
@@ -602,19 +614,19 @@ String duracao(double horas) {
 }
 
 /// 41.25 -> "41,25" (em ingles, "41.25")
-String numero(double valor, {int casas = 2}) {
-  final texto = valor.toStringAsFixed(casas);
-  return emIngles ? texto : texto.replaceAll('.', ',');
+String number(double value, {int homes = 2}) {
+  final text = value.toStringAsFixed(homes);
+  return inEnglish ? text : text.replaceAll('.', ',');
 }
 
 /// Aceita "0,25", "0.25", "1.299,90" e "R$ 1.299,90".
 /// Em ingles a virgula separa os milhares ("1,299.90"); quem digita do jeito brasileiro ("0,85" ou
 /// "2.499,90") continua certo: o separador que vem por ultimo e o decimal.
-double? lerNumero(String texto) {
-  var t = texto.trim().replaceAll('R\$', '').replaceAll(' ', '');
-  final virgulaDecimal = emIngles
+double? readNumber(String text) {
+  var t = text.trim().replaceAll('R\$', '').replaceAll(' ', '');
+  final decimalComma = inEnglish
       ? t.lastIndexOf(',') > t.lastIndexOf('.') && !RegExp(r'^\d{1,3}(,\d{3})+$').hasMatch(t)
       : t.contains(',');
-  t = virgulaDecimal ? t.replaceAll('.', '').replaceAll(',', '.') : t.replaceAll(',', '');
+  t = decimalComma ? t.replaceAll('.', '').replaceAll(',', '.') : t.replaceAll(',', '');
   return double.tryParse(t);
 }

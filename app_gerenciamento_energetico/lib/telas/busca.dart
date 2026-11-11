@@ -1,5 +1,5 @@
 // Comeco do calculo, uma decisao por tela:
-// etapa 1 (TelaBusca): qual tipo de aparelho; etapa 2 (TelaModelo): marca e modelo.
+// etapa 1 (SearchScreen): qual tipo de aparelho; etapa 2 (ModelScreen): marca e modelo.
 
 import 'package:flutter/material.dart';
 
@@ -13,72 +13,72 @@ import 'estimar.dart';
 import 'uso.dart';
 
 /// Etapa 1: a pessoa escolhe o tipo de aparelho em botoes grandes.
-class TelaBusca extends StatefulWidget {
-  const TelaBusca({super.key});
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
 
   @override
-  State<TelaBusca> createState() => _TelaBuscaState();
+  State<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _TelaBuscaState extends State<TelaBusca> {
-  late Future<List<String>> _categorias;
+class _SearchScreenState extends State<SearchScreen> {
+  late Future<List<String>> _categories;
 
   @override
   void initState() {
     super.initState();
-    _categorias = Api.categorias();
+    _categories = Api.categories();
   }
 
-  void _abrirModelo(String? categoria) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaModelo(categoria: categoria)));
+  void _openModel(String? category) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ModelScreen(category: category)));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Pagina(
-      titulo: 'Iamp',
-      tituloWidget: const LogoIamp(),
-      etapa: const Etapa(1, totalEtapas),
-      filho: ListView(
+    return AppPage(
+      title: 'Iamp',
+      widgetTitle: const LogoIamp(),
+      step: const FlowStep(1, totalSteps),
+      child: ListView(
         children: [
-          CabecalhoPergunta(
+          QuestionHeader(
             tr('Qual aparelho você quer calcular?', 'Which appliance do you want to calculate?'),
-            ajuda: tr(
+            help: tr(
               'Mostramos quanto ele pesa na sua conta de luz, com dados oficiais do Inmetro e da ANEEL.',
               'We show how much it adds to your electricity bill, using official data from Inmetro and ANEEL '
                   '(Brazilian energy regulators).',
             ),
           ),
-          const _ResumoCasa(),
+          const _HomeSummary(),
           FutureBuilder<List<String>>(
-            future: _categorias,
+            future: _categories,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
-                return Carregando(texto: tr('Carregando os aparelhos...', 'Loading appliances...'));
+                return Loading(text: tr('Carregando os aparelhos...', 'Loading appliances...'));
               }
               if (snap.hasError) {
-                return MensagemErro(
+                return ErrorMessage(
                   snap.error.toString(),
-                  tentarDeNovo: () => setState(() {
-                    _categorias = Api.categorias();
+                  tryAgain: () => setState(() {
+                    _categories = Api.categories();
                   }),
                 );
               }
-              return GradeDeTipos(snap.data!, aoEscolher: _abrirModelo);
+              return TypeGrid(snap.data!, onChoose: _openModel);
             },
           ),
-          const SizedBox(height: Espaco.p),
-          CartaoOpcao(
-            icone: Icons.search,
-            titulo: tr('Procurar pela marca', 'Search by brand'),
-            subtitulo: tr(
+          const SizedBox(height: Spacing.p),
+          OptionCard(
+            icon: Icons.search,
+            title: tr('Procurar pela marca', 'Search by brand'),
+            subtitle: tr(
               'Se você não sabe o tipo ou quer ver todos os aparelhos de uma marca.',
               "If you don't know the type or want to see every appliance from a brand.",
             ),
-            onTap: () => _abrirModelo(null),
+            onTap: () => _openModel(null),
           ),
-          const SizedBox(height: Espaco.p),
-          const ChamadaEstimar(),
+          const SizedBox(height: Spacing.p),
+          const EstimateCallToAction(),
         ],
       ),
     );
@@ -87,37 +87,37 @@ class _TelaBuscaState extends State<TelaBusca> {
 
 /// Botoes grandes com icone e nome de cada tipo. Duas colunas no celular;
 /// uma coluna quando a fonte do sistema esta grande ou a tela e estreita.
-class GradeDeTipos extends StatelessWidget {
-  final List<String> categorias;
-  final void Function(String) aoEscolher;
+class TypeGrid extends StatelessWidget {
+  final List<String> categories;
+  final void Function(String) onChoose;
 
-  const GradeDeTipos(this.categorias, {super.key, required this.aoEscolher});
+  const TypeGrid(this.categories, {super.key, required this.onChoose});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
-      builder: (context, limites) {
-        final colunas = fonteGrande(context) || limites.maxWidth < 340 ? 1 : 2;
-        if (colunas == 1) {
+      builder: (context, limits) {
+        final columns = largeFont(context) || limits.maxWidth < 340 ? 1 : 2;
+        if (columns == 1) {
           return Column(
             children: [
-              for (final c in categorias)
-                CartaoOpcao(icone: iconeDaCategoria(c), titulo: nomeDaCategoria(c), onTap: () => aoEscolher(c)),
+              for (final c in categories)
+                OptionCard(icon: categoryIcon(c), title: categoryName(c), onTap: () => onChoose(c)),
             ],
           );
         }
         return Column(
           children: [
-            for (var i = 0; i < categorias.length; i += 2)
+            for (var i = 0; i < categories.length; i += 2)
               IntrinsicHeight(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: _BotaoTipo(categorias[i], aoEscolher: aoEscolher)),
-                    const SizedBox(width: Espaco.p),
+                    Expanded(child: _TypeButton(categories[i], onChoose: onChoose)),
+                    const SizedBox(width: Spacing.p),
                     Expanded(
-                      child: i + 1 < categorias.length
-                          ? _BotaoTipo(categorias[i + 1], aoEscolher: aoEscolher)
+                      child: i + 1 < categories.length
+                          ? _TypeButton(categories[i + 1], onChoose: onChoose)
                           : const SizedBox.shrink(),
                     ),
                   ],
@@ -130,11 +130,11 @@ class GradeDeTipos extends StatelessWidget {
   }
 }
 
-class _BotaoTipo extends StatelessWidget {
-  final String categoria;
-  final void Function(String) aoEscolher;
+class _TypeButton extends StatelessWidget {
+  final String category;
+  final void Function(String) onChoose;
 
-  const _BotaoTipo(this.categoria, {required this.aoEscolher});
+  const _TypeButton(this.category, {required this.onChoose});
 
   @override
   Widget build(BuildContext context) {
@@ -145,15 +145,15 @@ class _BotaoTipo extends StatelessWidget {
         child: Card(
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => aoEscolher(categoria),
+            onTap: () => onChoose(category),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Espaco.pm, vertical: Espaco.m),
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.pm, vertical: Spacing.m),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(iconeDaCategoria(categoria), size: t.iconeGrande),
-                  const SizedBox(height: Espaco.p),
-                  Text(nomeDaCategoria(categoria), style: t.forte, textAlign: TextAlign.center),
+                  Icon(categoryIcon(category), size: t.largeIcon),
+                  const SizedBox(height: Spacing.p),
+                  Text(categoryName(category), style: t.strong, textAlign: TextAlign.center),
                 ],
               ),
             ),
@@ -165,94 +165,94 @@ class _BotaoTipo extends StatelessWidget {
 }
 
 /// Etapa 2: marca e/ou modelo, dentro do tipo escolhido (ou de todos).
-class TelaModelo extends StatefulWidget {
-  final String? categoria;
+class ModelScreen extends StatefulWidget {
+  final String? category;
 
-  const TelaModelo({super.key, this.categoria});
+  const ModelScreen({super.key, this.category});
 
   @override
-  State<TelaModelo> createState() => _TelaModeloState();
+  State<ModelScreen> createState() => _ModelScreenState();
 }
 
-class _TelaModeloState extends State<TelaModelo> {
-  final _texto = TextEditingController();
-  List<Aparelho>? _resultados;
-  bool _carregando = false;
-  String? _erro;
-  int _pedido = 0; // so a busca mais recente vale
-  Future<List<Marca>>? _marcas; // todas as marcas do tipo escolhido (lista abaixo do campo)
-  String _filtro = ''; // o que a pessoa digitou: filtra a lista de marcas
+class _ModelScreenState extends State<ModelScreen> {
+  final _text = TextEditingController();
+  List<Appliance>? _results;
+  bool _loading = false;
+  String? _error;
+  int _request = 0; // so a busca mais recente vale
+  Future<List<Brand>>? _brands; // todas as marcas do tipo escolhido (lista abaixo do campo)
+  String _filter = ''; // o que a pessoa digitou: filtra a lista de marcas
 
   @override
   void initState() {
     super.initState();
-    _carregarMarcas();
+    _loadBrands();
   }
 
-  void _carregarMarcas() {
-    final c = widget.categoria;
-    if (c != null) _marcas = Api.marcas(c);
+  void _loadBrands() {
+    final c = widget.category;
+    if (c != null) _brands = Api.brands(c);
   }
 
   /// Mudou o texto: a lista de marcas filtra na hora e o resultado da busca anterior sai da tela.
-  void _digitou(String texto) {
+  void _typed(String text) {
     setState(() {
-      _filtro = texto.trim().toLowerCase();
-      _resultados = null;
-      _erro = null;
+      _filter = text.trim().toLowerCase();
+      _results = null;
+      _error = null;
     });
   }
 
   @override
   void dispose() {
-    _texto.dispose();
+    _text.dispose();
     super.dispose();
   }
 
-  Future<void> _buscar() async {
-    final busca = _texto.text.trim();
-    if (busca.length < 2) {
-      setState(() => _erro = tr('Digite pelo menos 2 letras da marca ou do modelo.', 'Type at least 2 letters of the brand or model.'));
+  Future<void> _search() async {
+    final searchText = _text.text.trim();
+    if (searchText.length < 2) {
+      setState(() => _error = tr('Digite pelo menos 2 letras da marca ou do modelo.', 'Type at least 2 letters of the brand or model.'));
       return;
     }
     FocusScope.of(context).unfocus(); // fecha o teclado para mostrar os resultados
-    final pedido = ++_pedido;
+    final request = ++_request;
     setState(() {
-      _carregando = true;
-      _erro = null;
+      _loading = true;
+      _error = null;
     });
     try {
-      final lista = await Api.buscarAparelhos(busca, categoria: widget.categoria);
-      if (mounted && pedido == _pedido) setState(() => _resultados = lista);
-    } on ApiErro catch (e) {
-      if (mounted && pedido == _pedido) setState(() => _erro = e.mensagem);
+      final itemList = await Api.searchAppliances(searchText, category: widget.category);
+      if (mounted && request == _request) setState(() => _results = itemList);
+    } on ApiError catch (e) {
+      if (mounted && request == _request) setState(() => _error = e.message);
     } finally {
-      if (mounted && pedido == _pedido) setState(() => _carregando = false);
+      if (mounted && request == _request) setState(() => _loading = false);
     }
   }
 
-  void _escolher(Aparelho aparelho) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaUso(consulta: Consulta(aparelho))));
+  void _choose(Appliance appliance) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => UsageScreen(query: Query(appliance))));
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final c = widget.categoria;
-    final resultados = _resultados;
-    return Pagina(
-      titulo: c == null ? tr('Procurar aparelho', 'Find an appliance') : nomeDaCategoria(c),
-      etapa: const Etapa(2, totalEtapas),
-      rodape: FilledButton.icon(
-        onPressed: _carregando ? null : _buscar,
+    final c = widget.category;
+    final results = _results;
+    return AppPage(
+      title: c == null ? tr('Procurar aparelho', 'Find an appliance') : categoryName(c),
+      step: const FlowStep(2, totalSteps),
+      footer: FilledButton.icon(
+        onPressed: _loading ? null : _search,
         icon: const Icon(Icons.search),
         label: Text(tr('Buscar', 'Search')),
       ),
-      filho: ListView(
+      child: ListView(
         children: [
-          CabecalhoPergunta(
+          QuestionHeader(
             tr('Qual é a marca e o modelo?', 'What is the brand and model?'),
-            ajuda: c == null
+            help: c == null
                 ? tr(
                     'Pode digitar só a marca. A marca e o modelo estão na etiqueta do aparelho ou no manual.',
                     "You can type just the brand. The brand and model are on the appliance's label or in the manual.",
@@ -263,58 +263,58 @@ class _TelaModeloState extends State<TelaModelo> {
                   ),
           ),
           TextField(
-            controller: _texto,
+            controller: _text,
             autofocus: c == null, // com a lista de marcas, o teclado nao abre sozinho por cima dela
             textInputAction: TextInputAction.search,
-            onChanged: _digitou,
-            onSubmitted: (_) => _buscar(),
+            onChanged: _typed,
+            onSubmitted: (_) => _search(),
             decoration: InputDecoration(
               labelText: tr('Marca e/ou modelo', 'Brand and/or model'),
               hintText: tr('Ex.: Brastemp, Bosch EWI, Samsung', 'E.g.: Brastemp, Bosch EWI, Samsung'),
-              suffixIcon: IconButton(tooltip: tr('Buscar', 'Search'), icon: const Icon(Icons.search), onPressed: _buscar),
+              suffixIcon: IconButton(tooltip: tr('Buscar', 'Search'), icon: const Icon(Icons.search), onPressed: _search),
             ),
           ),
-          const SizedBox(height: Espaco.m),
-          if (_carregando) Carregando(texto: tr('Procurando...', 'Searching...')),
-          if (_erro != null) MensagemErro(_erro!),
-          if (!_carregando && resultados != null && resultados.isEmpty) ...[
+          const SizedBox(height: Spacing.m),
+          if (_loading) Loading(text: tr('Procurando...', 'Searching...')),
+          if (_error != null) ErrorMessage(_error!),
+          if (!_loading && results != null && results.isEmpty) ...[
             Text(
               tr(
                 'Nenhum aparelho encontrado. Tente só a marca ou parte do modelo.',
                 'No appliance found. Try just the brand or part of the model.',
               ),
-              style: t.corpo,
+              style: t.body,
             ),
-            const SizedBox(height: Espaco.m),
-            const ChamadaEstimar(),
+            const SizedBox(height: Spacing.m),
+            const EstimateCallToAction(),
           ],
-          if (!_carregando && resultados != null && resultados.isNotEmpty) ...[
+          if (!_loading && results != null && results.isNotEmpty) ...[
             Semantics(
               liveRegion: true,
               child: Text(
-                resultados.length == 1
+                results.length == 1
                     ? tr('1 aparelho encontrado', '1 appliance found')
-                    : tr('${resultados.length} aparelhos encontrados', '${resultados.length} appliances found'),
-                style: t.rotulo,
+                    : tr('${results.length} aparelhos encontrados', '${results.length} appliances found'),
+                style: t.label,
               ),
             ),
-            const SizedBox(height: Espaco.p),
+            const SizedBox(height: Spacing.p),
             // a chave muda a cada busca: as secoes voltam a ficar fechadas
-            ResultadosPorTipo(resultados, key: ObjectKey(resultados), aoEscolher: _escolher),
-            const SizedBox(height: Espaco.m),
-            const ChamadaEstimar(),
+            ResultsPerType(results, key: ObjectKey(results), onChoose: _choose),
+            const SizedBox(height: Spacing.m),
+            const EstimateCallToAction(),
           ],
           // lista de marcas do tipo escolhido (some enquanto o resultado de uma busca esta na tela)
-          if (c != null && resultados == null && !_carregando) ...[
-            const SizedBox(height: Espaco.p),
-            Text(tr('Ou escolha a marca', 'Or pick the brand'), style: t.forte),
-            const SizedBox(height: Espaco.p),
-            _ListaDeMarcas(
-              categoria: c,
-              marcas: _marcas,
-              filtro: _filtro,
-              aoEscolher: _escolher,
-              tentarDeNovo: () => setState(_carregarMarcas),
+          if (c != null && results == null && !_loading) ...[
+            const SizedBox(height: Spacing.p),
+            Text(tr('Ou escolha a marca', 'Or pick the brand'), style: t.strong),
+            const SizedBox(height: Spacing.p),
+            _BrandList(
+              category: c,
+              brands: _brands,
+              filterText: _filter,
+              onChoose: _choose,
+              tryAgain: () => setState(_loadBrands),
             ),
           ],
         ],
@@ -324,48 +324,48 @@ class _TelaModeloState extends State<TelaModelo> {
 }
 
 /// Todas as marcas de um tipo, filtradas pelo texto digitado. Cada marca abre os modelos dela.
-class _ListaDeMarcas extends StatelessWidget {
-  final String categoria;
-  final Future<List<Marca>>? marcas;
-  final String filtro;
-  final void Function(Aparelho) aoEscolher;
-  final VoidCallback tentarDeNovo;
+class _BrandList extends StatelessWidget {
+  final String category;
+  final Future<List<Brand>>? brands;
+  final String filterText;
+  final void Function(Appliance) onChoose;
+  final VoidCallback tryAgain;
 
-  const _ListaDeMarcas({
-    required this.categoria,
-    required this.marcas,
-    required this.filtro,
-    required this.aoEscolher,
-    required this.tentarDeNovo,
+  const _BrandList({
+    required this.category,
+    required this.brands,
+    required this.filterText,
+    required this.onChoose,
+    required this.tryAgain,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    return FutureBuilder<List<Marca>>(
-      future: marcas,
+    return FutureBuilder<List<Brand>>(
+      future: brands,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return Carregando(texto: tr('Carregando as marcas...', 'Loading brands...'));
+          return Loading(text: tr('Carregando as marcas...', 'Loading brands...'));
         }
         if (snap.hasError) {
-          final erro = snap.error;
-          return MensagemErro(
-            erro is ApiErro ? erro.mensagem : tr('Não deu para carregar as marcas.', 'Could not load the brands.'),
-            tentarDeNovo: tentarDeNovo,
+          final error = snap.error;
+          return ErrorMessage(
+            error is ApiError ? error.message : tr('Não deu para carregar as marcas.', 'Could not load the brands.'),
+            tryAgain: tryAgain,
           );
         }
-        final visiveis = [
+        final visible = [
           for (final m in snap.data!)
-            if (m.nome.toLowerCase().contains(filtro)) m,
+            if (m.name.toLowerCase().contains(filterText)) m,
         ];
-        if (visiveis.isEmpty) {
+        if (visible.isEmpty) {
           return Text(
             tr(
-              'Nenhuma marca com "$filtro". Toque em Buscar para procurar pelo modelo.',
-              'No brand matches "$filtro". Tap Search to look for the model.',
+              'Nenhuma marca com "$filterText". Toque em Buscar para procurar pelo modelo.',
+              'No brand matches "$filterText". Tap Search to look for the model.',
             ),
-            style: t.corpo,
+            style: t.body,
           );
         }
         return Column(
@@ -374,13 +374,13 @@ class _ListaDeMarcas extends StatelessWidget {
             Semantics(
               liveRegion: true,
               child: Text(
-                visiveis.length == 1 ? tr('1 marca', '1 brand') : tr('${visiveis.length} marcas', '${visiveis.length} brands'),
-                style: t.rotulo,
+                visible.length == 1 ? tr('1 marca', '1 brand') : tr('${visible.length} marcas', '${visible.length} brands'),
+                style: t.label,
               ),
             ),
-            const SizedBox(height: Espaco.p),
+            const SizedBox(height: Spacing.p),
             // a chave e a marca: ao filtrar, cada secao continua com os modelos que ja carregou
-            for (final m in visiveis) _SecaoDaMarca(categoria, m, key: ValueKey(m.nome), aoEscolher: aoEscolher),
+            for (final m in visible) _BrandSection(category, m, key: ValueKey(m.name), onChoose: onChoose),
           ],
         );
       },
@@ -389,83 +389,83 @@ class _ListaDeMarcas extends StatelessWidget {
 }
 
 /// Uma marca: fechada mostra o nome e quantos modelos tem; ao abrir, busca os modelos na API.
-class _SecaoDaMarca extends StatefulWidget {
-  final String categoria;
-  final Marca marca;
-  final void Function(Aparelho) aoEscolher;
+class _BrandSection extends StatefulWidget {
+  final String category;
+  final Brand brand;
+  final void Function(Appliance) onChoose;
 
-  const _SecaoDaMarca(this.categoria, this.marca, {super.key, required this.aoEscolher});
+  const _BrandSection(this.category, this.brand, {super.key, required this.onChoose});
 
   @override
-  State<_SecaoDaMarca> createState() => _SecaoDaMarcaState();
+  State<_BrandSection> createState() => _BrandSectionState();
 }
 
-class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
-  Future<List<Aparelho>>? _modelos; // so carrega quando a pessoa abre a marca
+class _BrandSectionState extends State<_BrandSection> {
+  Future<List<Appliance>>? _models; // so carrega quando a pessoa abre a marca
 
   // corpo em bloco: com "=>" a funcao devolveria o Future e o setState(_carregar) quebra
-  void _carregar() {
-    _modelos = Api.modelosDaMarca(widget.categoria, widget.marca.nome);
+  void _load() {
+    _models = Api.brandModels(widget.category, widget.brand.name);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final m = widget.marca;
+    final m = widget.brand;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        title: Text(m.nome, style: t.forte),
+        title: Text(m.name, style: t.strong),
         subtitle: Text(
-          m.modelos == 1 ? tr('1 modelo', '1 model') : tr('${m.modelos} modelos', '${m.modelos} models'),
-          style: t.secundario,
+          m.models == 1 ? tr('1 modelo', '1 model') : tr('${m.models} modelos', '${m.models} models'),
+          style: t.secondary,
         ),
-        onExpansionChanged: (aberta) {
-          if (aberta && _modelos == null) setState(_carregar);
+        onExpansionChanged: (isOpen) {
+          if (isOpen && _models == null) setState(_load);
         },
         children: [
-          FutureBuilder<List<Aparelho>>(
-            future: _modelos,
+          FutureBuilder<List<Appliance>>(
+            future: _models,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
                 return Padding(
-                  padding: const EdgeInsets.all(Espaco.m),
-                  child: Carregando(texto: tr('Carregando os modelos...', 'Loading models...')),
+                  padding: const EdgeInsets.all(Spacing.m),
+                  child: Loading(text: tr('Carregando os modelos...', 'Loading models...')),
                 );
               }
               if (snap.hasError) {
-                final erro = snap.error;
+                final error = snap.error;
                 return Padding(
-                  padding: const EdgeInsets.all(Espaco.m),
-                  child: MensagemErro(
-                    erro is ApiErro ? erro.mensagem : tr('Não deu para carregar os modelos.', 'Could not load the models.'),
-                    tentarDeNovo: () => setState(_carregar),
+                  padding: const EdgeInsets.all(Spacing.m),
+                  child: ErrorMessage(
+                    error is ApiError ? error.message : tr('Não deu para carregar os modelos.', 'Could not load the models.'),
+                    tryAgain: () => setState(_load),
                   ),
                 );
               }
-              final lista = snap.data!;
-              final total = lista.isEmpty ? 0 : (lista.first.totalCategoria > lista.length ? lista.first.totalCategoria : lista.length);
+              final itemList = snap.data!;
+              final total = itemList.isEmpty ? 0 : (itemList.first.totalCategory > itemList.length ? itemList.first.totalCategory : itemList.length);
               return Column(
                 children: [
-                  for (final a in lista) ...[
+                  for (final a in itemList) ...[
                     const Divider(height: 1),
                     ListTile(
-                      title: Text(a.modelo),
-                      subtitle: a.detalhe.isEmpty ? null : Text(a.detalhe),
+                      title: Text(a.model),
+                      subtitle: a.detail.isEmpty ? null : Text(a.detail),
                       trailing: const Icon(Icons.chevron_right),
-                      onTap: () => widget.aoEscolher(a),
+                      onTap: () => widget.onChoose(a),
                     ),
                   ],
-                  if (total > lista.length) ...[
+                  if (total > itemList.length) ...[
                     const Divider(height: 1),
                     Padding(
-                      padding: const EdgeInsets.all(Espaco.m),
+                      padding: const EdgeInsets.all(Spacing.m),
                       child: Text(
                         tr(
-                          'Mostrando ${lista.length} de $total. Digite o modelo no campo acima para achar os outros.',
-                          'Showing ${lista.length} of $total. Type the model in the field above to find the others.',
+                          'Mostrando ${itemList.length} de $total. Digite o modelo no campo acima para achar os outros.',
+                          'Showing ${itemList.length} of $total. Type the model in the field above to find the others.',
                         ),
-                        style: t.secundario,
+                        style: t.secondary,
                       ),
                     ),
                   ],
@@ -482,67 +482,67 @@ class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
 /// Resultados agrupados por tipo de aparelho, em secoes que abrem e fecham.
 /// Uma marca pode ter varios tipos (ex.: Philco tem 7): cada tipo vira uma secao com a quantidade.
 /// Se so ha um tipo (busca pelo modelo ou dentro de um tipo), a secao ja vem aberta.
-class ResultadosPorTipo extends StatelessWidget {
-  final List<Aparelho> resultados;
-  final void Function(Aparelho) aoEscolher;
+class ResultsPerType extends StatelessWidget {
+  final List<Appliance> results;
+  final void Function(Appliance) onChoose;
 
-  const ResultadosPorTipo(this.resultados, {super.key, required this.aoEscolher});
+  const ResultsPerType(this.results, {super.key, required this.onChoose});
 
   @override
   Widget build(BuildContext context) {
-    final porTipo = <String, List<Aparelho>>{}; // mantem a ordem da API
-    for (final a in resultados) {
-      porTipo.putIfAbsent(a.categoria, () => []).add(a);
+    final byType = <String, List<Appliance>>{}; // mantem a ordem da API
+    for (final a in results) {
+      byType.putIfAbsent(a.category, () => []).add(a);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final MapEntry(key: tipo, value: lista) in porTipo.entries)
-          _SecaoDoTipo(tipo, lista, aberta: porTipo.length == 1, aoEscolher: aoEscolher),
+        for (final MapEntry(key: kind, value: itemList) in byType.entries)
+          _TypeSection(kind, itemList, isOpen: byType.length == 1, onChoose: onChoose),
       ],
     );
   }
 }
 
-class _SecaoDoTipo extends StatelessWidget {
-  final String tipo;
-  final List<Aparelho> lista;
-  final bool aberta;
-  final void Function(Aparelho) aoEscolher;
+class _TypeSection extends StatelessWidget {
+  final String kind;
+  final List<Appliance> itemList;
+  final bool isOpen;
+  final void Function(Appliance) onChoose;
 
-  const _SecaoDoTipo(this.tipo, this.lista, {required this.aberta, required this.aoEscolher});
+  const _TypeSection(this.kind, this.itemList, {required this.isOpen, required this.onChoose});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final total = lista.first.totalCategoria > lista.length ? lista.first.totalCategoria : lista.length;
+    final total = itemList.first.totalCategory > itemList.length ? itemList.first.totalCategory : itemList.length;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
-        initiallyExpanded: aberta,
-        leading: Icon(iconeDaCategoria(tipo)),
-        title: Text(tituloDaCategoria(tipo), style: t.forte),
-        subtitle: Text(total == 1 ? tr('1 modelo', '1 model') : tr('$total modelos', '$total models'), style: t.secundario),
+        initiallyExpanded: isOpen,
+        leading: Icon(categoryIcon(kind)),
+        title: Text(categoryTitle(kind), style: t.strong),
+        subtitle: Text(total == 1 ? tr('1 modelo', '1 model') : tr('$total modelos', '$total models'), style: t.secondary),
         children: [
-          for (final a in lista) ...[
+          for (final a in itemList) ...[
             const Divider(height: 1),
             ListTile(
-              title: Text(a.nome),
-              subtitle: a.detalhe.isEmpty ? null : Text(a.detalhe),
+              title: Text(a.name),
+              subtitle: a.detail.isEmpty ? null : Text(a.detail),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => aoEscolher(a),
+              onTap: () => onChoose(a),
             ),
           ],
-          if (total > lista.length) ...[
+          if (total > itemList.length) ...[
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(Espaco.m),
+              padding: const EdgeInsets.all(Spacing.m),
               child: Text(
                 tr(
-                  'Mostrando ${lista.length} de $total. Digite parte do modelo para achar os outros.',
-                  'Showing ${lista.length} of $total. Type part of the model to find the others.',
+                  'Mostrando ${itemList.length} de $total. Digite parte do modelo para achar os outros.',
+                  'Showing ${itemList.length} of $total. Type part of the model to find the others.',
                 ),
-                style: t.secundario,
+                style: t.secondary,
               ),
             ),
           ],
@@ -552,17 +552,17 @@ class _SecaoDoTipo extends StatelessWidget {
   }
 }
 
-class ChamadaEstimar extends StatelessWidget {
-  const ChamadaEstimar({super.key});
+class EstimateCallToAction extends StatelessWidget {
+  const EstimateCallToAction({super.key});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Card(
-      color: t.fundoDestaque,
+      color: t.highlightBackground,
       clipBehavior: Clip.antiAlias,
       child: ListTile(
-        leading: Icon(Icons.calculate_outlined, size: t.iconeGrande),
+        leading: Icon(Icons.calculate_outlined, size: t.largeIcon),
         title: Text(tr('Não achou? Estime o gasto', "Can't find it? Estimate the cost")),
         subtitle: Text(
           tr(
@@ -571,30 +571,30 @@ class ChamadaEstimar extends StatelessWidget {
           ),
         ),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EstimateScreen())),
       ),
     );
   }
 }
 
 /// Resumo da casa na tela inicial (aparece depois do primeiro aparelho adicionado).
-class _ResumoCasa extends StatelessWidget {
-  const _ResumoCasa();
+class _HomeSummary extends StatelessWidget {
+  const _HomeSummary();
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: casa,
+      listenable: home,
       builder: (context, _) {
-        if (casa.vazia) return const SizedBox.shrink();
-        final n = casa.totalAparelhos;
+        if (home.isEmpty) return const SizedBox.shrink();
+        final n = home.totalAppliances;
         return Padding(
-          padding: const EdgeInsets.only(bottom: Espaco.m),
+          padding: const EdgeInsets.only(bottom: Spacing.m),
           child: Card(
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               leading: const Icon(Icons.home_outlined),
-              title: Text(tr('Minha casa: ${reais(casa.custoMes)} por mês', 'My home: ${reais(casa.custoMes)} per month')),
+              title: Text(tr('Minha casa: ${reais(home.monthlyCost)} por mês', 'My home: ${reais(home.monthlyCost)} per month')),
               subtitle: Text(
                 tr(
                   '$n ${n == 1 ? 'aparelho' : 'aparelhos'} · toque para ver',
@@ -602,7 +602,7 @@ class _ResumoCasa extends StatelessWidget {
                 ),
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => irPara(Aba.casa),
+              onTap: () => goTo(AppTab.home),
             ),
           ),
         );

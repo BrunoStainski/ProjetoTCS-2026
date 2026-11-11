@@ -17,129 +17,129 @@ import pandas as pd
 
 import config
 import banco
-from banco import ESQUEMA
-from calculadora_residencial import carregar_catalogo, normalizar
-from tarifas_aneel import ler_tarifas_residenciais
+from banco import SCHEMA
+from calculadora_residencial import load_catalog, normalize
+from tarifas_aneel import read_residential_tariffs
 
-CONSULTAS_SQL = Path(__file__).resolve().parent / "consultas_exemplo.sql"
+QUERIES_SQL = Path(__file__).resolve().parent / "consultas_exemplo.sql"
 
-COLUNAS_APARELHOS = [
+APPLIANCE_COLUMNS = [
     "categoria", "marca", "modelo", "tipo", "capacidade", "unidade", "detalhe",
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta", "kwh_ciclo",
     "potencia_w", "standby_kwh_mes", "fluxo_lm", "origem_dado", "arquivo_origem", "busca",
 ]
 
 
-def _uf_valida(valor):
-    uf = str(valor).strip().upper() if pd.notna(valor) else ""
+def _uf_valid(value):
+    uf = str(value).strip().upper() if pd.notna(value) else ""
     return uf if len(uf) == 2 and uf.isalpha() else None
 
 
-def carregar_aparelhos(con):
-    catalogo = carregar_catalogo().rename(columns={"arquivo": "arquivo_origem"})
-    catalogo[COLUNAS_APARELHOS].to_sql("aparelhos", con, if_exists="append", index=False)
-    for arquivo, linhas in catalogo["arquivo_origem"].value_counts().sort_index().items():
-        banco.executar(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (arquivo, int(linhas)))
-    return len(catalogo)
+def load_appliances(con):
+    catalog = load_catalog().rename(columns={"arquivo": "arquivo_origem"})
+    catalog[APPLIANCE_COLUMNS].to_sql("aparelhos", con, if_exists="append", index=False)
+    for file, lines in catalog["arquivo_origem"].value_counts().sort_index().items():
+        banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (file, int(lines)))
+    return len(catalog)
 
 
-PORTATEIS_CSV = config.DADOS / "eletroportateis.csv"
+SMALL_APPLIANCES_CSV = config.DATA / "eletroportateis.csv"
 
 
-def _registrar_carga(con, arquivo, linhas):
-    banco.executar(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (arquivo, int(linhas)))
+def _register_load(con, file, lines):
+    banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (file, int(lines)))
 
 
-def carregar_portateis(con):
-    df = pd.read_csv(PORTATEIS_CSV, encoding="utf-8-sig")
+def load_small_appliances(con):
+    df = pd.read_csv(SMALL_APPLIANCES_CSV, encoding="utf-8-sig")
     df[["categoria", "nome", "potencia_w", "horas_dia", "dias_mes", "fonte"]].to_sql(
         "portateis", con, if_exists="append", index=False)
-    _registrar_carga(con, PORTATEIS_CSV.name, len(df))
+    _register_load(con, SMALL_APPLIANCES_CSV.name, len(df))
     return len(df)
 
 
-def carregar_dados_extras(con):
-    return {"portateis": carregar_portateis(con)}
+def load_extra_data(con):
+    return {"portateis": load_small_appliances(con)}
 
 
-def _texto(valor):
-    return str(valor).strip() if pd.notna(valor) and str(valor).strip() else None
+def _text(value):
+    return str(value).strip() if pd.notna(value) and str(value).strip() else None
 
 
-def ler_ufs():
+def read_ufs():
     """distribuidoras_uf.csv -> {nome normalizado: (nome, uf, fonte da uf, tarifa, vigencia, fonte tarifa)}."""
-    if not config.DISTRIBUIDORAS_CSV.exists():
-        print(f"[aviso] {config.DISTRIBUIDORAS_CSV.name} nao encontrado: distribuidoras ficam sem UF")
+    if not config.DISTRIBUTORS_CSV.exists():
+        print(f"[aviso] {config.DISTRIBUTORS_CSV.name} nao encontrado: distribuidoras ficam sem UF")
         return {}
-    df = pd.read_csv(config.DISTRIBUIDORAS_CSV, encoding="utf-8-sig", dtype=str)
+    df = pd.read_csv(config.DISTRIBUTORS_CSV, encoding="utf-8-sig", dtype=str)
     df.columns = [c.strip().lower() for c in df.columns]
-    nome = "distribuidora" if "distribuidora" in df.columns else df.columns[0]
+    name = "distribuidora" if "distribuidora" in df.columns else df.columns[0]
     return {
-        normalizar(l[nome]): {
-            "nome": l[nome].strip(), "uf": _uf_valida(l.get("uf")), "fonte_uf": _texto(l.get("base")),
-            "tarifa_kwh": _texto(l.get("tarifa_kwh")), "vigencia_inicio": _texto(l.get("vigencia_inicio")),
-            "fonte": _texto(l.get("fonte_tarifa")),
+        normalize(l[name]): {
+            "nome": l[name].strip(), "uf": _uf_valid(l.get("uf")), "fonte_uf": _text(l.get("base")),
+            "tarifa_kwh": _text(l.get("tarifa_kwh")), "vigencia_inicio": _text(l.get("vigencia_inicio")),
+            "fonte": _text(l.get("fonte_tarifa")),
         }
-        for l in df.to_dict("records") if _texto(l.get(nome))
+        for l in df.to_dict("records") if _text(l.get(name))
     }
 
 
-def carregar_distribuidoras_e_tarifas(con):
-    ufs = ler_ufs()
+def load_distributors_and_tariffs(con):
+    ufs = read_ufs()
 
     # Tarifas: do tarifas_aneel_limpo.csv; sem ele, da coluna tarifa_kwh do distribuidoras_uf.csv
-    if config.TARIFAS_CSV.exists():
-        tarifas = ler_tarifas_residenciais(config.TARIFAS_CSV)
-        origem = config.TARIFAS_CSV.name
+    if config.TARIFFS_CSV.exists():
+        tariffs = read_residential_tariffs(config.TARIFFS_CSV)
+        origin = config.TARIFFS_CSV.name
     else:
-        print(f"[aviso] {config.TARIFAS_CSV.name} nao encontrado, usando tarifa_kwh do distribuidoras_uf.csv")
-        tarifas = pd.DataFrame(
+        print(f"[aviso] {config.TARIFFS_CSV.name} nao encontrado, usando tarifa_kwh do distribuidoras_uf.csv")
+        tariffs = pd.DataFrame(
             [{"nome": d["nome"], "tarifa_kwh": pd.to_numeric(str(d["tarifa_kwh"]).replace(",", "."), errors="coerce"),
-              "vigencia_inicio": d["vigencia_inicio"], "fonte": d["fonte"] or config.DISTRIBUIDORAS_CSV.name}
+              "vigencia_inicio": d["vigencia_inicio"], "fonte": d["fonte"] or config.DISTRIBUTORS_CSV.name}
              for d in ufs.values() if d["tarifa_kwh"]],
             columns=["nome", "tarifa_kwh", "vigencia_inicio", "fonte"],
         )
-        origem = config.DISTRIBUIDORAS_CSV.name
-    tarifas = tarifas[tarifas["tarifa_kwh"] > 0]
+        origin = config.DISTRIBUTORS_CSV.name
+    tariffs = tariffs[tariffs["tarifa_kwh"] > 0]
 
     # Distribuidoras: todas que aparecem em qualquer um dos dois arquivos
-    nomes = {}
-    for nome in tarifas["nome"]:
-        nomes.setdefault(normalizar(nome), nome)
-    for chave, dado in ufs.items():
-        nomes.setdefault(chave, dado["nome"])
+    names = {}
+    for name in tariffs["nome"]:
+        names.setdefault(normalize(name), name)
+    for key, item in ufs.items():
+        names.setdefault(key, item["nome"])
 
     ids = {}
-    for chave, nome in sorted(nomes.items()):
-        dado = ufs.get(chave, {})
-        ids[chave] = banco.executar(
+    for key, name in sorted(names.items()):
+        item = ufs.get(key, {})
+        ids[key] = banco.run(
             con, "INSERT INTO distribuidoras (nome, uf, fonte_uf) VALUES (?, ?, ?) RETURNING id",
-            (nome, dado.get("uf"), dado.get("fonte_uf")),
+            (name, item.get("uf"), item.get("fonte_uf")),
         ).scalar_one()
 
-    for linha in tarifas.to_dict("records"):
-        banco.executar(
+    for line in tariffs.to_dict("records"):
+        banco.run(
             con, "INSERT INTO tarifas (distribuidora_id, tarifa_kwh, vigencia_inicio, fonte) VALUES (?, ?, ?, ?)",
-            (ids[normalizar(linha["nome"])], float(linha["tarifa_kwh"]),
-             _texto(linha["vigencia_inicio"]), linha["fonte"]),
+            (ids[normalize(line["nome"])], float(line["tarifa_kwh"]),
+             _text(line["vigencia_inicio"]), line["fonte"]),
         )
 
-    banco.executar(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (origem, len(tarifas)))
-    if ufs and origem != config.DISTRIBUIDORAS_CSV.name:
-        banco.executar(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (config.DISTRIBUIDORAS_CSV.name, len(ufs)))
-    return len(nomes), len(tarifas)
+    banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (origin, len(tariffs)))
+    if ufs and origin != config.DISTRIBUTORS_CSV.name:
+        banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (config.DISTRIBUTORS_CSV.name, len(ufs)))
+    return len(names), len(tariffs)
 
 
-def rodar_exemplos(con):
-    if not CONSULTAS_SQL.exists():
-        print(f"{CONSULTAS_SQL.name} nao encontrado")
+def run_examples(con):
+    if not QUERIES_SQL.exists():
+        print(f"{QUERIES_SQL.name} nao encontrado")
         return
-    blocos = [b.strip() for b in CONSULTAS_SQL.read_text(encoding="utf-8").split(";") if b.strip()]
-    for bloco in blocos:
-        titulo = next((l.lstrip("- ").strip() for l in bloco.splitlines() if l.startswith("--")), "consulta")
-        print(f"\n=== {titulo}")
-        resultado = banco.consulta(con, bloco)
-        print("(sem linhas)" if resultado.empty else resultado.to_string(index=False))
+    blocks = [b.strip() for b in QUERIES_SQL.read_text(encoding="utf-8").split(";") if b.strip()]
+    for block in blocks:
+        title = next((l.lstrip("- ").strip() for l in block.splitlines() if l.startswith("--")), "consulta")
+        print(f"\n=== {title}")
+        result = banco.query(con, block)
+        print("(sem linhas)" if result.empty else result.to_string(index=False))
 
 
 def main():
@@ -148,35 +148,35 @@ def main():
     args = parser.parse_args()
 
     try:
-        con = banco.conectar()
-    except ConnectionError as erro:
-        print(f"Erro: {erro}")
+        con = banco.connect()
+    except ConnectionError as error:
+        print(f"Erro: {error}")
         raise SystemExit(1)
     try:
-        con.exec_driver_sql(ESQUEMA)
-        n_aparelhos = carregar_aparelhos(con)
-        n_dist, n_tarifas = carregar_distribuidoras_e_tarifas(con)
-        extras = carregar_dados_extras(con)
+        con.exec_driver_sql(SCHEMA)
+        n_appliances = load_appliances(con)
+        n_dist, n_tariffs = load_distributors_and_tariffs(con)
+        extra = load_extra_data(con)
         con.commit()
     except Exception:
         con.rollback()
         raise
 
-    def contar(sql):
-        return banco.executar(con, sql).scalar_one()
+    def count(sql):
+        return banco.run(con, sql).scalar_one()
 
-    sem_uf = contar("SELECT COUNT(*) FROM distribuidoras WHERE uf IS NULL")
-    n_consultas = contar("SELECT COUNT(*) FROM consultas")
-    com_tarifa = contar("SELECT COUNT(*) FROM vw_tarifa_vigente")
+    without_uf = count("SELECT COUNT(*) FROM distribuidoras WHERE uf IS NULL")
+    n_queries = count("SELECT COUNT(*) FROM consultas")
+    with_tariff = count("SELECT COUNT(*) FROM vw_tarifa_vigente")
     print(f"Banco criado: {con.engine.url.render_as_string(hide_password=True)}")
-    print(f"  aparelhos:      {n_aparelhos}")
-    print(f"  distribuidoras: {n_dist} ({sem_uf} sem UF, {com_tarifa} com tarifa vigente)")
-    print(f"  tarifas:        {n_tarifas} (incluindo vigencias antigas)")
-    print(f"  consultas:      {n_consultas} (historico mantido)")
-    print(f"  portateis:      {extras['portateis']}")
+    print(f"  aparelhos:      {n_appliances}")
+    print(f"  distribuidoras: {n_dist} ({without_uf} sem UF, {with_tariff} com tarifa vigente)")
+    print(f"  tarifas:        {n_tariffs} (incluindo vigencias antigas)")
+    print(f"  consultas:      {n_queries} (historico mantido)")
+    print(f"  portateis:      {extra['portateis']}")
 
     if args.exemplos:
-        rodar_exemplos(con)
+        run_examples(con)
     con.close()
 
 

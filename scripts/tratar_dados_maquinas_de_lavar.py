@@ -4,10 +4,10 @@
 # %%
 from pathlib import Path
 import pandas as pd
-from config import ler_csv_inmetro, salvar_processado
+from config import read_csv_inmetro, save_processed
 import numpy as np
 
-df = ler_csv_inmetro("maquinas-de-lavar.csv")
+df = read_csv_inmetro("maquinas-de-lavar.csv")
 
 df.columns = (
     df.columns
@@ -28,21 +28,21 @@ print("Colunas:", list(df.columns))
 
 # %%
 if 'Status_do_Modelo' in df.columns:
-    antes = len(df)
+    before = len(df)
     df = df[df['Status_do_Modelo'].astype(str).str.strip().str.lower() == 'incluido']
-    print(f"✓ Filtro 'Incluido' aplicado: {len(df)} linhas (removidas {antes - len(df)})")
+    print(f"✓ Filtro 'Incluido' aplicado: {len(df)} linhas (removidas {before - len(df)})")
 
-colunas_para_remover = [
+columns_to_remove = [
     'Status_do_Modelo',
     'Código_de_Barras',
     'Status_do_Registro',
     'Número_do_Registro',
 ]
 
-colunas_existentes = [col for col in colunas_para_remover if col in df.columns]
-df = df.drop(columns=colunas_existentes)
+existing_columns = [col for col in columns_to_remove if col in df.columns]
+df = df.drop(columns=existing_columns)
 
-print(f"✓ {len(colunas_existentes)} colunas irrelevantes removidas.")
+print(f"✓ {len(existing_columns)} colunas irrelevantes removidas.")
 print(f"Colunas restantes ({len(df.columns)}):", list(df.columns))
 
 # %% [markdown]
@@ -56,9 +56,9 @@ for col in ['Marca', 'Modelo', 'Tipo_de_Lavadora']:
 if 'Marca' in df.columns:
     df['Marca'] = df['Marca'].str.upper()
 
-linhas_antes = len(df)
+lines_before = len(df)
 df = df.drop_duplicates()
-print(f"✓ Linhas duplicadas exatas removidas: {linhas_antes - len(df)}")
+print(f"✓ Linhas duplicadas exatas removidas: {lines_before - len(df)}")
 
 if all(c in df.columns for c in ['Marca', 'Modelo', 'Tensão_V']):
     df['contagem_nulos'] = df.isnull().sum(axis=1)
@@ -72,7 +72,7 @@ if all(c in df.columns for c in ['Marca', 'Modelo', 'Tensão_V']):
 # Notebook 4: Correção de Typos e Filtros
 
 # %%
-colunas_numericas = [
+numeric_columns = [
     'Capacidade_de_lavagem_kg',
     'Consumo_de_energia_kWh_ciclo_água_fria',
     'Desempenho_de_lavagem_água_fria',
@@ -81,7 +81,7 @@ colunas_numericas = [
     'Consumo_de_água_l',
     'Tempo_do_ciclo_min',
 ]
-for col in colunas_numericas:
+for col in numeric_columns:
     if col in df.columns:
         df[col] = pd.to_numeric(df[col], errors='coerce')
 
@@ -92,19 +92,19 @@ if 'Tensão_V' in df.columns:
 print("✓ Tipos convertidos para numérico.")
 
 if 'Desempenho_de_lavagem_água_fria' in df.columns:
-    mask_desemp = df['Desempenho_de_lavagem_água_fria'] > 1.5
-    df.loc[mask_desemp, 'Desempenho_de_lavagem_água_fria'] = (
-        df.loc[mask_desemp, 'Desempenho_de_lavagem_água_fria'] / 100
+    mask_performance = df['Desempenho_de_lavagem_água_fria'] > 1.5
+    df.loc[mask_performance, 'Desempenho_de_lavagem_água_fria'] = (
+        df.loc[mask_performance, 'Desempenho_de_lavagem_água_fria'] / 100
     )
 print("✓ Typos corrigidos.")
 
-antes = len(df)
+before = len(df)
 
 if 'Tensão_V' in df.columns:
     df = df[df['Tensão_V'].isin([127, 220])]
     print(f"Após filtro de tensão: {len(df)} linhas")
 
-filtros = [
+filters = [
     ('Capacidade_de_lavagem_kg', 1, 25),
     ('Consumo_de_energia_kWh_ciclo_água_fria', 0, 1.5),
     ('Desempenho_de_lavagem_água_fria', 0.5, 1.2),
@@ -114,9 +114,9 @@ filtros = [
     ('Tempo_do_ciclo_min', 3, 700),
 ]
 
-for col, minimo, maximo in filtros:
+for col, minimum, maximum in filters:
     if col in df.columns:
-        mask = df[col].isna() | ((df[col] >= minimo) & (df[col] <= maximo))
+        mask = df[col].isna() | ((df[col] >= minimum) & (df[col] <= maximum))
         df = df[mask]
         print(f"Após filtro de {col}: {len(df)} linhas")
 
@@ -126,34 +126,34 @@ print(f"✓ Linhas restantes: {len(df)}")
 # Notebook 5: Imputação e Exportação
 
 # %%
-colunas_obrigatorias = [
+required_columns = [
     'Capacidade_de_lavagem_kg',
     'Consumo_de_energia_kWh_ciclo_água_fria',
     'Desempenho_de_lavagem_água_fria',
     'Consumo_de_água_l',
     'Tempo_do_ciclo_min',
 ]
-colunas_opcionais = [
+optional_columns = [
     'Consumo_de_energia_kWh_ciclo_água_quente',
     'Velocidade_de_centrifugação_rpm',
 ]
 
-colunas_obrigatorias = [c for c in colunas_obrigatorias if c in df.columns]
-colunas_opcionais = [c for c in colunas_opcionais if c in df.columns]
+required_columns = [c for c in required_columns if c in df.columns]
+optional_columns = [c for c in optional_columns if c in df.columns]
 
 # Marca as linhas cujo consumo vai ser preenchido pela média (o app avisa o usuário)
 df['Consumo_Imputado'] = df['Consumo_de_energia_kWh_ciclo_água_fria'].isna()
 
 if 'Marca' in df.columns and 'Tensão_V' in df.columns:
-    df[colunas_obrigatorias] = (
-        df.groupby(['Marca', 'Tensão_V'])[colunas_obrigatorias]
+    df[required_columns] = (
+        df.groupby(['Marca', 'Tensão_V'])[required_columns]
           .transform(lambda x: x.fillna(x.mean()))
     )
 
-df = df.dropna(subset=colunas_obrigatorias)
+df = df.dropna(subset=required_columns)
 
 if 'Tipo_de_Lavadora' in df.columns and 'Marca' in df.columns:
-    for col in colunas_opcionais:
+    for col in optional_columns:
         if df.groupby('Tipo_de_Lavadora')[col].count().max() > 0:
             df[col] = df.groupby(['Tipo_de_Lavadora', 'Marca'])[col].transform(
                 lambda x: x.fillna(x.mean())
@@ -167,4 +167,4 @@ print(f"Colunas finais: {list(df.columns)}")
 print("Nulos restantes por coluna:")
 print(df.isnull().sum())
 
-salvar_processado(df, "maquinas-de-lavar_limpo.csv")
+save_processed(df, "maquinas-de-lavar_limpo.csv")

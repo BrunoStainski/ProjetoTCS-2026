@@ -13,23 +13,23 @@ import 'eco_coach.dart';
 import 'menu.dart';
 import 'minha_casa.dart';
 
-class TelaInicio extends StatelessWidget {
-  const TelaInicio({super.key});
+class StartScreen extends StatelessWidget {
+  const StartScreen({super.key});
 
-  static const _telas = {
-    Aba.calcular: TelaBusca(),
-    Aba.casa: TelaMinhaCasa(),
-    Aba.economizar: TelaEcoCoach(),
+  static const _screens = {
+    AppTab.calculate: SearchScreen(),
+    AppTab.home: MyHomeScreen(),
+    AppTab.save: EcoCoachScreen(),
   };
 
   /// Voltar do Android: primeiro volta dentro da aba; na primeira tela de outra aba, vai para Calcular;
   /// na primeira tela de Calcular, fecha o app.
-  void _voltar() {
-    final pilha = chavesDasAbas[abaAtual.value]!.currentState;
-    if (pilha != null && pilha.canPop()) {
-      pilha.maybePop();
-    } else if (abaAtual.value != Aba.calcular) {
-      irPara(Aba.calcular);
+  void _back() {
+    final stack = tabKeys[currentTab.value]!.currentState;
+    if (stack != null && stack.canPop()) {
+      stack.maybePop();
+    } else if (currentTab.value != AppTab.calculate) {
+      goTo(AppTab.calculate);
     } else {
       SystemNavigator.pop();
     }
@@ -39,28 +39,28 @@ class TelaInicio extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (saiu, _) {
-        if (!saiu) _voltar();
+      onPopInvokedWithResult: (left, _) {
+        if (!left) _back();
       },
-      child: ValueListenableBuilder<Aba>(
-        valueListenable: abaAtual,
-        builder: (context, aba, _) => Scaffold(
+      child: ValueListenableBuilder<AppTab>(
+        valueListenable: currentTab,
+        builder: (context, tab, _) => Scaffold(
           body: IndexedStack(
-            index: aba.index,
+            index: tab.index,
             children: [
-              for (final a in Aba.values)
+              for (final a in AppTab.values)
                 // cada aba com o proprio messenger: o aviso aparece na tela da aba, acima do botao dela
                 ScaffoldMessenger(
                   child: HeroControllerScope.none(
                     child: Navigator(
-                      key: chavesDasAbas[a],
-                      onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => _telas[a]!),
+                      key: tabKeys[a],
+                      onGenerateRoute: (_) => MaterialPageRoute(builder: (_) => _screens[a]!),
                     ),
                   ),
                 ),
             ],
           ),
-          bottomNavigationBar: const _BarraDeAbas(),
+          bottomNavigationBar: const _TabBar(),
           drawer: const MenuIamp(), // menu de acesso rapido (botao no topo da 1a tela de cada aba)
         ),
       ),
@@ -68,8 +68,8 @@ class TelaInicio extends StatelessWidget {
   }
 }
 
-class _BarraDeAbas extends StatelessWidget {
-  const _BarraDeAbas();
+class _TabBar extends StatelessWidget {
+  const _TabBar();
 
   @override
   Widget build(BuildContext context) {
@@ -78,16 +78,16 @@ class _BarraDeAbas extends StatelessWidget {
       maxScaleFactor: 1.5,
       child: Builder(
         builder: (context) {
-          final altura = MediaQuery.textScalerOf(context).scale(80).clamp(80.0, 104.0);
+          final height = MediaQuery.textScalerOf(context).scale(80).clamp(80.0, 104.0);
           return ListenableBuilder(
-            listenable: Listenable.merge([abaAtual, casa]),
+            listenable: Listenable.merge([currentTab, home]),
             builder: (context, _) => NavigationBar(
-              height: altura,
-              selectedIndex: abaAtual.value.index,
+              height: height,
+              selectedIndex: currentTab.value.index,
               onDestinationSelected: (i) {
-                final aba = Aba.values[i];
+                final tab = AppTab.values[i];
                 // tocar na aba que ja esta aberta volta para a primeira tela dela
-                irPara(aba, recomecar: aba == abaAtual.value);
+                goTo(tab, restart: tab == currentTab.value);
               },
               destinations: [
                 NavigationDestination(
@@ -98,21 +98,21 @@ class _BarraDeAbas extends StatelessWidget {
                 ),
                 NavigationDestination(
                   icon: Badge(
-                    isLabelVisible: !casa.vazia,
-                    label: Text('${casa.totalAparelhos}'),
+                    isLabelVisible: !home.isEmpty,
+                    label: Text('${home.totalAppliances}'),
                     child: const Icon(Icons.home_outlined),
                   ),
                   selectedIcon: Badge(
-                    isLabelVisible: !casa.vazia,
-                    label: Text('${casa.totalAparelhos}'),
+                    isLabelVisible: !home.isEmpty,
+                    label: Text('${home.totalAppliances}'),
                     child: const Icon(Icons.home),
                   ),
                   label: tr('Minha casa', 'My home'),
-                  tooltip: casa.vazia
+                  tooltip: home.isEmpty
                       ? tr('Minha casa, nenhum aparelho', 'My home, no appliances')
                       : tr(
-                          'Minha casa, ${casa.totalAparelhos} ${casa.totalAparelhos == 1 ? 'aparelho' : 'aparelhos'}',
-                          'My home, ${casa.totalAparelhos} ${casa.totalAparelhos == 1 ? 'appliance' : 'appliances'}',
+                          'Minha casa, ${home.totalAppliances} ${home.totalAppliances == 1 ? 'aparelho' : 'aparelhos'}',
+                          'My home, ${home.totalAppliances} ${home.totalAppliances == 1 ? 'appliance' : 'appliances'}',
                         ),
                 ),
                 NavigationDestination(

@@ -11,50 +11,50 @@ import 'sugestoes.dart';
 
 /// Aba "Minha casa": soma os aparelhos calculados, mostra o que mais pesa na conta
 /// e compara a casa com casas parecidas (perfil de consumo, POST /classificar).
-class TelaMinhaCasa extends StatefulWidget {
-  const TelaMinhaCasa({super.key});
+class MyHomeScreen extends StatefulWidget {
+  const MyHomeScreen({super.key});
 
   @override
-  State<TelaMinhaCasa> createState() => _TelaMinhaCasaState();
+  State<MyHomeScreen> createState() => _MyHomeScreenState();
 }
 
-class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
-  bool _classificando = false;
-  String? _erroPerfil;
-  final _chavePerfil = GlobalKey();
+class _MyHomeScreenState extends State<MyHomeScreen> {
+  bool _classifying = false;
+  String? _profileError;
+  final _profileKey = GlobalKey();
 
-  Future<void> _classificar() async {
+  Future<void> _classify() async {
     setState(() {
-      _classificando = true;
-      _erroPerfil = null;
+      _classifying = true;
+      _profileError = null;
     });
     try {
-      casa.guardarPerfil(await Api.classificar(casa.moradores, casa.itensParaPerfil()));
+      home.storeProfile(await Api.classify(home.residents, home.itemsForProfile()));
       // leva a tela ate o cartao do perfil, que aparece no fim da lista
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final alvo = _chavePerfil.currentContext;
-        if (alvo != null && alvo.mounted) {
-          Scrollable.ensureVisible(alvo, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
+        final target = _profileKey.currentContext;
+        if (target != null && target.mounted) {
+          Scrollable.ensureVisible(target, duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic);
         }
       });
-    } on ApiErro catch (e) {
-      if (mounted) setState(() => _erroPerfil = e.mensagem);
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _profileError = e.message);
     } finally {
-      if (mounted) setState(() => _classificando = false);
+      if (mounted) setState(() => _classifying = false);
     }
   }
 
-  void _remover(ItemCasa item) {
-    final avisos = ScaffoldMessenger.of(context);
-    final posicao = casa.remover(item);
-    avisos
+  void _remove(ItemHome item) {
+    final notices = ScaffoldMessenger.of(context);
+    final position = home.remove(item);
+    notices
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(tr('${item.resultado.nome} saiu da sua casa.', '${item.resultado.nome} was removed from your home.')),
-          duration: duracaoAviso,
+          content: Text(tr('${item.result.name} saiu da sua casa.', '${item.result.name} was removed from your home.')),
+          duration: noticeDuration,
           persist: false,
-          action: SnackBarAction(label: tr('Desfazer', 'Undo'), onPressed: () => casa.reinserir(item, posicao)),
+          action: SnackBarAction(label: tr('Desfazer', 'Undo'), onPressed: () => home.reinsert(item, position)),
         ),
       );
   }
@@ -62,105 +62,105 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: casa,
+      listenable: home,
       builder: (context, _) =>
-          Pagina(titulo: tr('Minha casa', 'My home'), rodape: _rodape(), filho: casa.vazia ? const _CasaVazia() : _lista()),
+          AppPage(title: tr('Minha casa', 'My home'), footer: _footer(), child: home.isEmpty ? const _EmptyHome() : _list()),
     );
   }
 
   /// Acao principal embaixo: calcular (casa vazia), ver o perfil e, depois do perfil, economizar.
-  Widget _rodape() {
-    if (casa.vazia) {
+  Widget _footer() {
+    if (home.isEmpty) {
       return FilledButton.icon(
-        onPressed: () => irPara(Aba.calcular, recomecar: true),
+        onPressed: () => goTo(AppTab.calculate, restart: true),
         icon: const Icon(Icons.calculate_outlined),
         label: Text(tr('Calcular um aparelho', 'Calculate an appliance')),
       );
     }
-    if (casa.perfil != null) {
+    if (home.profile != null) {
       return FilledButton.icon(
-        onPressed: () => irPara(Aba.economizar),
+        onPressed: () => goTo(AppTab.save),
         icon: const Icon(Icons.savings_outlined),
         label: Text(tr('Ver como economizar', 'See how to save')),
       );
     }
     return FilledButton.icon(
-      onPressed: _classificando ? null : _classificar,
-      icon: _classificando
+      onPressed: _classifying ? null : _classify,
+      icon: _classifying
           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.insights),
-      label: Text(_classificando ? tr('Comparando...', 'Comparing...') : tr('Comparar com outras casas', 'Compare with other homes')),
+      label: Text(_classifying ? tr('Comparando...', 'Comparing...') : tr('Comparar com outras casas', 'Compare with other homes')),
     );
   }
 
-  Widget _lista() {
+  Widget _list() {
     final t = Iamp.de(context);
-    final total = casa.kwhMes;
-    final n = casa.totalAparelhos;
+    final total = home.monthlyKwh;
+    final n = home.totalAppliances;
     return ListView(
       children: [
-        CartaoDestaque(
-          titulo: tr('Sua conta de luz com estes aparelhos', 'Your electricity bill with these appliances'),
-          valor: casa.custoMes,
-          formatar: (v) => tr('${reais(v)} por mês', '${reais(v)} per month'),
-          rodape: tr(
-            '${reais(casa.custoAno)} por ano · $n ${n == 1 ? 'aparelho' : 'aparelhos'}',
-            '${reais(casa.custoAno)} per year · $n ${n == 1 ? 'appliance' : 'appliances'}',
+        HighlightCard(
+          title: tr('Sua conta de luz com estes aparelhos', 'Your electricity bill with these appliances'),
+          value: home.monthlyCost,
+          format: (v) => tr('${reais(v)} por mês', '${reais(v)} per month'),
+          footer: tr(
+            '${reais(home.yearlyCost)} por ano · $n ${n == 1 ? 'aparelho' : 'aparelhos'}',
+            '${reais(home.yearlyCost)} per year · $n ${n == 1 ? 'appliance' : 'appliances'}',
           ),
         ),
         Text(
-          tr('Consumo de ${numero(total)} kWh por mês.', 'Uses ${numero(total)} kWh per month.'),
-          style: t.secundario,
+          tr('Consumo de ${number(total)} kWh por mês.', 'Uses ${number(total)} kWh per month.'),
+          style: t.secondary,
           textAlign: TextAlign.center,
         ),
-        if (casa.tarifasMisturadas)
+        if (home.mixedTariffs)
           Padding(
-            padding: const EdgeInsets.only(top: Espaco.p),
-            child: ListaAvisos([
+            padding: const EdgeInsets.only(top: Spacing.p),
+            child: NoticeList([
               tr(
                 'Alguns aparelhos foram calculados com tarifas diferentes; o total soma os dois.',
                 'Some appliances were calculated with different rates; the total adds them together.',
               ),
             ]),
           ),
-        Titulo(tr('O que mais pesa na conta', 'What weighs most on the bill')),
-        for (final item in casa.porCusto)
-          _CartaoItem(item, fracao: total > 0 ? item.kwhMes / total : 0, aoRemover: () => _remover(item)),
-        const SizedBox(height: Espaco.p),
+        SectionTitle(tr('O que mais pesa na conta', 'What weighs most on the bill')),
+        for (final item in home.byCost)
+          _ItemCard(item, fraction: total > 0 ? item.monthlyKwh / total : 0, onRemove: () => _remove(item)),
+        const SizedBox(height: Spacing.p),
         OutlinedButton.icon(
-          onPressed: () => irPara(Aba.calcular, recomecar: true),
+          onPressed: () => goTo(AppTab.calculate, restart: true),
           icon: const Icon(Icons.add),
           label: Text(tr('Adicionar outro aparelho', 'Add another appliance')),
         ),
-        Titulo(tr('Quantas pessoas moram na casa?', 'How many people live in the home?')),
+        SectionTitle(tr('Quantas pessoas moram na casa?', 'How many people live in the home?')),
         Text(
           tr('Usamos para comparar a sua casa com casas parecidas.', 'We use it to compare your home with similar homes.'),
-          style: t.secundario,
+          style: t.secondary,
         ),
-        const SizedBox(height: Espaco.p),
-        _Contador(
-          valor: casa.moradores,
-          rotulo: casa.moradores == 1 ? tr('morador', 'resident') : tr('moradores', 'residents'),
-          descricao: tr('moradores', 'residents'),
-          minimo: 1,
-          maximo: 20,
-          aoMudar: casa.mudarMoradores,
+        const SizedBox(height: Spacing.p),
+        _Counter(
+          value: home.residents,
+          label: home.residents == 1 ? tr('morador', 'resident') : tr('moradores', 'residents'),
+          description: tr('moradores', 'residents'),
+          minimum: 1,
+          maximum: 20,
+          onChange: home.changeResidents,
         ),
-        if (_erroPerfil != null) MensagemErro(_erroPerfil!, tentarDeNovo: _classificar),
-        if (casa.perfil != null)
+        if (_profileError != null) ErrorMessage(_profileError!, tryAgain: _classify),
+        if (home.profile != null)
           Padding(
-            key: _chavePerfil,
-            padding: const EdgeInsets.only(top: Espaco.m),
-            child: _CartaoPerfil(casa.perfil!, maior: casa.porCusto.first, total: total),
+            key: _profileKey,
+            padding: const EdgeInsets.only(top: Spacing.m),
+            child: _ProfileCard(home.profile!, largest: home.byCost.first, total: total),
           ),
-        const SizedBox(height: Espaco.g),
+        const SizedBox(height: Spacing.g),
       ],
     );
   }
 }
 
-class _CasaVazia extends StatelessWidget {
-  const _CasaVazia();
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome();
 
   @override
   Widget build(BuildContext context) {
@@ -170,13 +170,13 @@ class _CasaVazia extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.home_outlined, size: t.iconeEnorme),
-            const SizedBox(height: Espaco.m),
+            Icon(Icons.home_outlined, size: t.hugeIcon),
+            const SizedBox(height: Spacing.m),
             Semantics(
               header: true,
-              child: Text(tr('Sua casa ainda está vazia', 'Your home is still empty'), style: t.titulo, textAlign: TextAlign.center),
+              child: Text(tr('Sua casa ainda está vazia', 'Your home is still empty'), style: t.title, textAlign: TextAlign.center),
             ),
-            const SizedBox(height: Espaco.p),
+            const SizedBox(height: Spacing.p),
             Text(
               tr(
                 'Calcule um aparelho e toque em "Adicionar à minha casa". '
@@ -185,7 +185,7 @@ class _CasaVazia extends StatelessWidget {
                     'With a few appliances, Iamp shows the bill total and where you can save.',
               ),
               textAlign: TextAlign.center,
-              style: t.corpo,
+              style: t.body,
             ),
           ],
         ),
@@ -195,21 +195,21 @@ class _CasaVazia extends StatelessWidget {
 }
 
 /// Botoes - e + com o numero no meio. Cada botao diz ao leitor de tela o que muda.
-class _Contador extends StatelessWidget {
-  final int valor;
-  final String rotulo;
-  final String descricao;
-  final int minimo;
-  final int maximo;
-  final void Function(int) aoMudar;
+class _Counter extends StatelessWidget {
+  final int value;
+  final String label;
+  final String description;
+  final int minimum;
+  final int maximum;
+  final void Function(int) onChange;
 
-  const _Contador({
-    required this.valor,
-    required this.rotulo,
-    required this.descricao,
-    required this.minimo,
-    required this.maximo,
-    required this.aoMudar,
+  const _Counter({
+    required this.value,
+    required this.label,
+    required this.description,
+    required this.minimum,
+    required this.maximum,
+    required this.onChange,
   });
 
   @override
@@ -217,20 +217,20 @@ class _Contador extends StatelessWidget {
     final t = Iamp.de(context);
     return Wrap(
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: Espaco.p,
+      spacing: Spacing.p,
       children: [
         IconButton.outlined(
-          tooltip: tr('Diminuir $descricao', 'Decrease $descricao'),
-          onPressed: valor > minimo ? () => aoMudar(valor - 1) : null,
+          tooltip: tr('Diminuir $description', 'Decrease $description'),
+          onPressed: value > minimum ? () => onChange(value - 1) : null,
           icon: const Icon(Icons.remove),
         ),
         Semantics(
           liveRegion: true,
-          child: Text('$valor $rotulo', style: t.numero),
+          child: Text('$value $label', style: t.number),
         ),
         IconButton.outlined(
-          tooltip: tr('Aumentar $descricao', 'Increase $descricao'),
-          onPressed: valor < maximo ? () => aoMudar(valor + 1) : null,
+          tooltip: tr('Aumentar $description', 'Increase $description'),
+          onPressed: value < maximum ? () => onChange(value + 1) : null,
           icon: const Icon(Icons.add),
         ),
       ],
@@ -238,21 +238,21 @@ class _Contador extends StatelessWidget {
   }
 }
 
-class _CartaoItem extends StatelessWidget {
-  final ItemCasa item;
-  final double fracao;
-  final VoidCallback aoRemover;
+class _ItemCard extends StatelessWidget {
+  final ItemHome item;
+  final double fraction;
+  final VoidCallback onRemove;
 
-  const _CartaoItem(this.item, {required this.fracao, required this.aoRemover});
+  const _ItemCard(this.item, {required this.fraction, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final r = item.resultado;
-    final parte = '${numero(fracao * 100, casas: 0)}%';
+    final r = item.result;
+    final piece = '${number(fraction * 100, homes: 0)}%';
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(Espaco.m),
+        padding: const EdgeInsets.all(Spacing.m),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -264,73 +264,73 @@ class _CartaoItem extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(iconeDaCategoria(r.categoria), size: t.iconeGrande),
-                      const SizedBox(width: Espaco.pm),
+                      Icon(categoryIcon(r.category), size: t.largeIcon),
+                      const SizedBox(width: Spacing.pm),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(r.nome, style: t.forte, maxLines: 3, overflow: TextOverflow.ellipsis),
+                            Text(r.name, style: t.strong, maxLines: 3, overflow: TextOverflow.ellipsis),
                             Text(
-                              [nomeDaCategoria(r.categoria), if (r.detalhe.isNotEmpty) r.detalhe].join(' · '),
-                              style: t.secundario,
+                              [categoryName(r.category), if (r.detail.isNotEmpty) r.detail].join(' · '),
+                              style: t.secondary,
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: Espaco.pm),
-                  Text(tr('${reais(item.custoMes)} por mês', '${reais(item.custoMes)} per month'), style: t.valorMedio),
+                  const SizedBox(height: Spacing.pm),
+                  Text(tr('${reais(item.monthlyCost)} por mês', '${reais(item.monthlyCost)} per month'), style: t.averageValue),
                   Text(
-                    tr('$parte da conta · ${numero(item.kwhMes)} kWh', '$parte of the bill · ${numero(item.kwhMes)} kWh'),
-                    style: t.secundario,
+                    tr('$piece da conta · ${number(item.monthlyKwh)} kWh', '$piece of the bill · ${number(item.monthlyKwh)} kWh'),
+                    style: t.secondary,
                   ),
-                  const SizedBox(height: Espaco.p),
-                  ExcludeSemantics(child: BarraParte(fracao, descricao: tr('$parte da conta', '$parte of the bill'))),
+                  const SizedBox(height: Spacing.p),
+                  ExcludeSemantics(child: PartBar(fraction, description: tr('$piece da conta', '$piece of the bill'))),
                 ],
               ),
             ),
-            const SizedBox(height: Espaco.pm),
-            Text(tr('Quantidade', 'Quantity'), style: t.rotulo),
-            _Contador(
-              valor: item.quantidade,
-              rotulo: item.quantidade == 1 ? tr('unidade', 'unit') : tr('unidades', 'units'),
-              descricao: tr('a quantidade de ${r.nome}', 'the quantity of ${r.nome}'),
-              minimo: 1,
-              maximo: 99,
-              aoMudar: (q) => casa.mudarQuantidade(item, q),
+            const SizedBox(height: Spacing.pm),
+            Text(tr('Quantidade', 'Quantity'), style: t.label),
+            _Counter(
+              value: item.quantity,
+              label: item.quantity == 1 ? tr('unidade', 'unit') : tr('unidades', 'units'),
+              description: tr('a quantidade de ${r.name}', 'the quantity of ${r.name}'),
+              minimum: 1,
+              maximum: 99,
+              onChange: (q) => home.changeQuantity(item, q),
             ),
-            const Divider(height: Espaco.g),
+            const Divider(height: Spacing.g),
             Wrap(
-              spacing: Espaco.p,
-              runSpacing: Espaco.p,
+              spacing: Spacing.p,
+              runSpacing: Spacing.p,
               children: [
-                if (!item.consulta.portatil)
+                if (!item.query.smallAppliance)
                   TextButton.icon(
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => TelaSugestoes(consulta: item.consulta, item: item, atual: item.resultado),
+                        builder: (_) => SuggestionScreen(query: item.query, item: item, current: item.result),
                       ),
                     ),
                     icon: const Icon(Icons.trending_down),
                     label: Text(tr('Ver modelos que gastam menos', 'See models that use less')),
                   ),
-                if (item.consulta.portatil)
+                if (item.query.smallAppliance)
                   TextButton.icon(
                     onPressed: () =>
-                        Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: item.resultado))),
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => TipScreen(result: item.result))),
                     icon: const Icon(Icons.tips_and_updates_outlined),
                     label: Text(tr('Como gastar menos', 'How to spend less')),
                   ),
                 Semantics(
-                  label: tr('Remover ${r.nome} da casa', 'Remove ${r.nome} from the home'),
+                  label: tr('Remover ${r.name} da casa', 'Remove ${r.name} from the home'),
                   excludeSemantics: true,
                   button: true,
-                  onTap: aoRemover,
+                  onTap: onRemove,
                   child: TextButton.icon(
-                    onPressed: aoRemover,
+                    onPressed: onRemove,
                     icon: const Icon(Icons.delete_outline),
                     label: Text(tr('Remover', 'Remove')),
                   ),
@@ -344,27 +344,27 @@ class _CartaoItem extends StatelessWidget {
   }
 }
 
-class _CartaoPerfil extends StatelessWidget {
-  final Classificacao c;
-  final ItemCasa maior;
+class _ProfileCard extends StatelessWidget {
+  final Classification c;
+  final ItemHome largest;
   final double total;
 
-  const _CartaoPerfil(this.c, {required this.maior, required this.total});
+  const _ProfileCard(this.c, {required this.largest, required this.total});
 
-  static const _icones = {
+  static const _icons = {
     'Consciente': Icons.eco_outlined,
     'Moderado': Icons.balance,
     'Ineficiente': Icons.warning_amber_rounded,
   };
 
-  static String? _explicacao(String perfil) => switch (perfil) {
+  static String? _explanation(String profile) => switch (profile) {
     'Consciente' => tr('A sua casa gasta pouco por pessoa.', 'Your home uses little per person.'),
     'Moderado' => tr('A sua casa gasta perto da média por pessoa.', 'Your home uses close to the average per person.'),
     'Ineficiente' => tr('A sua casa gasta mais que a média por pessoa.', 'Your home uses more than the average per person.'),
     _ => null,
   };
 
-  static Map<String, String> get _nomesFracoes => {
+  static Map<String, String> get _fractionNames => {
     'frac_chuveiro': tr('Chuveiro', 'Electric shower'),
     'frac_ar': tr('Ar-condicionado', 'Air conditioner'),
     'frac_refrigerador': tr('Geladeira', 'Fridge'),
@@ -374,93 +374,93 @@ class _CartaoPerfil extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     // verde = bom, amarelo = neutro, vermelho = alerta (sempre com o nome e um icone diferente)
-    final cor = switch (c.perfil) {
-      'Consciente' => t.economia,
-      'Ineficiente' => t.alerta,
-      _ => t.destaque,
+    final cor = switch (c.profile) {
+      'Consciente' => t.savings,
+      'Ineficiente' => t.alert,
+      _ => t.highlight,
     };
-    final acima = c.diferencaPercentual > 0;
+    final above = c.percentageDifference > 0;
     // a tarifa media da casa transforma o kWh por morador em reais
-    final tarifaMedia = total > 0 ? casa.custoMes / total : 0.0;
+    final meanTariff = total > 0 ? home.monthlyCost / total : 0.0;
     return Container(
-      padding: const EdgeInsets.all(Espaco.g),
-      decoration: t.cartaoDestaque(cor),
+      padding: const EdgeInsets.all(Spacing.g),
+      decoration: t.highlightCard(cor),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           MergeSemantics(
             child: Row(
               children: [
-                Icon(_icones[c.perfil] ?? Icons.insights, color: cor, size: t.iconeGrande + 8),
-                const SizedBox(width: Espaco.m),
+                Icon(_icons[c.profile] ?? Icons.insights, color: cor, size: t.largeIcon + 8),
+                const SizedBox(width: Spacing.m),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(tr('Perfil da casa', 'Home profile'), style: t.rotulo),
-                      Text(nomeDoPerfil(c.perfil), style: t.valor.copyWith(color: cor)),
-                      if (_explicacao(c.perfil) case final explicacao?) Text(explicacao, style: t.corpo),
+                      Text(tr('Perfil da casa', 'Home profile'), style: t.label),
+                      Text(profileName(c.profile), style: t.value.copyWith(color: cor)),
+                      if (_explanation(c.profile) case final explanation?) Text(explanation, style: t.body),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: Espaco.m),
-          LadoALado(
-            CartaoInfo(
+          const SizedBox(height: Spacing.m),
+          SideBySide(
+            InfoCard(
               tr('Sua casa, por pessoa', 'Your home, per person'),
-              tr('${reais(c.kwhPorMorador * tarifaMedia)} por mês', '${reais(c.kwhPorMorador * tarifaMedia)} per month'),
-              detalhe: '${numero(c.kwhPorMorador, casas: 1)} kWh',
+              tr('${reais(c.kwhPerResident * meanTariff)} por mês', '${reais(c.kwhPerResident * meanTariff)} per month'),
+              detail: '${number(c.kwhPerResident, homes: 1)} kWh',
             ),
-            CartaoInfo(
+            InfoCard(
               tr('Casas parecidas, por pessoa', 'Similar homes, per person'),
-              tr('cerca de ${reais(c.medianaKwhPorMorador * tarifaMedia)}', 'about ${reais(c.medianaKwhPorMorador * tarifaMedia)}'),
-              detalhe: '${numero(c.medianaKwhPorMorador, casas: 1)} kWh',
+              tr('cerca de ${reais(c.medianKwhPerResident * meanTariff)}', 'about ${reais(c.medianKwhPerResident * meanTariff)}'),
+              detail: '${number(c.medianKwhPerResident, homes: 1)} kWh',
             ),
           ),
-          const SizedBox(height: Espaco.pm),
+          const SizedBox(height: Spacing.pm),
           MergeSemantics(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // a seta muda junto com a cor: acima da media = para cima
-                Icon(acima ? Icons.arrow_upward : Icons.arrow_downward, color: acima ? t.alerta : t.economia),
-                const SizedBox(width: Espaco.p),
-                Expanded(child: Text(_primeiraMaiuscula(c.comparacaoTexto), style: t.corpo)),
+                Icon(above ? Icons.arrow_upward : Icons.arrow_downward, color: above ? t.alert : t.savings),
+                const SizedBox(width: Spacing.p),
+                Expanded(child: Text(_capitalizeFirst(c.textComparison), style: t.body)),
               ],
             ),
           ),
-          Titulo(tr('Quanto cada um pesa no consumo', 'How much each one weighs in consumption')),
-          for (final e in _nomesFracoes.entries)
+          SectionTitle(tr('Quanto cada um pesa no consumo', 'How much each one weighs in consumption')),
+          for (final e in _fractionNames.entries)
             Padding(
-              padding: const EdgeInsets.only(bottom: Espaco.pm),
+              padding: const EdgeInsets.only(bottom: Spacing.pm),
               child: MergeSemantics(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text('${e.value}: ${numero((c.fracoes[e.key] ?? 0) * 100, casas: 0)}%', style: t.corpo),
-                    const SizedBox(height: Espaco.pp),
-                    ExcludeSemantics(child: BarraParte(c.fracoes[e.key] ?? 0, descricao: e.value)),
+                    Text('${e.value}: ${number((c.fractions[e.key] ?? 0) * 100, homes: 0)}%', style: t.body),
+                    const SizedBox(height: Spacing.pp),
+                    ExcludeSemantics(child: PartBar(c.fractions[e.key] ?? 0, description: e.value)),
                   ],
                 ),
               ),
             ),
-          const SizedBox(height: Espaco.p),
+          const SizedBox(height: Spacing.p),
           Text(
             tr(
-              'O que mais pesa: ${maior.resultado.nome} '
-                  '(${numero(total > 0 ? maior.kwhMes / total * 100 : 0, casas: 0)}% do consumo). '
+              'O que mais pesa: ${largest.result.name} '
+                  '(${number(total > 0 ? largest.monthlyKwh / total * 100 : 0, homes: 0)}% do consumo). '
                   'Veja no cartão dele se existe um modelo que gasta menos.',
-              'What weighs most: ${maior.resultado.nome} '
-                  '(${numero(total > 0 ? maior.kwhMes / total * 100 : 0, casas: 0)}% of consumption). '
+              'What weighs most: ${largest.result.name} '
+                  '(${number(total > 0 ? largest.monthlyKwh / total * 100 : 0, homes: 0)}% of consumption). '
                   'Check its card to see if there is a model that uses less.',
             ),
-            style: t.corpo,
+            style: t.body,
           ),
-          const SizedBox(height: Espaco.m),
-          ListaAvisos([
-            c.aviso,
+          const SizedBox(height: Spacing.m),
+          NoticeList([
+            c.notice,
             tr('O perfil considera só os aparelhos que você adicionou.', 'The profile only counts the appliances you added.'),
           ]),
         ],
@@ -468,5 +468,5 @@ class _CartaoPerfil extends StatelessWidget {
     );
   }
 
-  static String _primeiraMaiuscula(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+  static String _capitalizeFirst(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }

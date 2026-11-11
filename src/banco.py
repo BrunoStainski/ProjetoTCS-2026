@@ -9,7 +9,7 @@ from sqlalchemy.exc import OperationalError
 
 import config
 
-ESQUEMA = """
+SCHEMA = """
 -- Tabelas de dados: recriadas a cada carga (vem dos CSVs limpos).
 DROP VIEW IF EXISTS vw_tarifa_vigente;
 DROP TABLE IF EXISTS tarifas;
@@ -123,60 +123,60 @@ def engine():
     return _engine
 
 
-def conectar():
+def connect():
     """Abre uma conexao. Feche com con.close() (ou use 'with conectar() as con')."""
     try:
         return engine().connect()
-    except OperationalError as erro:
+    except OperationalError as error:
         raise ConnectionError(
             "nao consegui conectar no PostgreSQL. O container esta rodando? "
             "(docker compose up -d) e o .env esta preenchido?\n"
-            f"Detalhe: {erro.orig}"
+            f"Detalhe: {error.orig}"
         ) from None
 
 
-def _nomear(sql, params):
+def _to_named_params(sql, params):
     """Troca cada ? por :p0, :p1... (formato do SQLAlchemy) e monta o dicionario."""
-    partes = sql.split("?")
-    if len(partes) - 1 != len(params):
+    parts = sql.split("?")
+    if len(parts) - 1 != len(params):
         raise ValueError("numero de ? diferente do numero de parametros")
-    novo = partes[0] + "".join(f":p{i}{parte}" for i, parte in enumerate(partes[1:]))
-    return text(novo), {f"p{i}": v for i, v in enumerate(params)}
+    rewritten = parts[0] + "".join(f":p{i}{piece}" for i, piece in enumerate(parts[1:]))
+    return text(rewritten), {f"p{i}": v for i, v in enumerate(params)}
 
 
-def consulta(con, sql, params=()):
+def query(con, sql, params=()):
     """SELECT -> DataFrame. Use ? no lugar de cada parametro."""
-    sql, valores = _nomear(sql, params)
-    return pd.read_sql_query(sql, con, params=valores)
+    sql, values = _to_named_params(sql, params)
+    return pd.read_sql_query(sql, con, params=values)
 
 
-def executar(con, sql, params=()):
-    sql, valores = _nomear(sql, params)
-    return con.execute(sql, valores)
+def run(con, sql, params=()):
+    sql, values = _to_named_params(sql, params)
+    return con.execute(sql, values)
 
 
-def categorias(con):
-    return consulta(con, "SELECT DISTINCT categoria FROM aparelhos ORDER BY 1")["categoria"].tolist()
+def categories(con):
+    return query(con, "SELECT DISTINCT categoria FROM aparelhos ORDER BY 1")["categoria"].tolist()
 
 
-def buscar_aparelhos(con, categoria, alvo, limite):
+def search_appliances(con, category, target, limit):
     """alvo ja vem normalizado. Devolve (match exato, match por termos)."""
-    exato = consulta(con, "SELECT * FROM aparelhos WHERE categoria = ? AND busca = ?", (categoria, alvo))
-    termos = alvo.split()
-    if not termos:
-        return exato, exato.head(0)
+    exact = query(con, "SELECT * FROM aparelhos WHERE categoria = ? AND busca = ?", (category, target))
+    terms = target.split()
+    if not terms:
+        return exact, exact.head(0)
     # normalizar() so deixa letras, numeros e espaco, entao % e _ nunca aparecem nos termos
-    filtro = " AND ".join("busca LIKE ?" for _ in termos)
-    resultados = consulta(
+    conditions = " AND ".join("busca LIKE ?" for _ in terms)
+    results = query(
         con,
-        f"SELECT * FROM aparelhos WHERE categoria = ? AND {filtro} ORDER BY marca, modelo LIMIT ?",
-        (categoria, *[f"%{t}%" for t in termos], limite),
+        f"SELECT * FROM aparelhos WHERE categoria = ? AND {conditions} ORDER BY marca, modelo LIMIT ?",
+        (category, *[f"%{t}%" for t in terms], limit),
     )
-    return exato, resultados
+    return exact, results
 
 
-def distribuidoras_com_tarifa(con):
-    return consulta(
+def distributors_with_tariff(con):
+    return query(
         con,
         """
         SELECT d.id AS distribuidora_id, d.nome AS distribuidora, d.uf,
@@ -188,8 +188,8 @@ def distribuidoras_com_tarifa(con):
     )
 
 
-def registrar_consulta(con, r, horas_dia=None, ciclos_mes=None, velocidade=None):
-    executar(
+def register_query(con, r, daily_hours=None, monthly_cycles=None, speed=None):
+    run(
         con,
         """
         INSERT INTO consultas (categoria, marca, modelo, uf, distribuidora, horas_dia, ciclos_mes,
@@ -198,7 +198,7 @@ def registrar_consulta(con, r, horas_dia=None, ciclos_mes=None, velocidade=None)
         """,
         (r["categoria"], r["marca"], r["modelo"], r["uf"],
          None if r["distribuidora"] == "-" else r["distribuidora"],
-         horas_dia, ciclos_mes, velocidade, r["kwh_mes"], r["metodo"],
+         daily_hours, monthly_cycles, speed, r["kwh_mes"], r["metodo"],
          r["tarifa_kwh"], r["origem_tarifa"], r["custo_mes"]),
     )
     con.commit()

@@ -29,7 +29,7 @@ ML:  scripts/gerar_seed.py -> treinar_ctgan.py -> treinar_kmeans.py -> models/*.
 |---|---|---|
 | Limpeza | `scripts/tratar_dados_*.py`, `scripts/config.py` | Ler `raw`, limpar, salvar em `processed` em snake_case |
 | Treino | `scripts/gerar_seed.py`, `treinar_*.py`, `carregar_rag.py` | Gerar modelos (`models/*.pkl`) e a base vetorial; rodam fora da API |
-| Banco | `src/banco.py`, `src/criar_banco.py` | Esquema (`ESQUEMA`), conexão, consultas parametrizadas, carga |
+| Banco | `src/banco.py`, `src/criar_banco.py` | Esquema (`SCHEMA`), conexão, consultas parametrizadas, carga |
 | Regras | `src/calculadora_residencial.py`, `estimativa.py`, `gas.py`, `ml_pipeline.py`, `rag.py`, `rag_agent.py` | Cálculo, equivalência, estimativa, perfil, RAG. Sem HTTP |
 | Serviço | `src/servico.py` | Junta banco + regras em funções reutilizáveis pelas interfaces |
 | API | `src/main.py` | Modelos Pydantic, rotas, erros HTTP, CORS, carga automática no `lifespan` |
@@ -41,8 +41,8 @@ ML:  scripts/gerar_seed.py -> treinar_ctgan.py -> treinar_kmeans.py -> models/*.
 
 - Regra de negócio não entra em `main.py` nem no app Flutter: vai para `calculadora_residencial.py`/`estimativa.py`/`gas.py` (puro) ou `servico.py` (com banco). O app só exibe o que a API devolve, incluindo `metodo` e `avisos`.
 - Rota nova: função em `servico.py` + modelos Pydantic + rota com `tags` e `response_model` + teste em `tests/test_api.py` + linha na tabela da API do `README.md` e do `CLAUDE.md`. Se mudar o fluxo de negócio, atualizar o BPMN (`docs/bpmn_processo.bpmn` e `.png`).
-- Tabela ou coluna nova: `banco.ESQUEMA` + função de carga em `criar_banco.py` + registro em `cargas` + coluna de fonte. Coluna nova em `aparelhos` também entra em `COLUNAS_APARELHOS`.
-- Categoria nova de aparelho: script `tratar_dados_<categoria>.py`, entrada em `SPECS`, e decidir `PREMISSAS`, `EQUIVALENCIA` ou `SEM_SUGESTAO` (ver skills de regra de negócio).
+- Tabela ou coluna nova: `banco.SCHEMA` + função de carga em `criar_banco.py` + registro em `cargas` + coluna de fonte. Coluna nova em `aparelhos` também entra em `APPLIANCE_COLUMNS`.
+- Categoria nova de aparelho: script `tratar_dados_<categoria>.py`, entrada em `SPECS`, e decidir `ASSUMPTIONS`, `EQUIVALENCE` ou `NO_SUGGESTION` (ver skills de regra de negócio).
 - Modelos de ML na API são só números em pkl (`kmeans.pkl`, `refrigerador.pkl`): a imagem da API **não** tem scikit-learn, torch ou sdv. Dependência pesada vai para `requirements-ml.txt`.
 - A imagem Docker leva só `src/`, `datasets/processed/`, os dois pkl e o modelo de embeddings baixado no build (`.dockerignore` exclui o resto). Mudou código em `src/`, refaça `docker compose up -d --build`.
 - Configuração vem do `.env` via `config.py` (`POSTGRES_*`, `GEMINI_API_KEY`, `GEMINI_MODELOS`, `RECARREGAR_BANCO`). Segredos só em `.env`, `terraform.tfvars` e `terraform.tfstate`, todos no `.gitignore`.
@@ -57,4 +57,4 @@ ML:  scripts/gerar_seed.py -> treinar_ctgan.py -> treinar_kmeans.py -> models/*.
 
 ## Antes de implementar
 
-Confira `ESQUEMA`, `SPECS`, `servico.py`, `main.py`, `api.dart` e os testes existentes. Não presuma endpoints, campos ou políticas que não estejam no projeto; quando a regra for uma premissa do grupo (sem fonte), deixe isso explícito no código, no aviso ao usuário e na documentação.
+Confira `SCHEMA`, `SPECS`, `servico.py`, `main.py`, `api.dart` e os testes existentes. Não presuma endpoints, campos ou políticas que não estejam no projeto; quando a regra for uma premissa do grupo (sem fonte), deixe isso explícito no código, no aviso ao usuário e na documentação.

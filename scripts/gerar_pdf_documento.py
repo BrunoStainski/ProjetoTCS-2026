@@ -27,27 +27,27 @@ import io
 import markdown
 from PIL import Image
 
-RAIZ = Path(__file__).resolve().parents[1]
-ENTRADA = RAIZ / "docs" / "documento_processo.md"
-SAIDA = RAIZ / "docs" / "documento_processo.pdf"
-BPMN = ENTRADA.parent / "bpmn_processo.png"
+ROOT = Path(__file__).resolve().parents[1]
+INPUT = ROOT / "docs" / "documento_processo.md"
+OUTPUT = ROOT / "docs" / "documento_processo.pdf"
+BPMN = INPUT.parent / "bpmn_processo.png"
 
 # (inicio, fim) como fracao da largura do diagrama; a sobreposicao evita tarefa cortada ao meio
-PARTES_BPMN = [
+BPMN_PARTS = [
     (0.00, 0.37, "Parte 1 de 3: cálculo do consumo e do custo; preparação de dados e treino (offline)"),
     (0.34, 0.67, "Parte 2 de 3: sugestão de troca e payback"),
     (0.64, 1.00, "Parte 3 de 3: perfil de consumo (K-Means) e Eco-Coach (RAG + Gemini)"),
 ]
 Image.MAX_IMAGE_PIXELS = None  # o PNG do BPMN tem ~88 milhoes de pixels
 
-NAVEGADORES = [
+NAVIGATORS = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     "google-chrome", "chromium", "chromium-browser", "microsoft-edge",
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 ]
 
-ESTILO = """
+STYLE = """
 @page { size: A4; margin: 18mm 16mm; }
 body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1a1a1a; }
 h1 { font-size: 22pt; margin: 0 0 4pt; }
@@ -72,62 +72,62 @@ hr { border: none; border-top: 1px solid #ddd; margin: 14pt 0; }
 """
 
 
-def embutir_imagens(html, pasta):
+def embed_images(html, folder):
     """Troca src="arquivo.png" pelo conteudo em base64 (o PDF fica autocontido)."""
-    def trocar(m):
-        caminho = (pasta / m.group(1)).resolve()
-        tipo = "svg+xml" if caminho.suffix == ".svg" else "png"
-        if not caminho.exists():
-            print(f"aviso: imagem nao encontrada: {caminho}")
+    def replace(m):
+        path = (folder / m.group(1)).resolve()
+        kind = "svg+xml" if path.suffix == ".svg" else "png"
+        if not path.exists():
+            print(f"aviso: imagem nao encontrada: {path}")
             return m.group(0)
-        dados = base64.b64encode(caminho.read_bytes()).decode()
-        return f'src="data:image/{tipo};base64,{dados}"'
-    return re.sub(r'src="([^"]+\.(?:png|svg))"', trocar, html)
+        data = base64.b64encode(path.read_bytes()).decode()
+        return f'src="data:image/{kind};base64,{data}"'
+    return re.sub(r'src="([^"]+\.(?:png|svg))"', replace, html)
 
 
-def partes_bpmn():
+def bpmn_parts():
     """HTML com o BPMN cortado em partes, cada uma numa pagina paisagem."""
-    imagem = Image.open(BPMN)
-    largura, altura = imagem.size
-    blocos = []
-    for inicio, fim, legenda in PARTES_BPMN:
-        corte = imagem.crop((int(inicio * largura), 0, int(fim * largura), altura))
+    image = Image.open(BPMN)
+    width, height = image.size
+    blocks = []
+    for start, end, legend in BPMN_PARTS:
+        cutoff = image.crop((int(start * width), 0, int(end * width), height))
         buffer = io.BytesIO()
-        corte.save(buffer, format="PNG", optimize=True)
-        dados = base64.b64encode(buffer.getvalue()).decode()
-        blocos.append(f'<div class="paisagem"><p>BPMN, {legenda}</p>'
-                      f'<img alt="BPMN, {legenda}" src="data:image/png;base64,{dados}"></div>')
-    return "\n".join(blocos)
+        cutoff.save(buffer, format="PNG", optimize=True)
+        data = base64.b64encode(buffer.getvalue()).decode()
+        blocks.append(f'<div class="paisagem"><p>BPMN, {legend}</p>'
+                      f'<img alt="BPMN, {legend}" src="data:image/png;base64,{data}"></div>')
+    return "\n".join(blocks)
 
 
-def achar_navegador():
-    for n in NAVEGADORES:
-        caminho = n if Path(n).exists() else shutil.which(n)
-        if caminho:
-            return caminho
+def find_navigator():
+    for n in NAVIGATORS:
+        path = n if Path(n).exists() else shutil.which(n)
+        if path:
+            return path
     sys.exit("Chrome ou Edge nao encontrado: instale um deles para gerar o PDF.")
 
 
 def main():
-    texto = ENTRADA.read_text(encoding="utf-8")
-    texto = texto.replace("<!-- BPMN_PARTES -->", "\n" + partes_bpmn() + "\n")
-    texto = re.sub(r"<!--.*?-->", "", texto, flags=re.S)  # outros marcadores internos
-    corpo = markdown.markdown(texto, extensions=["tables", "fenced_code", "sane_lists", "md_in_html"])
+    text = INPUT.read_text(encoding="utf-8")
+    text = text.replace("<!-- BPMN_PARTES -->", "\n" + bpmn_parts() + "\n")
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.S)  # outros marcadores internos
+    body = markdown.markdown(text, extensions=["tables", "fenced_code", "sane_lists", "md_in_html"])
     # visao geral do BPMN tambem numa pagina paisagem
-    corpo = re.sub(r'<p>(<img [^>]*src="bpmn_processo\.png"[^>]*>)</p>',
-                   r'<div class="paisagem"><p>BPMN 2.0, diagrama completo</p>\1</div>', corpo)
-    corpo = embutir_imagens(corpo, ENTRADA.parent)
+    body = re.sub(r'<p>(<img [^>]*src="bpmn_processo\.png"[^>]*>)</p>',
+                   r'<div class="paisagem"><p>BPMN 2.0, diagrama completo</p>\1</div>', body)
+    body = embed_images(body, INPUT.parent)
     html = (f'<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
-            f"<title>iamp - Documentacao do Projeto</title><style>{ESTILO}</style></head>"
-            f"<body>{corpo}</body></html>")
+            f"<title>iamp - Documentacao do Projeto</title><style>{STYLE}</style></head>"
+            f"<body>{body}</body></html>")
 
     with tempfile.TemporaryDirectory() as tmp:
-        arquivo = Path(tmp) / "documento.html"
-        arquivo.write_text(html, encoding="utf-8")
-        subprocess.run([achar_navegador(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
-                        f"--print-to-pdf={SAIDA}", arquivo.as_uri()],
+        file = Path(tmp) / "documento.html"
+        file.write_text(html, encoding="utf-8")
+        subprocess.run([find_navigator(), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
+                        f"--print-to-pdf={OUTPUT}", file.as_uri()],
                        check=True, capture_output=True, timeout=120)
-    print(f"PDF gerado: {SAIDA.relative_to(RAIZ)} ({SAIDA.stat().st_size // 1024} KB)")
+    print(f"PDF gerado: {OUTPUT.relative_to(ROOT)} ({OUTPUT.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":

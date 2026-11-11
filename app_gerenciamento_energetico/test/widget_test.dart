@@ -22,35 +22,35 @@ import 'package:app_gerenciamento_energetico/telas/resultado.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 import 'package:app_gerenciamento_energetico/telas/uso.dart';
 
-Map<String, dynamic> resultadoJson(String categoria, double kwh, double custo, {double tarifa = 0.8}) => {
-  'categoria': categoria,
+Map<String, dynamic> resultJson(String category, double kwh, double cost, {double tariff = 0.8}) => {
+  'categoria': category,
   'marca': 'MARCA',
-  'modelo': categoria.toUpperCase(),
+  'modelo': category.toUpperCase(),
   'detalhe': '',
   'distribuidora': 'COPEL-DIS',
   'uf': 'PR',
   'kwh_mes': kwh,
   'metodo': 'teste',
-  'tarifa_kwh': tarifa,
+  'tarifa_kwh': tariff,
   'origem_tarifa': 'teste',
-  'custo_mes': custo,
-  'custo_ano': custo * 12,
+  'custo_mes': cost,
+  'custo_ano': cost * 12,
   'avisos': <String>[],
 };
 
-Resultado resultado(String categoria, double kwh, double custo, {double tarifa = 0.8}) =>
-    Resultado.fromJson(resultadoJson(categoria, kwh, custo, tarifa: tarifa));
+Result result(String category, double kwh, double cost, {double tariff = 0.8}) =>
+    Result.fromJson(resultJson(category, kwh, cost, tariff: tariff));
 
-Consulta consulta(String categoria, {int id = 1}) =>
-    Consulta(Aparelho(id: id, categoria: categoria, marca: 'MARCA', modelo: categoria.toUpperCase()));
+Query query(String category, {int id = 1}) =>
+    Query(Appliance(id: id, category: category, brand: 'MARCA', model: category.toUpperCase()));
 
 final _json = {'content-type': 'application/json; charset=utf-8'};
 
 /// API falsa com o caminho completo do calculo de um aparelho do catalogo.
-MockClient apiFalsa({List<Uri>? pedidos, List<String?>? idiomas}) => MockClient((r) async {
-  pedidos?.add(r.url);
-  idiomas?.add(r.headers['Accept-Language']);
-  final corpo = switch (r.url.path) {
+MockClient apiFake({List<Uri>? requests, List<String?>? languages}) => MockClient((r) async {
+  requests?.add(r.url);
+  languages?.add(r.headers['Accept-Language']);
+  final body = switch (r.url.path) {
     '/categorias' => ['refrigerador', 'chuveiro', 'televisor'],
     '/aparelhos' => [
       for (final a in [
@@ -82,49 +82,49 @@ MockClient apiFalsa({List<Uri>? pedidos, List<String?>? idiomas}) => MockClient(
     '/distribuidoras' => [
       {'id': 7, 'nome': 'COPEL-DIS', 'uf': 'PR', 'tarifa_kwh': 0.768},
     ],
-    '/calcular' => resultadoJson('refrigerador', 41.25, 31.68, tarifa: 0.768),
+    '/calcular' => resultJson('refrigerador', 41.25, 31.68, tariff: 0.768),
     _ => null,
   };
-  return corpo == null ? http.Response('{"detail": "nao existe"}', 404) : http.Response(jsonEncode(corpo), 200, headers: _json);
+  return body == null ? http.Response('{"detail": "nao existe"}', 404) : http.Response(jsonEncode(body), 200, headers: _json);
 });
 
 void main() {
   setUp(() {
-    casa.limpar();
-    abaAtual.value = Aba.calcular;
-    idioma.value = Idioma.pt; // o app sempre abre em portugues
+    home.clear();
+    currentTab.value = AppTab.calculate;
+    language.value = Language.pt; // o app sempre abre em portugues
   });
 
   /// Celular de 360dp de largura. `alta`: tela comprida, para ver tudo sem rolar com fonte grande
   /// (o que quebra com fonte 2x e a largura: textos e botoes lado a lado).
-  void telaDeCelular(WidgetTester tester, {double fonte = 1, bool alta = false}) {
-    tester.view.physicalSize = Size(360 * 3, (alta ? 3000 : 780) * 3);
+  void phoneScreen(WidgetTester tester, {double fontScale = 1, bool tall = false}) {
+    tester.view.physicalSize = Size(360 * 3, (tall ? 3000 : 780) * 3);
     tester.view.devicePixelRatio = 3;
-    tester.platformDispatcher.textScaleFactorTestValue = fonte;
+    tester.platformDispatcher.textScaleFactorTestValue = fontScale;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   }
 
-  void telaAlta(WidgetTester tester) {
+  void tallScreen(WidgetTester tester) {
     tester.view.physicalSize = const Size(800, 2000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
   }
 
   group('Boas-vindas e menu', () {
-    Finder noMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+    Finder inMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
     // a logo e carregada ja no tamanho da tela (cacheWidth), por isso vem dentro de um ResizeImage
     final logo = find.byWidgetPredicate(
-      (w) => w is Image && w.image is ResizeImage && (w.image as ResizeImage).imageProvider == const AssetImage(MarcaIamp.imagem),
+      (w) => w is Image && w.image is ResizeImage && (w.image as ResizeImage).imageProvider == const AssetImage(IampBrand.image),
     );
 
-    Future<void> abrirMenu(WidgetTester tester) async {
+    Future<void> openMenu(WidgetTester tester) async {
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
     }
 
     testWidgets('abre nas boas-vindas e "Comece a economizar" leva ao cálculo', (tester) async {
-      telaDeCelular(tester);
+      phoneScreen(tester);
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
@@ -134,102 +134,102 @@ void main() {
         // so a marca e o botao: sem frases, e o icone ao lado do nome (nao em cima)
         expect(find.text('Sua conta de luz, sem surpresas'), findsNothing);
         expect(find.textContaining('Inmetro'), findsNothing);
-        final icone = tester.getRect(logo);
-        final nome = tester.getRect(find.text('Iamp'));
-        expect(nome.left, greaterThan(icone.right));
-        expect(nome.center.dy, closeTo(icone.center.dy, 2));
-        expect(icone.width, greaterThanOrEqualTo(100)); // maior que a logo do menu (48)
+        final icon = tester.getRect(logo);
+        final name = tester.getRect(find.text('Iamp'));
+        expect(name.left, greaterThan(icon.right));
+        expect(name.center.dy, closeTo(icon.center.dy, 2));
+        expect(icon.width, greaterThanOrEqualTo(100)); // maior que a logo do menu (48)
 
         await tester.tap(find.text('Comece a economizar'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Comece a economizar'), findsNothing);
       expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
-      expect(abaAtual.value, Aba.calcular);
+      expect(currentTab.value, AppTab.calculate);
     });
 
     testWidgets('boas-vindas cabe na tela com a fonte do sistema em 2x', (tester) async {
-      telaDeCelular(tester, fonte: 2);
+      phoneScreen(tester, fontScale: 2);
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(tester.takeException(), isNull);
       expect(find.text('Comece a economizar'), findsOneWidget);
     });
 
     testWidgets('menu cabe na tela com a fonte do sistema em 2x (textos quebram a linha)', (tester) async {
-      telaDeCelular(tester, fonte: 2);
+      phoneScreen(tester, fontScale: 2);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
-        await abrirMenu(tester);
-      }, apiFalsa);
+        await openMenu(tester);
+      }, apiFake);
       expect(tester.takeException(), isNull);
-      expect(noMenu(find.text('Calcular um aparelho')), findsOneWidget);
+      expect(inMenu(find.text('Calcular um aparelho')), findsOneWidget);
     });
 
     testWidgets('menu tem a logo com o nome ao lado e leva para Minha casa', (tester) async {
-      telaDeCelular(tester);
+      phoneScreen(tester);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
-        await abrirMenu(tester);
-        expect(noMenu(find.byType(MarcaIamp)), findsOneWidget);
-        expect(noMenu(logo), findsOneWidget);
-        expect(noMenu(find.text('Iamp')), findsOneWidget);
+        await openMenu(tester);
+        expect(inMenu(find.byType(IampBrand)), findsOneWidget);
+        expect(inMenu(logo), findsOneWidget);
+        expect(inMenu(find.text('Iamp')), findsOneWidget);
         for (final item in ['Início', 'Calcular um aparelho', 'Estimar um aparelho', 'Minha casa', 'Economizar']) {
-          expect(noMenu(find.text(item)), findsOneWidget);
+          expect(inMenu(find.text(item)), findsOneWidget);
         }
 
-        await tester.tap(noMenu(find.text('Minha casa')));
+        await tester.tap(inMenu(find.text('Minha casa')));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.byType(Drawer), findsNothing); // fechou
-      expect(abaAtual.value, Aba.casa);
+      expect(currentTab.value, AppTab.home);
       expect(find.text('Sua casa ainda está vazia'), findsOneWidget);
     });
 
     testWidgets('menu: "Estimar um aparelho" abre a estimativa e "Início" volta para as boas-vindas', (tester) async {
-      telaDeCelular(tester);
+      phoneScreen(tester);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
-        await abrirMenu(tester);
-        await tester.tap(noMenu(find.text('Estimar um aparelho')));
+        await openMenu(tester);
+        await tester.tap(inMenu(find.text('Estimar um aparelho')));
         await tester.pumpAndSettle();
-        expect(find.byType(TelaEstimar), findsOneWidget);
+        expect(find.byType(EstimateScreen), findsOneWidget);
         expect(find.byTooltip('Menu'), findsNothing); // tela de dentro: seta de voltar no lugar do menu
 
         // a seta de voltar segue o idioma do app (textos do Flutter em portugues: "Voltar", nao "Back")
         await tester.tap(find.byTooltip('Voltar'));
         await tester.pumpAndSettle();
-        await abrirMenu(tester);
-        await tester.tap(noMenu(find.text('Início')));
+        await openMenu(tester);
+        await tester.tap(inMenu(find.text('Início')));
         await tester.pumpAndSettle();
         expect(find.text('Comece a economizar'), findsOneWidget);
 
         await tester.tap(find.text('Comece a economizar'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
     });
   });
 
   group('Idioma', () {
-    Finder noMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+    Finder inMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
 
-    Future<void> escolherIdioma(WidgetTester tester, String nome) async {
+    Future<void> chooseLanguage(WidgetTester tester, String name) async {
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
-      expect(noMenu(find.text('Idioma · Language')), findsOneWidget);
-      await tester.tap(noMenu(find.text(nome)));
+      expect(inMenu(find.text('Idioma · Language')), findsOneWidget);
+      await tester.tap(inMenu(find.text(name)));
       await tester.pumpAndSettle();
     }
 
     testWidgets('abre em português e o menu troca o app inteiro para o inglês e de volta', (tester) async {
-      telaDeCelular(tester);
-      final idiomas = <String?>[];
+      phoneScreen(tester);
+      final languages = <String?>[];
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
@@ -237,57 +237,57 @@ void main() {
         await tester.tap(find.text('Comece a economizar'));
         await tester.pumpAndSettle();
         expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
-        expect(idiomas, everyElement('pt-BR')); // a API responde em portugues
+        expect(languages, everyElement('pt-BR')); // a API responde em portugues
 
-        await escolherIdioma(tester, 'English');
-        expect(idioma.value, Idioma.en);
+        await chooseLanguage(tester, 'English');
+        expect(language.value, Language.en);
         expect(find.byType(Drawer), findsNothing); // o menu fecha
         expect(find.text('Which appliance do you want to calculate?'), findsOneWidget);
         expect(find.text('Step 1 of 6'), findsOneWidget);
         expect(find.text('Fridge or freezer'), findsOneWidget);
-        for (final aba in ['Calculate', 'My home', 'Save']) {
-          expect(find.text(aba), findsWidgets);
+        for (final tab in ['Calculate', 'My home', 'Save']) {
+          expect(find.text(tab), findsWidgets);
         }
         expect(find.text('Qual aparelho você quer calcular?'), findsNothing);
 
         // o pedido seguinte vai para a API em ingles e a seta de voltar e do Flutter em ingles
-        idiomas.clear();
+        languages.clear();
         await tester.tap(find.text('Fridge or freezer'));
         await tester.pumpAndSettle();
         expect(find.text('What is the brand and model?'), findsOneWidget);
-        expect(idiomas, isNotEmpty);
-        expect(idiomas, everyElement('en'));
+        expect(languages, isNotEmpty);
+        expect(languages, everyElement('en'));
         await tester.tap(find.byTooltip('Back'));
         await tester.pumpAndSettle();
 
-        await escolherIdioma(tester, 'Português');
+        await chooseLanguage(tester, 'Português');
         expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
         expect(find.text('Etapa 1 de 6'), findsOneWidget);
-      }, () => apiFalsa(idiomas: idiomas));
-      expect(idioma.value, Idioma.pt);
+      }, () => apiFake(languages: languages));
+      expect(language.value, Language.pt);
     });
 
     testWidgets('o idioma escolhido aparece marcado (não só pela cor)', (tester) async {
-      telaDeCelular(tester);
+      phoneScreen(tester);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Menu'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(
-        tester.getSemantics(noMenu(find.text('Português'))),
+        tester.getSemantics(inMenu(find.text('Português'))),
         isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true, isButton: true),
       );
-      expect(tester.getSemantics(noMenu(find.text('English'))), isSemantics(isSelected: false));
-      expect(noMenu(find.byIcon(Icons.check_circle)), findsOneWidget);
+      expect(tester.getSemantics(inMenu(find.text('English'))), isSemantics(isSelected: false));
+      expect(inMenu(find.byIcon(Icons.check_circle)), findsOneWidget);
     });
 
     testWidgets('trocar o idioma volta as abas para o começo e mantém a casa', (tester) async {
-      telaDeCelular(tester);
-      casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
+      phoneScreen(tester);
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         // Calcular fica no meio do fluxo (etapa 2), com respostas da API em portugues
         await tester.tap(find.text('Geladeira ou freezer'));
@@ -296,102 +296,102 @@ void main() {
         await tester.tap(find.text('Minha casa').last);
         await tester.pumpAndSettle();
 
-        await escolherIdioma(tester, 'English');
+        await chooseLanguage(tester, 'English');
         expect(find.text('My home'), findsWidgets);
         expect(find.text('R\$ 31.68 per month'), findsWidgets); // valores no formato americano, em reais
         await tester.tap(find.text('Calculate').last);
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Which appliance do you want to calculate?'), findsOneWidget);
-      expect(casa.totalAparelhos, 1);
+      expect(home.totalAppliances, 1);
     });
 
     testWidgets('com o app em inglês a tela continua sem estouro com fonte 2x', (tester) async {
-      telaDeCelular(tester, fonte: 2, alta: true);
-      idioma.value = Idioma.en;
+      phoneScreen(tester, fontScale: 2, tall: true);
+      language.value = Language.en;
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Menu'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(tester.takeException(), isNull);
       expect(find.text('English'), findsOneWidget);
     });
 
     test('reais, números e números digitados seguem o idioma', () {
       expect(reais(1234.5), 'R\$ 1.234,50');
-      expect(numero(41.25), '41,25');
-      idioma.value = Idioma.en;
+      expect(number(41.25), '41,25');
+      language.value = Language.en;
       expect(reais(1234.5), 'R\$ 1,234.50');
-      expect(reais(0.76789, casas: 4), 'R\$ 0.7679');
-      expect(numero(41.25), '41.25');
-      expect(lerNumero('2,499.90'), 2499.9);
-      expect(lerNumero('1,299'), 1299);
-      expect(lerNumero('0.85'), 0.85);
+      expect(reais(0.76789, homes: 4), 'R\$ 0.7679');
+      expect(number(41.25), '41.25');
+      expect(readNumber('2,499.90'), 2499.9);
+      expect(readNumber('1,299'), 1299);
+      expect(readNumber('0.85'), 0.85);
       // quem digita do jeito brasileiro continua certo
-      expect(lerNumero('0,85'), 0.85);
-      expect(lerNumero('2.499,90'), 2499.9);
-      expect(lerNumero('R\$ 1,299.90'), 1299.9);
+      expect(readNumber('0,85'), 0.85);
+      expect(readNumber('2.499,90'), 2499.9);
+      expect(readNumber('R\$ 1,299.90'), 1299.9);
     });
 
     test('tarifa da conta de luz segue o idioma mesmo escolhida antes da troca', () {
-      final tarifa = EscolhaTarifa.manual(0.85);
-      expect(tarifa.descricao, 'Tarifa da conta de luz');
-      idioma.value = Idioma.en;
-      expect(tarifa.descricao, 'Rate from your electricity bill');
+      final tariff = TariffChoice.manual(0.85);
+      expect(tariff.description, 'Tarifa da conta de luz');
+      language.value = Language.en;
+      expect(tariff.description, 'Rate from your electricity bill');
     });
   });
 
   group('App', () {
     testWidgets('abre em Calcular com o nome Iamp, as 3 abas e o tema preto e amarelo', (tester) async {
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Iamp'), findsOneWidget);
       expect(find.text('iamp'), findsNothing);
       expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
       expect(find.text('Etapa 1 de 6'), findsOneWidget);
-      for (final aba in ['Calcular', 'Minha casa', 'Economizar']) {
-        expect(find.text(aba), findsWidgets);
+      for (final tab in ['Calcular', 'Minha casa', 'Economizar']) {
+        expect(find.text(tab), findsWidgets);
       }
       expect(find.text('Geladeira ou freezer'), findsOneWidget);
       expect(find.textContaining('Gás'), findsNothing);
-      final tema = Theme.of(tester.element(find.text('Qual aparelho você quer calcular?')));
-      expect(tema.scaffoldBackgroundColor, Cores.preto);
-      expect(tema.colorScheme.primary, Cores.amarelo);
-      expect(tema.extension<Iamp>(), isNotNull);
+      final theme = Theme.of(tester.element(find.text('Qual aparelho você quer calcular?')));
+      expect(theme.scaffoldBackgroundColor, AppColors.black);
+      expect(theme.colorScheme.primary, AppColors.yellow);
+      expect(theme.extension<Iamp>(), isNotNull);
     });
 
     testWidgets('aba Minha casa vazia explica como adicionar', (tester) async {
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Minha casa'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Sua casa ainda está vazia'), findsOneWidget);
       expect(find.text('Calcular um aparelho'), findsOneWidget);
     });
 
     testWidgets('aba Economizar sem aparelhos pede para calcular antes (nao chama a IA)', (tester) async {
-      final pedidos = <Uri>[];
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Economizar'));
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
+      }, () => apiFake(requests: requests));
       expect(find.text('Primeiro, calcule seus aparelhos'), findsOneWidget);
-      expect(pedidos.where((u) => u.path == '/eco-coach'), isEmpty);
+      expect(requests.where((u) => u.path == '/eco-coach'), isEmpty);
     });
 
     testWidgets('calculo completo: tipo, modelo, estado, distribuidora, resultado e casa', (tester) async {
-      telaDeCelular(tester);
-      final pedidos = <Uri>[];
+      phoneScreen(tester);
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
 
         await tester.tap(find.text('Geladeira ou freezer'));
@@ -400,7 +400,7 @@ void main() {
         await tester.enterText(find.byType(TextField), 'brastemp');
         await tester.tap(find.text('Buscar'));
         await tester.pumpAndSettle();
-        expect(pedidos.last.queryParameters['categoria'], 'refrigerador');
+        expect(requests.last.queryParameters['categoria'], 'refrigerador');
         expect(find.text('BRASTEMP GELA'), findsOneWidget); // um tipo so: secao ja aberta
         expect(find.text('Máquinas de lavar'), findsNothing);
 
@@ -418,18 +418,18 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Está na sua casa: ver o total'));
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
-      expect(abaAtual.value, Aba.casa);
+      }, () => apiFake(requests: requests));
+      expect(currentTab.value, AppTab.home);
       expect(find.text('O que mais pesa na conta'), findsOneWidget);
       expect(find.text('R\$ 31,68 por mês'), findsWidgets);
     });
 
     testWidgets('a mesma tarifa de antes aparece como primeira opcao', (tester) async {
-      casa.lembrarTarifa(EscolhaTarifa.manual(0.9));
+      home.rememberTariff(TariffChoice.manual(0.9));
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: TelaEstado(consulta: consulta('refrigerador', id: 2))));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: StateScreen(query: query('refrigerador', id: 2))));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('Usar a mesma conta de luz de antes?'), findsOneWidget);
       expect(find.text('Sim, usar Tarifa da conta de luz'), findsOneWidget);
       expect(find.text('Prefiro digitar a tarifa da minha conta'), findsOneWidget);
@@ -437,40 +437,40 @@ void main() {
   });
 
   group('Acessibilidade', () {
-    Future<void> casaCheia(WidgetTester tester) async {
-      casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
-      casa.adicionar(consulta('refrigerador', id: 2), resultado('refrigerador', 32.1, 24.65));
-      await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaMinhaCasa()));
+    Future<void> fullHome(WidgetTester tester) async {
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      home.add(query('refrigerador', id: 2), result('refrigerador', 32.1, 24.65));
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const MyHomeScreen()));
       await tester.pumpAndSettle();
     }
 
     testWidgets('fonte 2x nao quebra a tela inicial nem a busca', (tester) async {
-      telaDeCelular(tester, fonte: 2, alta: true);
+      phoneScreen(tester, fontScale: 2, tall: true);
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         expect(find.text('Qual aparelho você quer calcular?'), findsOneWidget);
         await tester.tap(find.text('Geladeira ou freezer'));
         await tester.pumpAndSettle();
         expect(find.text('Qual é a marca e o modelo?'), findsOneWidget);
-      }, apiFalsa);
+      }, apiFake);
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('fonte 2x nao quebra Minha casa, o resultado e o tempo de retorno', (tester) async {
-      telaDeCelular(tester, fonte: 2, alta: true);
-      await casaCheia(tester);
+      phoneScreen(tester, fontScale: 2, tall: true);
+      await fullHome(tester);
       expect(find.text('Quantidade'), findsWidgets);
       expect(tester.takeException(), isNull);
 
       await tester.pumpWidget(
         MaterialApp(
-          theme: temaIamp(),
+          theme: iampTheme(),
           home: Scaffold(
             body: ListView(
               children: [
-                DetalhesDoResultado(resultado('refrigerador', 41.25, 31.68)),
-                CartaoPayback(
+                ResultDetails(result('refrigerador', 41.25, 31.68)),
+                PaybackCard(
                   Payback.fromJson({'preco_novo': 2499.9, 'meses': 80, 'anos': 6.7, 'texto': 'Se paga em 80 meses.'}),
                 ),
               ],
@@ -484,11 +484,11 @@ void main() {
     });
 
     testWidgets('fonte 2x nao quebra as perguntas da estimativa', (tester) async {
-      telaDeCelular(tester, fonte: 2, alta: true);
+      phoneScreen(tester, fontScale: 2, tall: true);
       await tester.pumpWidget(
         MaterialApp(
-          theme: temaIamp(),
-          home: TelaEstimar(carregarCategorias: categoriasDeTeste, carregarResistivos: resistivosDeTeste),
+          theme: iampTheme(),
+          home: EstimateScreen(loadCategories: testCategories, loadResistive: testResistive),
         ),
       );
       await tester.pumpAndSettle();
@@ -503,54 +503,54 @@ void main() {
     });
 
     testWidgets('Minha casa: toque de 48dp, botoes com nome, contraste AA', (tester) async {
-      telaDeCelular(tester);
-      final semantica = tester.ensureSemantics();
-      await casaCheia(tester);
+      phoneScreen(tester);
+      final semantics = tester.ensureSemantics();
+      await fullHome(tester);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(iOSTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
       expect(find.bySemanticsLabel(RegExp('Remover MARCA CHUVEIRO da casa')), findsOneWidget);
       expect(find.byTooltip('Aumentar a quantidade de MARCA CHUVEIRO'), findsOneWidget);
-      semantica.dispose();
+      semantics.dispose();
     });
 
     testWidgets('tela inicial: toque de 48dp, botoes com nome, contraste AA', (tester) async {
-      telaDeCelular(tester);
-      final semantica = tester.ensureSemantics();
+      phoneScreen(tester);
+      final semantics = tester.ensureSemantics();
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       await expectLater(tester, meetsGuideline(textContrastGuideline));
-      semantica.dispose();
+      semantics.dispose();
     });
 
     testWidgets('valor que conta ate o numero e lido so com o valor final', (tester) async {
-      final semantica = tester.ensureSemantics();
+      final semantics = tester.ensureSemantics();
       await tester.pumpWidget(
         MaterialApp(
-          theme: temaIamp(),
-          home: Scaffold(body: CartaoDestaque(titulo: 'Gasto por mês', valor: 31.68, formatar: reais)),
+          theme: iampTheme(),
+          home: Scaffold(body: HighlightCard(title: 'Gasto por mês', value: 31.68, format: reais)),
         ),
       );
       await tester.pump(const Duration(milliseconds: 100)); // no meio da animacao
       expect(find.bySemanticsLabel(RegExp(r'R\$ 31,68')), findsOneWidget);
-      semantica.dispose();
+      semantics.dispose();
     });
 
     testWidgets('remover um aparelho pode ser desfeito', (tester) async {
-      telaAlta(tester);
-      await casaCheia(tester);
+      tallScreen(tester);
+      await fullHome(tester);
       await tester.tap(find.text('Remover').first);
       await tester.pumpAndSettle();
-      expect(casa.itens, hasLength(1));
+      expect(home.items, hasLength(1));
       await tester.tap(find.text('Desfazer'));
       await tester.pumpAndSettle();
-      expect(casa.itens, hasLength(2));
-      expect(casa.porCusto.first.resultado.categoria, 'chuveiro');
+      expect(home.items, hasLength(2));
+      expect(home.byCost.first.result.category, 'chuveiro');
     });
   });
 
@@ -558,45 +558,45 @@ void main() {
     expect(reais(31.68), 'R\$ 31,68');
     expect(reais(1234.5), 'R\$ 1.234,50');
     expect(reais(-2.5), '-R\$ 2,50');
-    expect(numero(41.25), '41,25');
-    expect(lerNumero('0,25'), 0.25);
-    expect(lerNumero('0.25'), 0.25);
-    expect(lerNumero('1.299,90'), 1299.90);
-    expect(lerNumero('R\$ 2.499,90'), 2499.90);
-    expect(lerNumero('abc'), isNull);
+    expect(number(41.25), '41,25');
+    expect(readNumber('0,25'), 0.25);
+    expect(readNumber('0.25'), 0.25);
+    expect(readNumber('1.299,90'), 1299.90);
+    expect(readNumber('R\$ 2.499,90'), 2499.90);
+    expect(readNumber('abc'), isNull);
   });
 
   test('casa soma os aparelhos com a quantidade e ordena pelo custo', () {
-    casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
-    final lampada = casa.adicionar(consulta('lampada_led', id: 2), resultado('lampada_led', 1.5, 1.2));
-    casa.adicionar(consulta('chuveiro', id: 3), resultado('chuveiro', 41.25, 31.68));
+    home.add(query('televisor'), result('televisor', 10, 8));
+    final lamp = home.add(query('lampada_led', id: 2), result('lampada_led', 1.5, 1.2));
+    home.add(query('chuveiro', id: 3), result('chuveiro', 41.25, 31.68));
 
-    casa.mudarQuantidade(lampada, 10);
+    home.changeQuantity(lamp, 10);
 
-    expect(casa.totalAparelhos, 12);
-    expect(casa.kwhMes, closeTo(10 + 15 + 41.25, 1e-9));
-    expect(casa.custoMes, closeTo(8 + 12 + 31.68, 1e-9));
-    expect(casa.porCusto.map((i) => i.resultado.categoria), ['chuveiro', 'lampada_led', 'televisor']);
+    expect(home.totalAppliances, 12);
+    expect(home.monthlyKwh, closeTo(10 + 15 + 41.25, 1e-9));
+    expect(home.monthlyCost, closeTo(8 + 12 + 31.68, 1e-9));
+    expect(home.byCost.map((i) => i.result.category), ['chuveiro', 'lampada_led', 'televisor']);
     // o perfil usa o consumo total de cada item (kWh x quantidade)
-    expect(casa.itensParaPerfil()[1], {'categoria': 'lampada_led', 'kwh_mes': 15.0});
+    expect(home.itemsForProfile()[1], {'categoria': 'lampada_led', 'kwh_mes': 15.0});
   });
 
   test('remover devolve a posicao e reinserir coloca o item no mesmo lugar', () {
-    casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
-    final meio = casa.adicionar(consulta('chuveiro', id: 2), resultado('chuveiro', 41.25, 31.68));
-    casa.adicionar(consulta('lampada_led', id: 3), resultado('lampada_led', 1.5, 1.2));
-    final posicao = casa.remover(meio);
-    expect(posicao, 1);
-    casa.reinserir(meio, posicao);
-    casa.reinserir(meio, posicao); // de novo nao duplica
-    expect(casa.itens.map((i) => i.resultado.categoria), ['televisor', 'chuveiro', 'lampada_led']);
+    home.add(query('televisor'), result('televisor', 10, 8));
+    final middle = home.add(query('chuveiro', id: 2), result('chuveiro', 41.25, 31.68));
+    home.add(query('lampada_led', id: 3), result('lampada_led', 1.5, 1.2));
+    final position = home.remove(middle);
+    expect(position, 1);
+    home.reinsert(middle, position);
+    home.reinsert(middle, position); // de novo nao duplica
+    expect(home.items.map((i) => i.result.category), ['televisor', 'chuveiro', 'lampada_led']);
   });
 
   test('trocar mantem a quantidade e qualquer mudanca apaga o perfil', () {
-    final item = casa.adicionar(consulta('refrigerador'), resultado('refrigerador', 40, 32));
-    casa.mudarQuantidade(item, 2);
-    casa.guardarPerfil(
-      Classificacao.fromJson({
+    final item = home.add(query('refrigerador'), result('refrigerador', 40, 32));
+    home.changeQuantity(item, 2);
+    home.storeProfile(
+      Classification.fromJson({
         'perfil': 'Moderado',
         'kwh_total': 80,
         'kwh_por_morador': 40,
@@ -605,29 +605,29 @@ void main() {
         'aviso': 'sintetico',
       }),
     );
-    expect(casa.perfil, isNotNull);
+    expect(home.profile, isNotNull);
 
-    casa.trocar(item, consulta('refrigerador', id: 9), resultado('refrigerador', 25, 20));
+    home.replace(item, query('refrigerador', id: 9), result('refrigerador', 25, 20));
 
-    expect(casa.perfil, isNull);
-    expect(casa.itens.single.quantidade, 2);
-    expect(casa.itens.single.consulta.aparelho.id, 9);
-    expect(casa.custoMes, 40);
+    expect(home.profile, isNull);
+    expect(home.items.single.quantity, 2);
+    expect(home.items.single.query.appliance.id, 9);
+    expect(home.monthlyCost, 40);
   });
 
   test('pergunta de uso entende horas opcionais (TV e ar-condicionado)', () {
-    final tv = PerguntaDeUso.fromJson({'pergunta': 'horas', 'opcoes': null, 'padrao': null, 'opcional': true});
-    expect(tv.pergunta, 'horas');
-    expect(tv.opcional, isTrue);
+    final tv = UsageQuestion.fromJson({'pergunta': 'horas', 'opcoes': null, 'padrao': null, 'opcional': true});
+    expect(tv.question, 'horas');
+    expect(tv.optional, isTrue);
     // respostas antigas da API, sem o campo, continuam funcionando
-    expect(PerguntaDeUso.fromJson({'pergunta': 'horas', 'padrao': null}).opcional, isFalse);
+    expect(UsageQuestion.fromJson({'pergunta': 'horas', 'padrao': null}).optional, isFalse);
   });
 
   test('consulta manda o uso e a tarifa para a API', () {
-    final c = consulta('chuveiro')
-      ..horasDia = 0.25
-      ..tarifa = EscolhaTarifa.manual(0.9);
-    expect(c.paraApi(), {
+    final c = query('chuveiro')
+      ..dailyHours = 0.25
+      ..tariff = TariffChoice.manual(0.9);
+    expect(c.toApi(), {
       'distribuidora_id': null,
       'tarifa_manual': 0.9,
       'horas_dia': 0.25,
@@ -635,38 +635,38 @@ void main() {
       'velocidade': null,
     });
     // a copia com outro aparelho mantem o uso e a tarifa
-    final troca = c.copiar(
-      aparelho: const Aparelho(id: 5, categoria: 'chuveiro', marca: 'X', modelo: 'Y'),
+    final replacement = c.copy(
+      appliance: const Appliance(id: 5, category: 'chuveiro', brand: 'X', model: 'Y'),
     );
-    expect(troca.paraApi(), c.paraApi());
-    expect(troca.aparelho.id, 5);
+    expect(replacement.toApi(), c.toApi());
+    expect(replacement.appliance.id, 5);
   });
 
   test('resultado aproximado traz a faixa e resultados antigos continuam funcionando', () {
-    final base = resultado('refrigerador', 45.75, 35.14);
-    expect(base.aproximado, isFalse);
-    expect(base.temFaixa, isFalse);
-    final r = Resultado.fromJson({
-      ...resultadoJson('refrigerador', 45.75, 35.14, tarifa: 0.768),
+    final base = result('refrigerador', 45.75, 35.14);
+    expect(base.approximate, isFalse);
+    expect(base.hasRange, isFalse);
+    final r = Result.fromJson({
+      ...resultJson('refrigerador', 45.75, 35.14, tariff: 0.768),
       'aproximado': true,
       'kwh_min': 41.55,
       'kwh_max': 51.92,
       'custo_min_mes': 31.91,
       'custo_max_mes': 39.87,
     });
-    expect(r.aproximado, isTrue);
-    expect(r.temFaixa, isTrue);
-    expect(r.custoMinMes, 31.91);
+    expect(r.approximate, isTrue);
+    expect(r.hasRange, isTrue);
+    expect(r.monthlyMinCost, 31.91);
   });
 
   test('consulta estimada manda os dados do aparelho e a tarifa para a rota da estimativa', () {
-    final c = Consulta(
-      const Aparelho(id: 0, categoria: 'refrigerador', marca: 'Consul', modelo: 'CRM45'),
-      estimativa: const Estimativa(rotaGeladeira, {'tipo': 'duplex', 'volume_total_l': 407.0, 'ano_compra': 2014}),
-    )..tarifa = EscolhaTarifa.manual(0.768);
-    expect(c.estimado, isTrue);
-    expect(c.portatil, isFalse);
-    expect(c.corpoDaEstimativa(), {
+    final c = Query(
+      const Appliance(id: 0, category: 'refrigerador', brand: 'Consul', model: 'CRM45'),
+      estimation: const Estimate(fridgeRoute, {'tipo': 'duplex', 'volume_total_l': 407.0, 'ano_compra': 2014}),
+    )..tariff = TariffChoice.manual(0.768);
+    expect(c.estimated, isTrue);
+    expect(c.smallAppliance, isFalse);
+    expect(c.estimateBody(), {
       'distribuidora_id': null,
       'tarifa_manual': 0.768,
       'horas_dia': null,
@@ -676,84 +676,84 @@ void main() {
       'volume_total_l': 407.0,
       'ano_compra': 2014,
     });
-    expect(c.copiar().estimado, isTrue);
-    expect(c.copiar(aparelho: const Aparelho(id: 3, categoria: 'refrigerador', marca: 'X', modelo: 'Y')).estimado,
+    expect(c.copy().estimated, isTrue);
+    expect(c.copy(appliance: const Appliance(id: 3, category: 'refrigerador', brand: 'X', model: 'Y')).estimated,
         isFalse);
   });
 
   test('total anual da casa usa o valor anual da API (sem diferenca de arredondamento)', () {
-    casa.adicionar(
-      consulta('refrigerador'),
-      Resultado.fromJson({...resultadoJson('refrigerador', 32.1, 24.65, tarifa: 0.76802), 'custo_ano': 295.84}),
+    home.add(
+      query('refrigerador'),
+      Result.fromJson({...resultJson('refrigerador', 32.1, 24.65, tariff: 0.76802), 'custo_ano': 295.84}),
     );
-    expect(casa.custoAno, 295.84);
+    expect(home.yearlyCost, 295.84);
   });
 
   test('tempo em horas e minutos', () {
-    final t = ControleTempo();
-    expect(t.vazio, isTrue);
-    expect(t.horasDia, isNull);
-    t.definir(0.5);
-    expect(t.horas.text, '0');
-    expect(t.minutos.text, '30');
-    expect(t.horasDia, 0.5);
-    t.minutos.text = '75';
-    expect(t.valido, isFalse);
-    t.horas.text = '1';
-    t.minutos.text = '15';
-    expect(t.horasDia, 1.25);
-    t.limpar();
-    expect(t.vazio, isTrue);
-    expect(duracao(0.25), '15 min');
-    expect(duracao(4.5), '4 h 30 min');
-    expect(duracao(2), '2 h');
+    final t = TimeControl();
+    expect(t.isEmpty, isTrue);
+    expect(t.dailyHours, isNull);
+    t.define(0.5);
+    expect(t.hours.text, '0');
+    expect(t.minutes.text, '30');
+    expect(t.dailyHours, 0.5);
+    t.minutes.text = '75';
+    expect(t.valid, isFalse);
+    t.hours.text = '1';
+    t.minutes.text = '15';
+    expect(t.dailyHours, 1.25);
+    t.clear();
+    expect(t.isEmpty, isTrue);
+    expect(duration(0.25), '15 min');
+    expect(duration(4.5), '4 h 30 min');
+    expect(duration(2), '2 h');
   });
 
   group('Estimativa, uma pergunta por tela', () {
-    Widget telaEstimar() => MaterialApp(
-      theme: temaIamp(),
-      home: TelaEstimar(carregarCategorias: categoriasDeTeste, carregarResistivos: resistivosDeTeste),
+    Widget estimateScreen() => MaterialApp(
+      theme: iampTheme(),
+      home: EstimateScreen(loadCategories: testCategories, loadResistive: testResistive),
     );
 
-    Future<void> tocar(WidgetTester tester, String texto) async {
-      await tester.tap(find.text(texto));
+    Future<void> tap(WidgetTester tester, String text) async {
+      await tester.tap(find.text(text));
       await tester.pumpAndSettle();
     }
 
     testWidgets('geladeira: tipo, gelo, capacidade, freezer e ano, cada um na sua tela', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
       expect(find.text('Que tipo de aparelho é?'), findsOneWidget);
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Geladeira ou freezer');
-      await tocar(tester, 'Geladeira duplex (2 portas)');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Geladeira ou freezer');
+      await tap(tester, 'Geladeira duplex (2 portas)');
       expect(find.text('Ela forma gelo nas paredes?'), findsOneWidget);
-      await tocar(tester, 'Não forma gelo (frost-free)');
+      await tap(tester, 'Não forma gelo (frost-free)');
 
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.textContaining('capacidade total em litros'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '407');
-      await tocar(tester, 'Continuar');
-      await tocar(tester, 'Não sei'); // litros do freezer
+      await tap(tester, 'Continuar');
+      await tap(tester, 'Não sei'); // litros do freezer
       expect(find.text('Em que ano você comprou?'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '1900');
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.textContaining('ano de compra entre 1980'), findsOneWidget);
     });
 
     testWidgets('voltar volta uma pergunta e guarda a resposta', (tester) async {
-      telaAlta(tester);
+      tallScreen(tester);
       // como no app: a estimativa e aberta por cima de outra tela
       await tester.pumpWidget(
         MaterialApp(
-          theme: temaIamp(),
+          theme: iampTheme(),
           home: Builder(
             builder: (context) => TextButton(
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => TelaEstimar(carregarCategorias: categoriasDeTeste, carregarResistivos: resistivosDeTeste),
+                  builder: (_) => EstimateScreen(loadCategories: testCategories, loadResistive: testResistive),
                 ),
               ),
               child: const Text('abrir'),
@@ -761,9 +761,9 @@ void main() {
           ),
         ),
       );
-      await tocar(tester, 'abrir');
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Geladeira ou freezer');
+      await tap(tester, 'abrir');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Geladeira ou freezer');
       expect(find.text('Qual é o tipo?'), findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -777,116 +777,116 @@ void main() {
     });
 
     testWidgets('eletroportateis mostram a potencia tipica e o tempo em horas e minutos', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
-      await tocar(tester, 'Eletroportátil');
+      await tap(tester, 'Eletroportátil');
       expect(find.text('Típica: 1500 W'), findsOneWidget);
-      await tocar(tester, 'Air fryer');
+      await tap(tester, 'Air fryer');
       expect(find.text('Não sei, usar a típica (1500 W)'), findsOneWidget);
-      await tocar(tester, 'Não sei, usar a típica (1500 W)');
+      await tap(tester, 'Não sei, usar a típica (1500 W)');
       expect(find.text('Sugerido: 30 min. Troque pelo seu uso real.'), findsOneWidget);
       expect(find.text('Minutos'), findsOneWidget);
     });
 
     testWidgets('maquina de lavar sem numero pergunta o tipo pelo nome conhecido e o tamanho', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Máquina de lavar');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Máquina de lavar');
       expect(find.text('Top Load (automatica)'), findsNothing);
       expect(find.text('Tampa em cima.'), findsOneWidget);
-      await tocar(tester, 'Automática que abre por cima');
+      await tap(tester, 'Automática que abre por cima');
       expect(find.text('Qual é o tamanho?'), findsOneWidget);
-      await tocar(tester, 'Outro tamanho');
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Outro tamanho');
+      await tap(tester, 'Continuar');
       expect(find.textContaining('Se não souber, volte e escolha um dos tamanhos'), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tocar(tester, '8 kg');
+      await tap(tester, '8 kg');
       expect(find.text('Você consegue ver algum destes no aparelho?'), findsOneWidget);
       expect(find.text('Etiqueta amarela do Inmetro'), findsOneWidget);
-      await tocar(tester, 'Não consigo ver nenhum');
+      await tap(tester, 'Não consigo ver nenhum');
       expect(find.text('Quantas vezes por mês você lava roupa?'), findsOneWidget);
     });
 
     testWidgets('televisao antiga usa a potencia escrita nela e as horas viram obrigatorias', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Televisor');
-      await tocar(tester, '32 polegadas');
-      await tocar(tester, 'Potência escrita no aparelho');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Televisor');
+      await tap(tester, '32 polegadas');
+      await tap(tester, 'Potência escrita no aparelho');
       expect(find.text('Qual é a potência?'), findsOneWidget);
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Digite o número em W, como está escrito. Ex.: 120.'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '2000');
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Digite o número em W, como está escrito. Ex.: 120.'), findsOneWidget);
       await tester.enterText(find.byType(TextField), '120');
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
       expect(find.text('Não sei, usar o valor do Inmetro'), findsNothing);
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Digite o tempo de uso por dia.'), findsOneWidget);
     });
 
     testWidgets('ventilador pergunta a velocidade e as horas; com a potencia, so as horas', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Ventilador de teto');
-      await tocar(tester, 'Não consigo ver nenhum');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Ventilador de teto');
+      await tap(tester, 'Não consigo ver nenhum');
       expect(find.text('Qual é o tamanho?'), findsNothing);
-      await tocar(tester, 'Média');
+      await tap(tester, 'Média');
       expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
       expect(find.text('Não sei, usar o valor do Inmetro'), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      await tocar(tester, 'Potência escrita no aparelho');
+      await tap(tester, 'Potência escrita no aparelho');
       await tester.enterText(find.byType(TextField), '130');
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Em qual velocidade você costuma usar?'), findsNothing);
       expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
     });
 
     testWidgets('chuveiro vai direto para a potencia', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(telaEstimar());
+      tallScreen(tester);
+      await tester.pumpWidget(estimateScreen());
       await tester.pumpAndSettle();
-      await tocar(tester, 'Eletrodoméstico grande');
-      await tocar(tester, 'Chuveiro elétrico');
+      await tap(tester, 'Eletrodoméstico grande');
+      await tap(tester, 'Chuveiro elétrico');
       expect(find.text('Qual é a potência?'), findsOneWidget);
       expect(find.text('Não consigo ver nenhum'), findsNothing);
-      await tocar(tester, 'Continuar');
+      await tap(tester, 'Continuar');
       expect(find.text('Digite o número em W, como está escrito. Ex.: 5500.'), findsOneWidget);
     });
 
     testWidgets('ventilador do catalogo pergunta a velocidade e depois as horas', (tester) async {
-      telaAlta(tester);
-      final c = consulta('ventilador_de_mesa', id: 3);
+      tallScreen(tester);
+      final c = query('ventilador_de_mesa', id: 3);
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: TelaUso(consulta: c)));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: c)));
         await tester.pumpAndSettle();
-        await tocar(tester, 'Média');
+        await tap(tester, 'Média');
         expect(find.text('Quanto tempo por dia ele fica ligado?'), findsOneWidget);
-        await tocar(tester, 'Continuar');
+        await tap(tester, 'Continuar');
         expect(find.textContaining('Informe quanto tempo por dia'), findsOneWidget);
         await tester.enterText(find.widgetWithText(TextField, 'Horas'), '8');
-        await tocar(tester, 'Continuar');
-      }, apiFalsa);
-      expect(c.velocidade, 'media');
-      expect(c.horasDia, 8);
+        await tap(tester, 'Continuar');
+      }, apiFake);
+      expect(c.speed, 'media');
+      expect(c.dailyHours, 8);
     });
 
     testWidgets('chamada da busca abre a estimativa', (tester) async {
-      telaAlta(tester);
-      await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const Scaffold(body: ChamadaEstimar())));
+      tallScreen(tester);
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const Scaffold(body: EstimateCallToAction())));
       await tester.tap(find.text('Não achou? Estime o gasto'));
       await tester.pumpAndSettle();
       expect(find.text('Estimar o gasto'), findsOneWidget);
@@ -894,9 +894,9 @@ void main() {
   });
 
   testWidgets('dicas do eco-coach mostram o texto formatado e as fontes', (tester) async {
-    telaAlta(tester);
-    final r = resultado('air_fryer', 37.5, 28.8);
-    Future<Dicas> falso(Resultado _) async => Dicas.fromJson({
+    tallScreen(tester);
+    final r = result('air_fryer', 37.5, 28.8);
+    Future<Tips> fake(Result _) async => Tips.fromJson({
       'dicas': 'A air fryer custa R\$ 28,80 por mês.\n\n## Como evitar desperdício\n'
           '- **Não abra** a cesta toda hora [1].\n2. Use o tempo certo [2].',
       'fontes': [
@@ -905,7 +905,7 @@ void main() {
       ],
       'aviso': 'Dicas geradas por IA.',
     });
-    await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: TelaDicas(resultado: r, buscarDicas: falso)));
+    await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: TipScreen(result: r, searchTips: fake)));
     await tester.pumpAndSettle();
     expect(find.text('Como evitar desperdício'), findsOneWidget);
     expect(find.textContaining('a cesta toda hora [1].', findRichText: true), findsOneWidget);
@@ -915,9 +915,9 @@ void main() {
   });
 
   testWidgets('dicas mostram o erro quando o eco-coach esta fora do ar', (tester) async {
-    Future<Dicas> fora(Resultado _) async => throw ApiErro('Eco-Coach indisponivel: GEMINI_API_KEY nao configurada');
+    Future<Tips> outside(Result _) async => throw ApiError('Eco-Coach indisponivel: GEMINI_API_KEY nao configurada');
     await tester.pumpWidget(
-      MaterialApp(theme: temaIamp(), home: TelaDicas(resultado: resultado('air_fryer', 1, 1), buscarDicas: fora)),
+      MaterialApp(theme: iampTheme(), home: TipScreen(result: result('air_fryer', 1, 1), searchTips: outside)),
     );
     await tester.pumpAndSettle();
     expect(find.textContaining('GEMINI_API_KEY'), findsOneWidget);
@@ -927,18 +927,18 @@ void main() {
   group('Eco-Coach', () {
     test('plano: citacoes [n] em amarelo e **negrito** sem os asteriscos', () {
       const base = TextStyle(fontSize: 18);
-      final pedacos = pedacosDoTexto('Desligue o **ar** nas saidas [1] e use o timer [2, 3].', base);
-      expect(pedacos.map((p) => p.text).join(), 'Desligue o ar nas saidas [1] e use o timer [2, 3].');
-      final citacoes = pedacos.where((p) => p.text!.startsWith('['));
-      expect(citacoes.map((p) => p.text), ['[1]', '[2, 3]']);
-      expect(citacoes.every((p) => p.style!.color == Cores.amarelo), isTrue);
-      expect(citacoes.every((p) => p.style!.fontSize == 18), isTrue); // citacao do mesmo tamanho do texto
-      expect(pedacos.firstWhere((p) => p.text == 'ar').style!.fontWeight, FontWeight.bold);
+      final pieces = textPieces('Desligue o **ar** nas saidas [1] e use o timer [2, 3].', base);
+      expect(pieces.map((p) => p.text).join(), 'Desligue o ar nas saidas [1] e use o timer [2, 3].');
+      final citations = pieces.where((p) => p.text!.startsWith('['));
+      expect(citations.map((p) => p.text), ['[1]', '[2, 3]']);
+      expect(citations.every((p) => p.style!.color == AppColors.yellow), isTrue);
+      expect(citations.every((p) => p.style!.fontSize == 18), isTrue); // citacao do mesmo tamanho do texto
+      expect(pieces.firstWhere((p) => p.text == 'ar').style!.fontWeight, FontWeight.bold);
     });
 
     testWidgets('plano: titulos, listas e paragrafos viram widgets', (tester) async {
       const md = '## Ações recomendadas\n\n1. Banho mais curto [1]\n- Geladeira longe do fogão [2]\nTexto final.';
-      await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const Scaffold(body: TextoPlano(md))));
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const Scaffold(body: PlanText(md))));
       expect(find.text('Ações recomendadas'), findsOneWidget);
       expect(find.text('1.'), findsOneWidget);
       expect(find.byIcon(Icons.bolt), findsOneWidget); // marcador da lista
@@ -946,71 +946,71 @@ void main() {
     });
 
     test('casa manda o custo de cada item e guarda as trocas sem repetir', () {
-      final item = casa.adicionar(consulta('chuveiro'), resultado('chuveiro', 41.25, 31.68));
-      casa.mudarQuantidade(item, 2);
-      expect(casa.itensParaEcoCoach().single, {'categoria': 'chuveiro', 'kwh_mes': 82.5, 'custo_mes': 63.36});
+      final item = home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      home.changeQuantity(item, 2);
+      expect(home.itemsForEcoCoach().single, {'categoria': 'chuveiro', 'kwh_mes': 82.5, 'custo_mes': 63.36});
 
-      const t1 = TrocaAvaliada(aparelho: 'geladeira A', alternativa: 'B', economiaMes: 7, paybackMeses: 300);
-      casa.registrarTroca(t1);
-      casa.registrarTroca(t1); // a mesma troca de novo nao duplica
-      expect(casa.trocas, hasLength(1));
+      const t1 = EvaluatedSwap(appliance: 'geladeira A', alternative: 'B', monthlySavings: 7, paybackMonths: 300);
+      home.registerSwap(t1);
+      home.registerSwap(t1); // a mesma troca de novo nao duplica
+      expect(home.swaps, hasLength(1));
       for (var i = 0; i < 6; i++) {
-        casa.registrarTroca(TrocaAvaliada(aparelho: 'tv $i', alternativa: 'x', economiaMes: 1));
+        home.registerSwap(EvaluatedSwap(appliance: 'tv $i', alternative: 'x', monthlySavings: 1));
       }
-      expect(casa.trocas, hasLength(5)); // so as 5 mais recentes
+      expect(home.swaps, hasLength(5)); // so as 5 mais recentes
     });
 
     test('plano guardado some quando a casa muda', () {
-      casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
-      casa.guardarPlano(EcoCoach.fromJson(planoExemplo));
-      expect(casa.plano!.fontes.single.pagina, 7);
-      casa.mudarMoradores(4);
-      expect(casa.plano, isNull);
+      home.add(query('televisor'), result('televisor', 10, 8));
+      home.storePlan(EcoCoach.fromJson(examplePlan));
+      expect(home.plan!.sources.single.page, 7);
+      home.changeResidents(4);
+      expect(home.plan, isNull);
     });
 
     testWidgets('aba Economizar so pede o plano quando a pessoa toca no botao', (tester) async {
-      casa.adicionar(consulta('televisor'), resultado('televisor', 10, 8));
-      var pedidos = 0;
+      home.add(query('televisor'), result('televisor', 10, 8));
+      var requests = 0;
       final api = MockClient((r) async {
-        if (r.url.path == '/eco-coach') pedidos++;
+        if (r.url.path == '/eco-coach') requests++;
         if (r.url.path == '/categorias') return http.Response('[]', 200, headers: _json);
-        return http.Response(jsonEncode(planoExemplo), 200, headers: _json);
+        return http.Response(jsonEncode(examplePlan), 200, headers: _json);
       });
       await http.runWithClient(() async {
-        await tester.pumpWidget(const IampApp(boasVindas: false));
+        await tester.pumpWidget(const IampApp(showWelcome: false));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Economizar'));
         await tester.pumpAndSettle();
-        expect(pedidos, 0);
+        expect(requests, 0);
         await tester.tap(find.text('Montar meu plano'));
         await tester.pumpAndSettle();
       }, () => api);
-      expect(pedidos, 1);
+      expect(requests, 1);
       expect(find.text('Seu plano de economia'), findsOneWidget);
       expect(find.text('Montar outro plano'), findsOneWidget);
     });
   });
 
   group('Busca por marca com varios tipos', () {
-    Aparelho ap(int id, String categoria, int total) => Aparelho.fromJson({
+    Appliance ap(int id, String category, int total) => Appliance.fromJson({
       'id': id,
-      'categoria': categoria,
+      'categoria': category,
       'marca': 'BRASTEMP',
       'modelo': 'M$id',
       'detalhe': '',
       'total_categoria': total,
     });
 
-    Future<void> mostrar(WidgetTester tester, List<Aparelho> lista) => tester.pumpWidget(
+    Future<void> display(WidgetTester tester, List<Appliance> itemList) => tester.pumpWidget(
       MaterialApp(
-        theme: temaIamp(),
-        home: Scaffold(body: SingleChildScrollView(child: ResultadosPorTipo(lista, aoEscolher: (_) {}))),
+        theme: iampTheme(),
+        home: Scaffold(body: SingleChildScrollView(child: ResultsPerType(itemList, onChoose: (_) {}))),
       ),
     );
 
     testWidgets('cada tipo vira uma secao fechada que abre ao tocar', (tester) async {
-      telaAlta(tester);
-      await mostrar(tester, [ap(1, 'maquina_de_lavar', 45), ap(2, 'maquina_de_lavar', 45), ap(3, 'refrigerador', 1)]);
+      tallScreen(tester);
+      await display(tester, [ap(1, 'maquina_de_lavar', 45), ap(2, 'maquina_de_lavar', 45), ap(3, 'refrigerador', 1)]);
       expect(find.text('Máquinas de lavar'), findsOneWidget);
       expect(find.text('45 modelos'), findsOneWidget);
       expect(find.text('Geladeiras'), findsOneWidget);
@@ -1024,20 +1024,20 @@ void main() {
     });
 
     testWidgets('um tipo so ja vem aberto', (tester) async {
-      await mostrar(tester, [ap(1, 'refrigerador', 1)]);
+      await display(tester, [ap(1, 'refrigerador', 1)]);
       expect(find.text('BRASTEMP M1'), findsOneWidget);
     });
 
     testWidgets('procurar pela marca, sem tipo, busca em todos os tipos', (tester) async {
-      telaAlta(tester);
-      final pedidos = <Uri>[];
+      tallScreen(tester);
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaModelo()));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const ModelScreen()));
         await tester.enterText(find.byType(TextField), 'brastemp');
         await tester.testTextInput.receiveAction(TextInputAction.search);
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
-      expect(pedidos.last.queryParameters.containsKey('categoria'), isFalse);
+      }, () => apiFake(requests: requests));
+      expect(requests.last.queryParameters.containsKey('categoria'), isFalse);
       expect(find.text('2 aparelhos encontrados'), findsOneWidget);
       expect(find.text('Máquinas de lavar'), findsOneWidget);
       expect(find.text('Geladeiras'), findsOneWidget);
@@ -1045,28 +1045,28 @@ void main() {
   });
 
   group('Lista de marcas (etapa 2)', () {
-    Future<void> abrirGeladeira(WidgetTester tester) async {
-      await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaModelo(categoria: 'refrigerador')));
+    Future<void> openFridge(WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const ModelScreen(category: 'refrigerador')));
       await tester.pumpAndSettle();
     }
 
     testWidgets('mostra todas as marcas do tipo e abre os modelos ao tocar na marca', (tester) async {
-      telaAlta(tester);
-      final pedidos = <Uri>[];
+      tallScreen(tester);
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await abrirGeladeira(tester);
+        await openFridge(tester);
         expect(find.text('Ou escolha a marca'), findsOneWidget);
         expect(find.text('2 marcas'), findsOneWidget);
         expect(find.text('BRASTEMP'), findsOneWidget);
         expect(find.text('60 modelos'), findsOneWidget);
-        expect(pedidos.where((u) => u.path == '/modelos'), isEmpty); // so carrega ao abrir
+        expect(requests.where((u) => u.path == '/modelos'), isEmpty); // so carrega ao abrir
 
         await tester.tap(find.text('BRASTEMP'));
         await tester.pumpAndSettle();
-        expect(pedidos.last.queryParameters, {'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'limite': '50'});
+        expect(requests.last.queryParameters, {'categoria': 'refrigerador', 'marca': 'BRASTEMP', 'limite': '50'});
         await tester.tap(find.text('GELA'));
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
+      }, () => apiFake(requests: requests));
       // segue o calculo normal (geladeira nao pergunta o uso: vai direto para o estado)
       expect(find.text('Em qual estado você mora?'), findsOneWidget);
     });
@@ -1076,19 +1076,19 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
       await http.runWithClient(() async {
-        await abrirGeladeira(tester);
+        await openFridge(tester);
         await tester.tap(find.text('CONSUL'));
         await tester.pumpAndSettle();
-      }, apiFalsa);
+      }, apiFake);
       expect(find.text('CRM1'), findsOneWidget);
       expect(find.textContaining('Mostrando 50 de 60'), findsOneWidget);
     });
 
     testWidgets('digitar filtra as marcas e "Buscar" continua procurando pelo modelo', (tester) async {
-      telaAlta(tester);
-      final pedidos = <Uri>[];
+      tallScreen(tester);
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await abrirGeladeira(tester);
+        await openFridge(tester);
         await tester.enterText(find.byType(TextField), 'cons');
         await tester.pump();
         expect(find.text('1 marca'), findsOneWidget);
@@ -1102,32 +1102,40 @@ void main() {
         await tester.enterText(find.byType(TextField), 'brastemp');
         await tester.testTextInput.receiveAction(TextInputAction.search);
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
-      expect(pedidos.last.path, '/aparelhos');
+      }, () => apiFake(requests: requests));
+      expect(requests.last.path, '/aparelhos');
       expect(find.text('1 aparelho encontrado'), findsOneWidget);
       expect(find.text('Ou escolha a marca'), findsNothing); // o resultado da busca substitui a lista
     });
 
     testWidgets('sem tipo escolhido nao mostra lista de marcas', (tester) async {
-      telaAlta(tester);
-      final pedidos = <Uri>[];
+      tallScreen(tester);
+      final requests = <Uri>[];
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: temaIamp(), home: const TelaModelo()));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const ModelScreen()));
         await tester.pumpAndSettle();
-      }, () => apiFalsa(pedidos: pedidos));
+      }, () => apiFake(requests: requests));
       expect(find.text('Ou escolha a marca'), findsNothing);
-      expect(pedidos.where((u) => u.path == '/marcas'), isEmpty);
+      expect(requests.where((u) => u.path == '/marcas'), isEmpty);
     });
+  });
+
+  testWidgets('carregando por mais de 8 s explica que o servidor esta acordando', (tester) async {
+    await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const Scaffold(body: Loading())));
+    expect(find.text('Carregando...'), findsOneWidget);
+    expect(find.textContaining('acordando'), findsNothing);
+    await tester.pump(Loading.waitBeforeHint + const Duration(milliseconds: 100));
+    expect(find.textContaining('O servidor estava em repouso e está acordando'), findsOneWidget);
   });
 
   testWidgets('aviso de aparelho adicionado some sozinho depois de 5 s', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: temaIamp(),
+        theme: iampTheme(),
         home: Scaffold(
           body: Builder(
             builder: (context) => TextButton(
-              onPressed: () => avisarAdicionado(ScaffoldMessenger.of(context), 'Foi.'),
+              onPressed: () => notifyAdded(ScaffoldMessenger.of(context), 'Foi.'),
               child: const Text('adicionar'),
             ),
           ),
@@ -1144,96 +1152,96 @@ void main() {
   });
 }
 
-Future<List<Resistivo>> resistivosDeTeste() async => [
-  Resistivo.fromJson({'categoria': 'air_fryer', 'nome': 'Air fryer', 'potencia_w': 1500, 'horas_dia': 0.5, 'dias_mes': 15}),
+Future<List<Resistive>> testResistive() async => [
+  Resistive.fromJson({'categoria': 'air_fryer', 'nome': 'Air fryer', 'potencia_w': 1500, 'horas_dia': 0.5, 'dias_mes': 15}),
 ];
 
-Map<String, dynamic> _forma(String campo, String unidade, String exemplo, double maximo) => {
-  'campo': campo,
-  'nome': campo == 'potencia_w' ? 'Potência escrita no aparelho' : 'Etiqueta amarela do Inmetro',
-  'rotulo': campo == 'potencia_w' ? 'Potência' : 'Consumo de energia',
-  'unidade': unidade,
+Map<String, dynamic> _shape(String field, String unit, String example, double maximum) => {
+  'campo': field,
+  'nome': field == 'potencia_w' ? 'Potência escrita no aparelho' : 'Etiqueta amarela do Inmetro',
+  'rotulo': field == 'potencia_w' ? 'Potência' : 'Consumo de energia',
+  'unidade': unit,
   'onde': 'Escrito no aparelho.',
   'dica': null,
-  'exemplo': exemplo,
-  'maximo': maximo,
+  'exemplo': example,
+  'maximo': maximum,
 };
 
-Map<String, dynamic> _categoria(
+Map<String, dynamic> _category(
   String c,
-  String nome, {
-  String? medida,
-  String? unidade,
-  List<Map<String, dynamic>> tamanhos = const [],
-  List<Map<String, dynamic>> tipos = const [],
-  bool especial = false,
-  List<Map<String, dynamic>> formas = const [],
-  bool obrigatorio = false,
-  Map<String, dynamic>? uso,
+  String name, {
+  String? measure,
+  String? unit,
+  List<Map<String, dynamic>> sizes = const [],
+  List<Map<String, dynamic>> types = const [],
+  bool special = false,
+  List<Map<String, dynamic>> shapes = const [],
+  bool isRequired = false,
+  Map<String, dynamic>? usage,
 }) => {
   'categoria': c,
-  'nome': nome,
-  'especial': especial,
-  'medida': medida,
-  'unidade_medida': unidade,
-  'tamanhos': tamanhos,
-  'tipos': tipos,
-  'formas': formas,
-  'valor_obrigatorio': obrigatorio,
-  'uso': uso ?? {'pergunta': null},
+  'nome': name,
+  'especial': special,
+  'medida': measure,
+  'unidade_medida': unit,
+  'tamanhos': sizes,
+  'tipos': types,
+  'formas': shapes,
+  'valor_obrigatorio': isRequired,
+  'uso': usage ?? {'pergunta': null},
 };
 
-Future<List<CategoriaEstimavel>> categoriasDeTeste() async => [
+Future<List<EstimableCategory>> testCategories() async => [
   for (final j in [
-    _categoria('refrigerador', 'Geladeira ou freezer', especial: true),
-    _categoria(
+    _category('refrigerador', 'Geladeira ou freezer', special: true),
+    _category(
       'maquina_de_lavar',
       'Máquina de lavar',
-      medida: 'Capacidade de lavagem (kg)',
-      unidade: 'kg',
-      tamanhos: [
+      measure: 'Capacidade de lavagem (kg)',
+      unit: 'kg',
+      sizes: [
         {'valor': 8, 'nome': '8 kg'},
       ],
-      tipos: [
+      types: [
         {'valor': 'Top Load (automatica)', 'nome': 'Automática que abre por cima', 'descricao': 'Tampa em cima.'},
       ],
-      formas: [_forma('kwh_ciclo', 'kWh/ciclo', 'Ex.: 0,25', 5)],
-      uso: {'pergunta': 'ciclos', 'padrao': 12},
+      shapes: [_shape('kwh_ciclo', 'kWh/ciclo', 'Ex.: 0,25', 5)],
+      usage: {'pergunta': 'ciclos', 'padrao': 12},
     ),
-    _categoria(
+    _category(
       'televisor',
       'Televisor',
-      medida: 'Tamanho da tela (polegadas)',
-      unidade: 'polegadas',
-      tamanhos: [
+      measure: 'Tamanho da tela (polegadas)',
+      unit: 'polegadas',
+      sizes: [
         {'valor': 32, 'nome': '32 polegadas'},
       ],
-      formas: [_forma('potencia_w', 'W', 'Ex.: 120', 1500), _forma('kwh_mes', 'kWh/mês', 'Ex.: 9,9', 300)],
-      uso: {'pergunta': 'horas', 'padrao': null, 'opcional': true},
+      shapes: [_shape('potencia_w', 'W', 'Ex.: 120', 1500), _shape('kwh_mes', 'kWh/mês', 'Ex.: 9,9', 300)],
+      usage: {'pergunta': 'horas', 'padrao': null, 'opcional': true},
     ),
-    _categoria(
+    _category(
       'ventilador_de_teto',
       'Ventilador de teto',
-      formas: [_forma('potencia_w', 'W', 'Ex.: 130', 500)],
-      uso: {
+      shapes: [_shape('potencia_w', 'W', 'Ex.: 130', 500)],
+      usage: {
         'pergunta': 'velocidade',
         'opcoes': ['baixa', 'media', 'alta'],
         'padrao': 'media',
         'perguntar_horas': true,
       },
     ),
-    _categoria(
+    _category(
       'chuveiro',
       'Chuveiro elétrico',
-      obrigatorio: true,
-      formas: [_forma('potencia_w', 'W', 'Ex.: 5500', 12000)],
-      uso: {'pergunta': 'horas', 'padrao': null},
+      isRequired: true,
+      shapes: [_shape('potencia_w', 'W', 'Ex.: 5500', 12000)],
+      usage: {'pergunta': 'horas', 'padrao': null},
     ),
   ])
-    CategoriaEstimavel.fromJson(j),
+    EstimableCategory.fromJson(j),
 ];
 
-const planoExemplo = {
+const examplePlan = {
   'perfil': 'Moderado',
   'kwh_total': 10.0,
   'custo_total': 8.0,

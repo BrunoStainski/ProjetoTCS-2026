@@ -11,36 +11,36 @@ import os
 from pathlib import Path
 
 
-def _raiz():
-    aqui = Path(__file__).resolve().parent
-    for pasta in (aqui, *aqui.parents):
-        if (pasta / "datasets").is_dir():
-            return pasta
-    return aqui
+def _root():
+    here = Path(__file__).resolve().parent
+    for folder in (here, *here.parents):
+        if (folder / "datasets").is_dir():
+            return folder
+    return here
 
 
-def _ler_env(caminho):
+def _read_env(path):
     """Le o .env (CHAVE=valor) sem precisar de biblioteca extra."""
-    valores = {}
-    if caminho.exists():
-        for linha in caminho.read_text(encoding="utf-8-sig").splitlines():
-            linha = linha.strip()
-            if linha and not linha.startswith("#") and "=" in linha:
-                chave, valor = linha.split("=", 1)
-                valores[chave.strip()] = valor.strip().strip('"').strip("'")
-    return valores
+    values = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8-sig").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
 
-RAIZ = _raiz()
-_ENV = {**_ler_env(RAIZ / ".env"), **os.environ}  # variavel de ambiente vence o .env
+ROOT = _root()
+_ENV = {**_read_env(ROOT / ".env"), **os.environ}  # variavel de ambiente vence o .env
 
 
-def _env(chave, padrao=None):
-    return _ENV.get(chave) or padrao
+def _env(key, default_value=None):
+    return _ENV.get(key) or default_value
 
 
-DADOS = Path(_env("IAMP_DADOS", RAIZ / "datasets" / "processed"))
-TARIFAS_CSV = DADOS / "tarifas_aneel_limpo.csv"
+DATA = Path(_env("IAMP_DADOS", ROOT / "datasets" / "processed"))
+TARIFFS_CSV = DATA / "tarifas_aneel_limpo.csv"
 
 # PostgreSQL do docker-compose (container postgres_iamp)
 DATABASE_URL = _env("DATABASE_URL") or "postgresql+psycopg2://{u}:{s}@{h}:{p}/{d}".format(
@@ -50,13 +50,18 @@ DATABASE_URL = _env("DATABASE_URL") or "postgresql+psycopg2://{u}:{s}@{h}:{p}/{d
     p=_env("POSTGRES_PORT", "5434"),
     d=_env("POSTGRES_DB", "banco_projeto"),
 )
+# Neon/Render entregam "postgresql://..." (ou "postgres://"); o SQLAlchemy 2.1 usa o driver psycopg 3
+# nesse formato, e o projeto usa o psycopg2: troca para o driver certo (o resto, como ?sslmode=require, fica).
+for _prefix in ("postgres://", "postgresql://"):
+    if DATABASE_URL.startswith(_prefix):
+        DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len(_prefix):]
 
 
-def _achar(nome):
-    for pasta in (DADOS, RAIZ / "datasets", RAIZ / "datasets" / "raw", RAIZ):
-        if (pasta / nome).exists():
-            return pasta / nome
-    return DADOS / nome
+def _find(name):
+    for folder in (DATA, ROOT / "datasets", ROOT / "datasets" / "raw", ROOT):
+        if (folder / name).exists():
+            return folder / name
+    return DATA / name
 
 
-DISTRIBUIDORAS_CSV = _achar("distribuidoras_uf.csv")
+DISTRIBUTORS_CSV = _find("distribuidoras_uf.csv")

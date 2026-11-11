@@ -7,218 +7,218 @@ import 'api.dart';
 import 'idioma.dart';
 
 /// Tarifa escolhida: distribuidora da ANEEL ou o valor da conta de luz.
-class EscolhaTarifa {
-  final int? distribuidoraId;
-  final double? tarifaManual;
-  final String? _distribuidora;
-  final double tarifaKwh;
+class TariffChoice {
+  final int? distributorId;
+  final double? manualTariff;
+  final String? _distributor;
+  final double tariffKwh;
 
-  EscolhaTarifa.daDistribuidora(Distribuidora d)
-    : distribuidoraId = d.id,
-      tarifaManual = null,
-      _distribuidora = d.uf == null ? d.nome : '${d.nome} - ${d.uf}',
-      tarifaKwh = d.tarifaKwh;
+  TariffChoice.fromDistributor(Distributor d)
+    : distributorId = d.id,
+      manualTariff = null,
+      _distributor = d.uf == null ? d.name : '${d.name} - ${d.uf}',
+      tariffKwh = d.tariffKwh;
 
-  EscolhaTarifa.manual(double tarifa)
-    : distribuidoraId = null,
-      tarifaManual = tarifa,
-      _distribuidora = null,
-      tarifaKwh = tarifa;
+  TariffChoice.manual(double tariff)
+    : distributorId = null,
+      manualTariff = tariff,
+      _distributor = null,
+      tariffKwh = tariff;
 
   /// Calculada na hora: segue o idioma, mesmo se a tarifa foi escolhida antes da troca.
-  String get descricao => _distribuidora ?? tr('Tarifa da conta de luz', 'Rate from your electricity bill');
+  String get description => _distributor ?? tr('Tarifa da conta de luz', 'Rate from your electricity bill');
 
-  Map<String, dynamic> paraApi() => {'distribuidora_id': distribuidoraId, 'tarifa_manual': tarifaManual};
+  Map<String, dynamic> toApi() => {'distribuidora_id': distributorId, 'tarifa_manual': manualTariff};
 }
 
-const rotaGeladeira = '/calcular/refrigerador-antigo';
-const rotaEstimado = '/calcular/estimado';
-const rotaResistivo = '/calcular/resistivo';
+const fridgeRoute = '/calcular/refrigerador-antigo';
+const estimatedRoute = '/calcular/estimado';
+const resistiveRoute = '/calcular/resistivo';
 
-class Estimativa {
-  final String rota;
-  final Map<String, dynamic> dados;
+class Estimate {
+  final String route;
+  final Map<String, dynamic> data;
 
-  const Estimativa(this.rota, this.dados);
+  const Estimate(this.route, this.data);
 }
 
 /// O que o usuario ja escolheu ao longo das telas.
-class Consulta {
-  final Aparelho aparelho;
-  final Estimativa? estimativa;
-  double? horasDia;
-  double? ciclosMes;
-  String? velocidade;
-  EscolhaTarifa? tarifa;
+class Query {
+  final Appliance appliance;
+  final Estimate? estimation;
+  double? dailyHours;
+  double? monthlyCycles;
+  String? speed;
+  TariffChoice? tariff;
 
-  Consulta(this.aparelho, {this.estimativa, this.horasDia, this.ciclosMes, this.velocidade, this.tarifa});
+  Query(this.appliance, {this.estimation, this.dailyHours, this.monthlyCycles, this.speed, this.tariff});
 
-  bool get estimado => estimativa != null;
-  bool get portatil => estimativa?.rota == rotaResistivo;
+  bool get estimated => estimation != null;
+  bool get smallAppliance => estimation?.route == resistiveRoute;
 
   /// Mesmo uso e mesma tarifa, opcionalmente com outro aparelho (troca por um mais economico).
-  Consulta copiar({Aparelho? aparelho}) => Consulta(
-    aparelho ?? this.aparelho,
-    estimativa: aparelho == null ? estimativa : null,
-    horasDia: horasDia,
-    ciclosMes: ciclosMes,
-    velocidade: velocidade,
-    tarifa: tarifa,
+  Query copy({Appliance? appliance}) => Query(
+    appliance ?? this.appliance,
+    estimation: appliance == null ? estimation : null,
+    dailyHours: dailyHours,
+    monthlyCycles: monthlyCycles,
+    speed: speed,
+    tariff: tariff,
   );
 
-  Map<String, dynamic> corpoDaEstimativa() => {...paraApi(), ...estimativa!.dados};
+  Map<String, dynamic> estimateBody() => {...toApi(), ...estimation!.data};
 
   /// Corpo comum de /calcular, /sugestoes e /comparar.
-  Map<String, dynamic> paraApi() => {
-    ...?tarifa?.paraApi(),
-    'horas_dia': horasDia,
-    'ciclos_mes': ciclosMes,
-    'velocidade': velocidade,
+  Map<String, dynamic> toApi() => {
+    ...?tariff?.toApi(),
+    'horas_dia': dailyHours,
+    'ciclos_mes': monthlyCycles,
+    'velocidade': speed,
   };
 }
 
-class ItemCasa {
+class ItemHome {
   final int id;
-  final Consulta consulta;
-  final Resultado resultado;
-  int quantidade;
+  final Query query;
+  final Result result;
+  int quantity;
 
-  ItemCasa(this.id, this.consulta, this.resultado, {this.quantidade = 1});
+  ItemHome(this.id, this.query, this.result, {this.quantity = 1});
 
-  double get kwhMes => resultado.kwhMes * quantidade;
-  double get custoMes => resultado.custoMes * quantidade;
-  double get custoAno => resultado.custoAno * quantidade;
+  double get monthlyKwh => result.monthlyKwh * quantity;
+  double get monthlyCost => result.monthlyCost * quantity;
+  double get yearlyCost => result.yearlyCost * quantity;
 }
 
-class Casa extends ChangeNotifier {
-  final List<ItemCasa> _itens = [];
-  int _proximoId = 1;
-  int moradores = 2;
+class Home extends ChangeNotifier {
+  final List<ItemHome> _items = [];
+  int _nextId = 1;
+  int residents = 2;
 
   /// Ultima tarifa usada: a tela da distribuidora oferece usar de novo.
-  EscolhaTarifa? ultimaTarifa;
+  TariffChoice? lastTariff;
 
   /// Perfil do K-Means. Volta a null quando a casa muda (precisa classificar de novo).
-  Classificacao? perfil;
+  Classification? profile;
 
   /// Ultimo plano do Eco-Coach (aba Economizar). Fica guardado ate a casa mudar (poupa o limite gratuito do Gemini).
-  EcoCoach? plano;
+  EcoCoach? plan;
 
   /// Trocas com payback calculado em "Vale a pena trocar?" (no maximo 5, as mais recentes).
-  final List<TrocaAvaliada> _trocas = [];
-  List<TrocaAvaliada> get trocas => List.unmodifiable(_trocas);
+  final List<EvaluatedSwap> _swaps = [];
+  List<EvaluatedSwap> get swaps => List.unmodifiable(_swaps);
 
-  List<ItemCasa> get itens => List.unmodifiable(_itens);
-  bool get vazia => _itens.isEmpty;
-  int get totalAparelhos => _itens.fold(0, (soma, i) => soma + i.quantidade);
-  double get kwhMes => _itens.fold(0.0, (soma, i) => soma + i.kwhMes);
-  double get custoMes => _itens.fold(0.0, (soma, i) => soma + i.custoMes);
-  double get custoAno => _itens.fold(0.0, (soma, i) => soma + i.custoAno);
+  List<ItemHome> get items => List.unmodifiable(_items);
+  bool get isEmpty => _items.isEmpty;
+  int get totalAppliances => _items.fold(0, (summed, i) => summed + i.quantity);
+  double get monthlyKwh => _items.fold(0.0, (summed, i) => summed + i.monthlyKwh);
+  double get monthlyCost => _items.fold(0.0, (summed, i) => summed + i.monthlyCost);
+  double get yearlyCost => _items.fold(0.0, (summed, i) => summed + i.yearlyCost);
 
   /// Do que mais pesa na conta para o que menos pesa.
-  List<ItemCasa> get porCusto => [..._itens]..sort((a, b) => b.custoMes.compareTo(a.custoMes));
+  List<ItemHome> get byCost => [..._items]..sort((a, b) => b.monthlyCost.compareTo(a.monthlyCost));
 
   /// A casa usa mais de uma tarifa? (o total soma valores com tarifas diferentes)
-  bool get tarifasMisturadas => _itens.map((i) => i.resultado.tarifaKwh).toSet().length > 1;
+  bool get mixedTariffs => _items.map((i) => i.result.tariffKwh).toSet().length > 1;
 
-  void _mudou() {
-    perfil = null;
-    plano = null;
+  void _changed() {
+    profile = null;
+    plan = null;
     notifyListeners();
   }
 
-  ItemCasa adicionar(Consulta consulta, Resultado resultado) {
-    final item = ItemCasa(_proximoId++, consulta.copiar(), resultado);
-    _itens.add(item);
-    _mudou();
+  ItemHome add(Query query, Result result) {
+    final item = ItemHome(_nextId++, query.copy(), result);
+    _items.add(item);
+    _changed();
     return item;
   }
 
   /// Tira o item da casa e devolve a posicao dele (para o "Desfazer").
-  int remover(ItemCasa item) {
-    final posicao = _itens.indexOf(item);
-    _itens.remove(item);
-    _mudou();
-    return posicao;
+  int remove(ItemHome item) {
+    final position = _items.indexOf(item);
+    _items.remove(item);
+    _changed();
+    return position;
   }
 
   /// Desfaz uma remocao: o item volta para a mesma posicao.
-  void reinserir(ItemCasa item, int posicao) {
-    if (_itens.contains(item)) return;
-    _itens.insert(posicao.clamp(0, _itens.length), item);
-    _mudou();
+  void reinsert(ItemHome item, int position) {
+    if (_items.contains(item)) return;
+    _items.insert(position.clamp(0, _items.length), item);
+    _changed();
   }
 
-  void mudarQuantidade(ItemCasa item, int quantidade) {
-    item.quantidade = quantidade.clamp(1, 99);
-    _mudou();
+  void changeQuantity(ItemHome item, int quantity) {
+    item.quantity = quantity.clamp(1, 99);
+    _changed();
   }
 
   /// Troca o aparelho de um item por um modelo mais economico, mantendo a quantidade.
-  void trocar(ItemCasa antigo, Consulta nova, Resultado resultado) {
-    final i = _itens.indexOf(antigo);
+  void replace(ItemHome old, Query newQuery, Result result) {
+    final i = _items.indexOf(old);
     if (i < 0) return;
-    _itens[i] = ItemCasa(_proximoId++, nova.copiar(), resultado, quantidade: antigo.quantidade);
-    _mudou();
+    _items[i] = ItemHome(_nextId++, newQuery.copy(), result, quantity: old.quantity);
+    _changed();
   }
 
-  void mudarMoradores(int n) {
-    moradores = n.clamp(1, 20);
-    _mudou();
+  void changeResidents(int n) {
+    residents = n.clamp(1, 20);
+    _changed();
   }
 
-  void lembrarTarifa(EscolhaTarifa tarifa) {
-    ultimaTarifa = tarifa;
+  void rememberTariff(TariffChoice tariff) {
+    lastTariff = tariff;
     notifyListeners();
   }
 
-  void guardarPerfil(Classificacao c) {
-    perfil = c;
+  void storeProfile(Classification c) {
+    profile = c;
     notifyListeners();
   }
 
-  void guardarPlano(EcoCoach p) {
-    plano = p;
+  void storePlan(EcoCoach p) {
+    plan = p;
     notifyListeners();
   }
 
   /// Trocou o idioma: o perfil e o plano vieram da API no idioma anterior e precisam ser pedidos de novo.
-  void esquecerTextosDaApi() {
-    perfil = null;
-    plano = null;
+  void forgetApiTexts() {
+    profile = null;
+    plan = null;
     notifyListeners();
   }
 
   /// Guarda a troca avaliada (a mesma dupla de aparelhos so aparece uma vez, com o valor mais novo).
-  void registrarTroca(TrocaAvaliada t) {
-    _trocas.removeWhere((x) => x.aparelho == t.aparelho && x.alternativa == t.alternativa);
-    _trocas.add(t);
-    if (_trocas.length > 5) _trocas.removeAt(0);
-    plano = null; // o plano precisa considerar a troca nova; o perfil nao muda
+  void registerSwap(EvaluatedSwap t) {
+    _swaps.removeWhere((x) => x.appliance == t.appliance && x.alternative == t.alternative);
+    _swaps.add(t);
+    if (_swaps.length > 5) _swaps.removeAt(0);
+    plan = null; // o plano precisa considerar a troca nova; o perfil nao muda
     notifyListeners();
   }
 
   /// Formato de POST /classificar.
-  List<Map<String, dynamic>> itensParaPerfil() => [
-    for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes},
+  List<Map<String, dynamic>> itemsForProfile() => [
+    for (final i in _items) {'categoria': i.result.category, 'kwh_mes': i.monthlyKwh},
   ];
 
   /// Formato de POST /eco-coach: igual ao do perfil, com o custo de cada item.
-  List<Map<String, dynamic>> itensParaEcoCoach() => [
-    for (final i in _itens) {'categoria': i.resultado.categoria, 'kwh_mes': i.kwhMes, 'custo_mes': i.custoMes},
+  List<Map<String, dynamic>> itemsForEcoCoach() => [
+    for (final i in _items) {'categoria': i.result.category, 'kwh_mes': i.monthlyKwh, 'custo_mes': i.monthlyCost},
   ];
 
   @visibleForTesting
-  void limpar() {
-    _itens.clear();
-    _trocas.clear();
-    moradores = 2;
-    ultimaTarifa = null;
-    perfil = null;
-    plano = null;
+  void clear() {
+    _items.clear();
+    _swaps.clear();
+    residents = 2;
+    lastTariff = null;
+    profile = null;
+    plan = null;
     notifyListeners();
   }
 }
 
 /// Unica casa do app (sem login, sem banco no celular).
-final casa = Casa();
+final home = Home();

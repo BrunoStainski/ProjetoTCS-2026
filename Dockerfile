@@ -13,10 +13,12 @@ COPY datasets/processed ./datasets/processed
 # so o K-Means (numeros puros, sem scikit-learn); o ctgan.pkl precisaria do torch
 COPY models/kmeans.pkl ./models/kmeans.pkl
 COPY models/refrigerador.pkl ./models/refrigerador.pkl
-# modelo de embeddings do Eco-Coach baixado no build (~220 MB): a API nao depende de download na 1a busca
-RUN python -c "from fastembed import TextEmbedding; TextEmbedding('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2', cache_dir='/app/models/fastembed')"
+# documentos do Eco-Coach + carga: com a base vazia (banco novo, ex.: Neon), a API carrega sozinha ao subir
+COPY datasets/raw/rag ./datasets/raw/rag
+COPY scripts/carregar_rag.py ./scripts/carregar_rag.py
 
 WORKDIR /app/src
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# porta: a do ambiente (o Render define PORT) ou 8000 (docker compose, Terraform)
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

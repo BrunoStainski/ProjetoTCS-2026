@@ -2,8 +2,10 @@
 Base vetorial do Eco-Coach (RAG): trechos de documentos oficiais guardados no PostgreSQL
 com a extensao pgvector.
 
-- Embeddings LOCAIS (fastembed, modelo multilingue pequeno, sem torch): nenhum texto sai do
-  computador para gerar os vetores, e nao depende de credito em API.
+- Embeddings pela API do Gemini (mesma GEMINI_API_KEY do Eco-Coach). Antes eram locais (fastembed), mas o
+  modelo ocupava ~550 MB de memoria e a API nao cabia no plano gratuito do Render (512 MB).
+  Vao para o Google so os trechos dos documentos publicos e as perguntas de busca (nomes de aparelhos),
+  nada do usuario. Modelo em GEMINI_EMBEDDING_MODEL (padrao gemini-embedding-001).
 - Os trechos vem de documentos publicos (Inmetro, Cemig); nada do usuario e gravado aqui.
 - Carga: scripts/carregar_rag.py (le datasets/raw/rag/ e o fontes.csv com a origem de cada um).
 """
@@ -13,11 +15,11 @@ from functools import lru_cache
 import banco
 import config
 
-MODELO_EMBEDDING = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-DIMENSAO = 384
-PASTA_MODELOS = config.RAIZ / "models" / "fastembed"  # cache do modelo (fora do git)
+EMBEDDING_MODEL = config._ENV.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001")
+DIMENSION = 768  # tamanho recomendado pelo Google (768, 1536 ou 3072)
+BATCH = 100  # textos por chamada na carga
 
-ESQUEMA_RAG = f"""
+RAG_SCHEMA = f"""
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TABLE IF NOT EXISTS trechos_rag (
     id            SERIAL PRIMARY KEY,
@@ -29,40 +31,66 @@ CREATE TABLE IF NOT EXISTS trechos_rag (
     secao         TEXT,                   -- ex.: GELADEIRA / FREEZER
     pagina        INTEGER,                -- so para PDF
     texto         TEXT NOT NULL,
-    embedding     vector({DIMENSAO}) NOT NULL,
+    embedding     vector({DIMENSION}) NOT NULL,
     carregado_em  TIMESTAMP NOT NULL DEFAULT now()
 );
 """
 
 
 @lru_cache(maxsize=1)
-def modelo():
-    from fastembed import TextEmbedding  # import aqui: so carrega o modelo quando precisa
-    PASTA_MODELOS.mkdir(parents=True, exist_ok=True)
-    return TextEmbedding(MODELO_EMBEDDING, cache_dir=str(PASTA_MODELOS))
+def _client():
+    key = config._ENV.get("GEMINI_API_KEY")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY nao configurada no .env")
+    from google import genai  # import aqui: so quando precisa
+    return genai.Client(api_key=key)
 
 
-def vetorizar(textos):
-    """Lista de textos -> lista de vetores (listas de float)."""
-    return [v.tolist() for v in modelo().embed(list(textos))]
+def vectorize(texts, task="RETRIEVAL_QUERY"):
+    """Lista de textos -> lista de vetores (listas de float).
+
+    task: RETRIEVAL_DOCUMENT na carga dos trechos, RETRIEVAL_QUERY na busca (o Gemini ajusta o vetor ao uso).
+    Falha do Gemini vira RuntimeError: a API responde 503 (Eco-Coach indisponivel), nao 500.
+    """
+    from google.genai import types
+
+    texts = list(texts)
+    config_embedding = types.EmbedContentConfig(task_type=task, output_dimensionality=DIMENSION)
+    vectors = []
+    try:
+        for start in range(0, len(texts), BATCH):
+            response = _client().models.embed_content(
+                model=EMBEDDING_MODEL, contents=texts[start:start + BATCH], config=config_embedding)
+            vectors += [list(e.values) for e in response.embeddings]
+    except RuntimeError:
+        raise
+    except Exception as error:  # limite do plano gratuito, rede, modelo fora do ar
+        raise RuntimeError(f"embeddings indisponiveis ({type(error).__name__})") from error
+    return vectors
 
 
-def literal_vetor(vetor):
+@lru_cache(maxsize=512)
+def _question_vector(question):
+    """As buscas se repetem muito (dicas do chuveiro, da geladeira...): cada pergunta vai uma vez so."""
+    return tuple(vectorize([question])[0])
+
+
+def literal_vector(vector):
     """Formato que o pgvector aceita: '[0.1,0.2,...]' (passado como parametro, nunca concatenado)."""
-    return "[" + ",".join(f"{x:.6f}" for x in vetor) + "]"
+    return "[" + ",".join(f"{x:.6f}" for x in vector) + "]"
 
 
-def base_carregada(con):
+def base_loaded(con):
     sql = "SELECT to_regclass('public.trechos_rag') IS NOT NULL"
-    if not banco.executar(con, sql).scalar_one():
+    if not banco.run(con, sql).scalar_one():
         return False
-    return banco.executar(con, "SELECT COUNT(*) FROM trechos_rag").scalar_one() > 0
+    return banco.run(con, "SELECT COUNT(*) FROM trechos_rag").scalar_one() > 0
 
 
-def buscar_trechos(con, pergunta, k=5):
+def search_chunks(con, question, k=5):
     """Os k trechos mais parecidos com a pergunta (distancia de cosseno do pgvector)."""
-    vetor = literal_vetor(vetorizar([pergunta])[0])
+    vector = literal_vector(_question_vector(question))
     sql = ("SELECT documento, orgao, url, secao, pagina, texto, "
            "1 - (embedding <=> CAST(? AS vector)) AS similaridade "
            "FROM trechos_rag ORDER BY embedding <=> CAST(? AS vector) LIMIT ?")
-    return banco.consulta(con, sql, (vetor, vetor, k)).to_dict("records")
+    return banco.query(con, sql, (vector, vector, k)).to_dict("records")
