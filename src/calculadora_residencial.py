@@ -13,6 +13,7 @@ import pandas as pd
 import config
 import estimativa
 from estimativa import tempo_por_dia
+from idioma import t, tr, unidades
 
 DIAS_MES = 30
 LIMITE_BUSCA = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
@@ -43,6 +44,7 @@ PREMISSAS = {
 HORAS_REFERENCIA_INMETRO = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
 HORAS_OPCIONAIS = {"ar_condicionado", "televisor"}
 NOMES_VELOCIDADES = {"baixa": "baixa", "media": "média", "alta": "alta"}
+NOMES_VELOCIDADES_EN = {"baixa": "low", "media": "medium", "alta": "high"}
 
 COLUNAS_NUM = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
@@ -388,88 +390,104 @@ def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=Non
     premissa = PREMISSAS.get(aparelho["categoria"], {})
     referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
     if horas_dia is not None and not 0 <= horas_dia <= 24:
-        raise ValueError("horas por dia precisa estar entre 0 e 24")
+        raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
+    informado = tr("informado", "entered")
+    ajuste = tr("informe as horas de uso para ajustar", "enter the hours of use to adjust")
 
     if velocidade and pd.notna(aparelho.get(f"kwh_mes_{velocidade}")):
         kwh = float(aparelho[f"kwh_mes_{velocidade}"])
-        nome = NOMES_VELOCIDADES.get(velocidade, velocidade)
+        nome = tr(NOMES_VELOCIDADES.get(velocidade, velocidade), NOMES_VELOCIDADES_EN.get(velocidade, velocidade))
         if horas_dia is not None and referencia:
             return {"kwh_mes": kwh * horas_dia / referencia,
-                    "metodo": (f"consumo do Inmetro na velocidade {nome} ({kwh:g} kWh/mês para "
-                               f"{tempo_por_dia(referencia)}) ajustado para {tempo_por_dia(horas_dia)} (informado)"),
+                    "metodo": tr(f"consumo do Inmetro na velocidade {nome} ({kwh:g} kWh/mês para "
+                                 f"{tempo_por_dia(referencia)}) ajustado para {tempo_por_dia(horas_dia)} (informado)",
+                                 f"Inmetro consumption at {nome} speed ({kwh:g} kWh/month for "
+                                 f"{tempo_por_dia(referencia)}) adjusted to {tempo_por_dia(horas_dia)} (entered)"),
                     "premissa": False}
-        metodo = f"consumo mensal do Inmetro, velocidade {nome}"
+        metodo = tr(f"consumo mensal do Inmetro, velocidade {nome}", f"Inmetro monthly consumption, {nome} speed")
         if referencia:
-            metodo += f" ({tempo_por_dia(referencia)} no ensaio; informe as horas de uso para ajustar)"
+            metodo += tr(f" ({tempo_por_dia(referencia)} no ensaio; {ajuste})",
+                         f" ({tempo_por_dia(referencia)} in the test; {ajuste})")
         return {"kwh_mes": kwh, "metodo": metodo, "premissa": False}
 
     if horas_dia is not None and (aparelho["categoria"] in HORAS_OPCIONAIS or referencia):
         if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
             return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
-                    "metodo": (f"{aparelho['potencia_w']:g} W (potência em carga total) x "
-                               f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor máximo, "
-                               "o compressor não fica ligado o tempo todo"),
+                    "metodo": tr(f"{aparelho['potencia_w']:g} W (potência em carga total) x "
+                                 f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor máximo, "
+                                 "o compressor não fica ligado o tempo todo",
+                                 f"{aparelho['potencia_w']:g} W (power at full load) x "
+                                 f"{tempo_por_dia(horas_dia)} x {dias} days (entered); maximum value, "
+                                 "the compressor is not on all the time"),
                     "premissa": False}
         if referencia and pd.notna(aparelho["kwh_mes"]):
             return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
-                    "metodo": (f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
-                               f"ajustado para {tempo_por_dia(horas_dia)} (informado)"),
+                    "metodo": tr(f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
+                                 f"ajustado para {tempo_por_dia(horas_dia)} (informado)",
+                                 f"Inmetro monthly consumption ({aparelho['kwh_mes']:g} kWh for {referencia:g} h/day) "
+                                 f"adjusted to {tempo_por_dia(horas_dia)} (entered)"),
                     "premissa": False}
 
     if pd.notna(aparelho["kwh_mes"]):
-        metodo = "consumo mensal do Inmetro"
+        metodo = tr("consumo mensal do Inmetro", "Inmetro monthly consumption")
         if referencia:
-            metodo += f" ({tempo_por_dia(referencia)} no ensaio; informe as horas de uso para ajustar)"
+            metodo += tr(f" ({tempo_por_dia(referencia)} no ensaio; {ajuste})",
+                         f" ({tempo_por_dia(referencia)} in the test; {ajuste})")
         elif aparelho["categoria"] in HORAS_OPCIONAIS:
-            metodo += " (uso padrão do ensaio; informe as horas de uso para ajustar)"
+            metodo += tr(f" (uso padrão do ensaio; {ajuste})", f" (standard test use; {ajuste})")
         return {"kwh_mes": float(aparelho["kwh_mes"]), "metodo": metodo, "premissa": False}
 
     if pd.notna(aparelho["kwh_ciclo"]):
         ciclos = ciclos_mes if ciclos_mes is not None else premissa.get("ciclos_mes")
         if ciclos is None:
-            raise ValueError("informe quantos ciclos por mes")
+            raise ValueError(tr("informe quantos ciclos por mes", "enter how many cycles per month"))
         if ciclos < 0:
-            raise ValueError("ciclos por mes nao pode ser negativo")
-        origem = "informado" if ciclos_mes is not None else "estimativa do grupo"
+            raise ValueError(tr("ciclos por mes nao pode ser negativo", "cycles per month cannot be negative"))
+        origem = informado if ciclos_mes is not None else tr("estimativa do grupo", "group estimate")
         return {"kwh_mes": float(aparelho["kwh_ciclo"]) * ciclos,
-                "metodo": f"{aparelho['kwh_ciclo']:g} kWh por ciclo x {ciclos:g} ciclos por mês ({origem})",
+                "metodo": tr(f"{aparelho['kwh_ciclo']:g} kWh por ciclo x {ciclos:g} ciclos por mês ({origem})",
+                             f"{aparelho['kwh_ciclo']:g} kWh per cycle x {ciclos:g} cycles per month ({origem})"),
                 "premissa": ciclos_mes is None}
 
     if pd.notna(aparelho["potencia_w"]):
         horas = horas_dia if horas_dia is not None else premissa.get("horas_dia")
         if horas is None:
-            raise ValueError("informe quantas horas por dia o aparelho fica ligado")
+            raise ValueError(tr("informe quantas horas por dia o aparelho fica ligado",
+                                "enter how many hours per day the appliance is on"))
         if not 0 <= horas <= 24:
-            raise ValueError("horas por dia precisa estar entre 0 e 24")
+            raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
         standby = aparelho.get("standby_kwh_mes")
         standby = 0.0 if pd.isna(standby) else float(standby)
-        origem = "informado" if horas_dia is not None else "estimativa do grupo"
-        metodo = f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} dias ({origem})"
+        origem = informado if horas_dia is not None else tr("estimativa do grupo", "group estimate")
+        metodo = tr(f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} dias ({origem})",
+                    f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} days ({origem})")
         if standby:
-            metodo += f" + {standby:.2f} kWh de stand-by"
+            metodo += tr(f" + {standby:.2f} kWh de stand-by", f" + {standby:.2f} kWh of standby")
         return {"kwh_mes": float(aparelho["potencia_w"]) * horas * dias / 1000 + standby,
                 "metodo": metodo, "premissa": horas_dia is None}
 
-    raise ValueError("aparelho sem dados de consumo")
+    raise ValueError(tr("aparelho sem dados de consumo", "appliance without consumption data"))
 
 
 def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa, uf, horas_dia=None,
                      tarifa_do_usuario=False):
     """Dicionario final que a tela mostra e que vai para a tabela consultas."""
     custo_mes = consumo["kwh_mes"] * tarifa_kwh
-    avisos = [AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO]
+    avisos = [t(AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO)]
     if consumo.get("premissa"):
-        avisos.append("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.")
+        avisos.append(tr("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.",
+                         "The time of use is an estimate made by our team. Enter yours for a more accurate value."))
     if aparelho.get("origem_dado") == ORIGEM_CONVERTIDA:
-        avisos.append(AVISO_CONVERTIDO)
+        avisos.append(t(AVISO_CONVERTIDO))
     elif aparelho.get("origem_dado") not in (None, "informado"):
-        avisos.append("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).")
+        avisos.append(tr("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).",
+                         "This model's consumption was filled in during data cleaning (it did not come from Inmetro)."))
     detalhe = aparelho.get("detalhe")
     return {
         "categoria": aparelho["categoria"],
         "marca": aparelho["marca"],
         "modelo": aparelho["modelo"],
-        "detalhe": "" if detalhe is None or pd.isna(detalhe) else detalhe,
+        "detalhe": "" if detalhe is None or pd.isna(detalhe) else unidades(detalhe),
         "distribuidora": distribuidora or "-",
         "uf": uf if isinstance(uf, str) and uf else "-",
         "horas_dia": horas_dia,

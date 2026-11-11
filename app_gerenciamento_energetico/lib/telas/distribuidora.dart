@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
 import 'resultado.dart';
@@ -80,30 +81,38 @@ class _TelaEstadoState extends State<TelaEstado> {
     final t = Iamp.de(context);
     final ultima = casa.ultimaTarifa;
     return Pagina(
-      titulo: 'Sua energia',
+      titulo: tr('Sua energia', 'Your electricity'),
       etapa: etapaDoCalculo(widget.consulta, 4),
       filho: ListView(
         children: [
           if (ultima != null) ...[
-            const CabecalhoPergunta('Usar a mesma conta de luz de antes?'),
+            CabecalhoPergunta(tr('Usar a mesma conta de luz de antes?', 'Use the same electricity bill as before?')),
             CartaoOpcao(
               icone: Icons.bolt,
-              titulo: 'Sim, usar ${ultima.descricao}',
-              subtitulo: 'Tarifa de ${reais(ultima.tarifaKwh, casas: 4)} por kWh',
+              titulo: tr('Sim, usar ${ultima.descricao}', 'Yes, use ${ultima.descricao}'),
+              subtitulo: tr(
+                'Tarifa de ${reais(ultima.tarifaKwh, casas: 4)} por kWh',
+                'Rate of ${reais(ultima.tarifaKwh, casas: 4)} per kWh',
+              ),
               onTap: () => calcularCom(context, widget.consulta, ultima),
             ),
             const SizedBox(height: Espaco.m),
-            Text('Ou escolha outro estado:', style: t.forte),
+            Text(tr('Ou escolha outro estado:', 'Or pick another state:'), style: t.forte),
             const SizedBox(height: Espaco.p),
           ] else
-            const CabecalhoPergunta(
-              'Em qual estado você mora?',
-              ajuda: 'Assim achamos a sua distribuidora de energia e o preço do kWh.',
+            CabecalhoPergunta(
+              tr('Em qual estado você mora?', 'Which Brazilian state do you live in?'),
+              ajuda: tr(
+                'Assim achamos a sua distribuidora de energia e o preço do kWh.',
+                'This is how we find your power company and the price of a kWh.',
+              ),
             ),
           FutureBuilder<List<String>>(
             future: _ufs,
             builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Carregando os estados...');
+              if (snap.connectionState != ConnectionState.done) {
+                return Carregando(texto: tr('Carregando os estados...', 'Loading states...'));
+              }
               if (snap.hasError) {
                 return MensagemErro(
                   snap.error.toString(),
@@ -124,8 +133,8 @@ class _TelaEstadoState extends State<TelaEstado> {
           const SizedBox(height: Espaco.m),
           CartaoOpcao(
             icone: Icons.receipt_long,
-            titulo: 'Prefiro digitar a tarifa da minha conta',
-            subtitulo: 'Se você tem a conta de luz em mãos.',
+            titulo: tr('Prefiro digitar a tarifa da minha conta', "I'd rather type the rate from my bill"),
+            subtitulo: tr('Se você tem a conta de luz em mãos.', 'If you have your electricity bill at hand.'),
             onTap: _digitarTarifa,
           ),
         ],
@@ -175,7 +184,9 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
       filho: FutureBuilder<List<Distribuidora>>(
         future: _distribuidoras,
         builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Carregando as distribuidoras...');
+          if (snap.connectionState != ConnectionState.done) {
+            return Carregando(texto: tr('Carregando as distribuidoras...', 'Loading power companies...'));
+          }
           if (snap.hasError) {
             return MensagemErro(
               snap.error.toString(),
@@ -188,23 +199,32 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
           final lista = _filtradas(todas);
           return ListView(
             children: [
-              const CabecalhoPergunta(
-                'Qual é a sua distribuidora de energia?',
-                ajuda: 'É a empresa que manda a conta de luz. O nome aparece no alto da conta.',
+              CabecalhoPergunta(
+                tr('Qual é a sua distribuidora de energia?', 'Which is your power company?'),
+                ajuda: tr(
+                  'É a empresa que manda a conta de luz. O nome aparece no alto da conta.',
+                  'It is the company that sends your electricity bill. Its name is at the top of the bill.',
+                ),
               ),
               if (todas.length > 5) ...[
                 TextField(
                   controller: _filtro,
                   onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(labelText: 'Procurar pelo nome', prefixIcon: Icon(Icons.search)),
+                  decoration: InputDecoration(
+                    labelText: tr('Procurar pelo nome', 'Search by name'),
+                    prefixIcon: const Icon(Icons.search),
+                  ),
                 ),
                 const SizedBox(height: Espaco.p),
               ],
-              if (lista.isEmpty) Text('Nenhuma distribuidora com esse nome.', style: t.corpo),
+              if (lista.isEmpty) Text(tr('Nenhuma distribuidora com esse nome.', 'No power company with that name.'), style: t.corpo),
               for (final d in lista)
                 CartaoOpcao(
                   titulo: d.nome,
-                  subtitulo: 'Tarifa de ${reais(d.tarifaKwh, casas: 4)} por kWh',
+                  subtitulo: tr(
+                    'Tarifa de ${reais(d.tarifaKwh, casas: 4)} por kWh',
+                    'Rate of ${reais(d.tarifaKwh, casas: 4)} per kWh',
+                  ),
                   onTap: () => calcularCom(context, widget.consulta, EscolhaTarifa.daDistribuidora(d)),
                 ),
             ],
@@ -238,7 +258,7 @@ class _TelaTarifaContaState extends State<TelaTarifaConta> {
   void _calcular() {
     final tarifa = lerNumero(_tarifa.text);
     if (tarifa == null || tarifa <= 0 || tarifa > 10) {
-      setState(() => _erro = 'Informe o valor em reais por kWh. Ex.: 0,85.');
+      setState(() => _erro = tr('Informe o valor em reais por kWh. Ex.: 0,85.', 'Enter the price in reais per kWh. E.g.: 0.85.'));
       return;
     }
     setState(() => _erro = null);
@@ -248,15 +268,19 @@ class _TelaTarifaContaState extends State<TelaTarifaConta> {
   @override
   Widget build(BuildContext context) {
     return Pagina(
-      titulo: 'Tarifa da conta',
+      titulo: tr('Tarifa da conta', 'Rate from your bill'),
       etapa: etapaDoCalculo(widget.consulta, 5),
-      rodape: FilledButton(onPressed: _calcular, child: const Text('Calcular')),
+      rodape: FilledButton(onPressed: _calcular, child: Text(tr('Calcular', 'Calculate'))),
       filho: ListView(
         children: [
-          const CabecalhoPergunta(
-            'Quanto custa o kWh na sua conta?',
-            ajuda: 'Divida o valor total da conta pelo consumo do mês em kWh. '
-                'Ex.: R\$ 170,00 ÷ 200 kWh = 0,85.',
+          CabecalhoPergunta(
+            tr('Quanto custa o kWh na sua conta?', 'How much does a kWh cost on your bill?'),
+            ajuda: tr(
+              'Divida o valor total da conta pelo consumo do mês em kWh. '
+                  'Ex.: R\$ 170,00 ÷ 200 kWh = 0,85.',
+              "Divide the bill's total by the month's consumption in kWh. "
+                  'E.g.: R\$ 170.00 ÷ 200 kWh = 0.85.',
+            ),
           ),
           TextField(
             controller: _tarifa,
@@ -264,8 +288,8 @@ class _TelaTarifaContaState extends State<TelaTarifaConta> {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             onSubmitted: (_) => _calcular(),
             decoration: InputDecoration(
-              labelText: 'Reais por kWh',
-              hintText: 'Ex.: 0,85',
+              labelText: tr('Reais por kWh', 'Reais (R\$) per kWh'),
+              hintText: tr('Ex.: 0,85', 'E.g.: 0.85'),
               prefixText: 'R\$ ',
               errorText: _erro,
             ),

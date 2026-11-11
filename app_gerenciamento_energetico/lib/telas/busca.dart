@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
@@ -40,15 +41,21 @@ class _TelaBuscaState extends State<TelaBusca> {
       etapa: const Etapa(1, totalEtapas),
       filho: ListView(
         children: [
-          const CabecalhoPergunta(
-            'Qual aparelho você quer calcular?',
-            ajuda: 'Mostramos quanto ele pesa na sua conta de luz, com dados oficiais do Inmetro e da ANEEL.',
+          CabecalhoPergunta(
+            tr('Qual aparelho você quer calcular?', 'Which appliance do you want to calculate?'),
+            ajuda: tr(
+              'Mostramos quanto ele pesa na sua conta de luz, com dados oficiais do Inmetro e da ANEEL.',
+              'We show how much it adds to your electricity bill, using official data from Inmetro and ANEEL '
+                  '(Brazilian energy regulators).',
+            ),
           ),
           const _ResumoCasa(),
           FutureBuilder<List<String>>(
             future: _categorias,
             builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Carregando os aparelhos...');
+              if (snap.connectionState != ConnectionState.done) {
+                return Carregando(texto: tr('Carregando os aparelhos...', 'Loading appliances...'));
+              }
               if (snap.hasError) {
                 return MensagemErro(
                   snap.error.toString(),
@@ -63,8 +70,11 @@ class _TelaBuscaState extends State<TelaBusca> {
           const SizedBox(height: Espaco.p),
           CartaoOpcao(
             icone: Icons.search,
-            titulo: 'Procurar pela marca',
-            subtitulo: 'Se você não sabe o tipo ou quer ver todos os aparelhos de uma marca.',
+            titulo: tr('Procurar pela marca', 'Search by brand'),
+            subtitulo: tr(
+              'Se você não sabe o tipo ou quer ver todos os aparelhos de uma marca.',
+              "If you don't know the type or want to see every appliance from a brand.",
+            ),
             onTap: () => _abrirModelo(null),
           ),
           const SizedBox(height: Espaco.p),
@@ -202,7 +212,7 @@ class _TelaModeloState extends State<TelaModelo> {
   Future<void> _buscar() async {
     final busca = _texto.text.trim();
     if (busca.length < 2) {
-      setState(() => _erro = 'Digite pelo menos 2 letras da marca ou do modelo.');
+      setState(() => _erro = tr('Digite pelo menos 2 letras da marca ou do modelo.', 'Type at least 2 letters of the brand or model.'));
       return;
     }
     FocusScope.of(context).unfocus(); // fecha o teclado para mostrar os resultados
@@ -231,20 +241,26 @@ class _TelaModeloState extends State<TelaModelo> {
     final c = widget.categoria;
     final resultados = _resultados;
     return Pagina(
-      titulo: c == null ? 'Procurar aparelho' : nomeDaCategoria(c),
+      titulo: c == null ? tr('Procurar aparelho', 'Find an appliance') : nomeDaCategoria(c),
       etapa: const Etapa(2, totalEtapas),
       rodape: FilledButton.icon(
         onPressed: _carregando ? null : _buscar,
         icon: const Icon(Icons.search),
-        label: const Text('Buscar'),
+        label: Text(tr('Buscar', 'Search')),
       ),
       filho: ListView(
         children: [
           CabecalhoPergunta(
-            'Qual é a marca e o modelo?',
+            tr('Qual é a marca e o modelo?', 'What is the brand and model?'),
             ajuda: c == null
-                ? 'Pode digitar só a marca. A marca e o modelo estão na etiqueta do aparelho ou no manual.'
-                : 'Escolha a marca na lista ou digite a marca e o modelo. Eles estão na etiqueta ${c == 'chuveiro' ? 'da embalagem' : 'do aparelho'} ou no manual.',
+                ? tr(
+                    'Pode digitar só a marca. A marca e o modelo estão na etiqueta do aparelho ou no manual.',
+                    "You can type just the brand. The brand and model are on the appliance's label or in the manual.",
+                  )
+                : tr(
+                    'Escolha a marca na lista ou digite a marca e o modelo. Eles estão na etiqueta ${c == 'chuveiro' ? 'da embalagem' : 'do aparelho'} ou no manual.',
+                    'Pick the brand from the list or type the brand and model. They are on the label ${c == 'chuveiro' ? 'of the box' : 'of the appliance'} or in the manual.',
+                  ),
           ),
           TextField(
             controller: _texto,
@@ -253,16 +269,22 @@ class _TelaModeloState extends State<TelaModelo> {
             onChanged: _digitou,
             onSubmitted: (_) => _buscar(),
             decoration: InputDecoration(
-              labelText: 'Marca e/ou modelo',
-              hintText: 'Ex.: Brastemp, Bosch EWI, Samsung',
-              suffixIcon: IconButton(tooltip: 'Buscar', icon: const Icon(Icons.search), onPressed: _buscar),
+              labelText: tr('Marca e/ou modelo', 'Brand and/or model'),
+              hintText: tr('Ex.: Brastemp, Bosch EWI, Samsung', 'E.g.: Brastemp, Bosch EWI, Samsung'),
+              suffixIcon: IconButton(tooltip: tr('Buscar', 'Search'), icon: const Icon(Icons.search), onPressed: _buscar),
             ),
           ),
           const SizedBox(height: Espaco.m),
-          if (_carregando) const Carregando(texto: 'Procurando...'),
+          if (_carregando) Carregando(texto: tr('Procurando...', 'Searching...')),
           if (_erro != null) MensagemErro(_erro!),
           if (!_carregando && resultados != null && resultados.isEmpty) ...[
-            Text('Nenhum aparelho encontrado. Tente só a marca ou parte do modelo.', style: t.corpo),
+            Text(
+              tr(
+                'Nenhum aparelho encontrado. Tente só a marca ou parte do modelo.',
+                'No appliance found. Try just the brand or part of the model.',
+              ),
+              style: t.corpo,
+            ),
             const SizedBox(height: Espaco.m),
             const ChamadaEstimar(),
           ],
@@ -270,7 +292,9 @@ class _TelaModeloState extends State<TelaModelo> {
             Semantics(
               liveRegion: true,
               child: Text(
-                resultados.length == 1 ? '1 aparelho encontrado' : '${resultados.length} aparelhos encontrados',
+                resultados.length == 1
+                    ? tr('1 aparelho encontrado', '1 appliance found')
+                    : tr('${resultados.length} aparelhos encontrados', '${resultados.length} appliances found'),
                 style: t.rotulo,
               ),
             ),
@@ -283,7 +307,7 @@ class _TelaModeloState extends State<TelaModelo> {
           // lista de marcas do tipo escolhido (some enquanto o resultado de uma busca esta na tela)
           if (c != null && resultados == null && !_carregando) ...[
             const SizedBox(height: Espaco.p),
-            Text('Ou escolha a marca', style: t.forte),
+            Text(tr('Ou escolha a marca', 'Or pick the brand'), style: t.forte),
             const SizedBox(height: Espaco.p),
             _ListaDeMarcas(
               categoria: c,
@@ -321,24 +345,38 @@ class _ListaDeMarcas extends StatelessWidget {
     return FutureBuilder<List<Marca>>(
       future: marcas,
       builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Carregando as marcas...');
+        if (snap.connectionState != ConnectionState.done) {
+          return Carregando(texto: tr('Carregando as marcas...', 'Loading brands...'));
+        }
         if (snap.hasError) {
           final erro = snap.error;
-          return MensagemErro(erro is ApiErro ? erro.mensagem : 'Não deu para carregar as marcas.', tentarDeNovo: tentarDeNovo);
+          return MensagemErro(
+            erro is ApiErro ? erro.mensagem : tr('Não deu para carregar as marcas.', 'Could not load the brands.'),
+            tentarDeNovo: tentarDeNovo,
+          );
         }
         final visiveis = [
           for (final m in snap.data!)
             if (m.nome.toLowerCase().contains(filtro)) m,
         ];
         if (visiveis.isEmpty) {
-          return Text('Nenhuma marca com "$filtro". Toque em Buscar para procurar pelo modelo.', style: t.corpo);
+          return Text(
+            tr(
+              'Nenhuma marca com "$filtro". Toque em Buscar para procurar pelo modelo.',
+              'No brand matches "$filtro". Tap Search to look for the model.',
+            ),
+            style: t.corpo,
+          );
         }
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Semantics(
               liveRegion: true,
-              child: Text(visiveis.length == 1 ? '1 marca' : '${visiveis.length} marcas', style: t.rotulo),
+              child: Text(
+                visiveis.length == 1 ? tr('1 marca', '1 brand') : tr('${visiveis.length} marcas', '${visiveis.length} brands'),
+                style: t.rotulo,
+              ),
             ),
             const SizedBox(height: Espaco.p),
             // a chave e a marca: ao filtrar, cada secao continua com os modelos que ja carregou
@@ -378,7 +416,10 @@ class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
       clipBehavior: Clip.antiAlias,
       child: ExpansionTile(
         title: Text(m.nome, style: t.forte),
-        subtitle: Text(m.modelos == 1 ? '1 modelo' : '${m.modelos} modelos', style: t.secundario),
+        subtitle: Text(
+          m.modelos == 1 ? tr('1 modelo', '1 model') : tr('${m.modelos} modelos', '${m.modelos} models'),
+          style: t.secundario,
+        ),
         onExpansionChanged: (aberta) {
           if (aberta && _modelos == null) setState(_carregar);
         },
@@ -387,14 +428,17 @@ class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
             future: _modelos,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
-                return const Padding(padding: EdgeInsets.all(Espaco.m), child: Carregando(texto: 'Carregando os modelos...'));
+                return Padding(
+                  padding: const EdgeInsets.all(Espaco.m),
+                  child: Carregando(texto: tr('Carregando os modelos...', 'Loading models...')),
+                );
               }
               if (snap.hasError) {
                 final erro = snap.error;
                 return Padding(
                   padding: const EdgeInsets.all(Espaco.m),
                   child: MensagemErro(
-                    erro is ApiErro ? erro.mensagem : 'Não deu para carregar os modelos.',
+                    erro is ApiErro ? erro.mensagem : tr('Não deu para carregar os modelos.', 'Could not load the models.'),
                     tentarDeNovo: () => setState(_carregar),
                   ),
                 );
@@ -417,7 +461,10 @@ class _SecaoDaMarcaState extends State<_SecaoDaMarca> {
                     Padding(
                       padding: const EdgeInsets.all(Espaco.m),
                       child: Text(
-                        'Mostrando ${lista.length} de $total. Digite o modelo no campo acima para achar os outros.',
+                        tr(
+                          'Mostrando ${lista.length} de $total. Digite o modelo no campo acima para achar os outros.',
+                          'Showing ${lista.length} of $total. Type the model in the field above to find the others.',
+                        ),
                         style: t.secundario,
                       ),
                     ),
@@ -475,7 +522,7 @@ class _SecaoDoTipo extends StatelessWidget {
         initiallyExpanded: aberta,
         leading: Icon(iconeDaCategoria(tipo)),
         title: Text(tituloDaCategoria(tipo), style: t.forte),
-        subtitle: Text(total == 1 ? '1 modelo' : '$total modelos', style: t.secundario),
+        subtitle: Text(total == 1 ? tr('1 modelo', '1 model') : tr('$total modelos', '$total models'), style: t.secundario),
         children: [
           for (final a in lista) ...[
             const Divider(height: 1),
@@ -491,7 +538,10 @@ class _SecaoDoTipo extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.all(Espaco.m),
               child: Text(
-                'Mostrando ${lista.length} de $total. Digite parte do modelo para achar os outros.',
+                tr(
+                  'Mostrando ${lista.length} de $total. Digite parte do modelo para achar os outros.',
+                  'Showing ${lista.length} of $total. Type part of the model to find the others.',
+                ),
                 style: t.secundario,
               ),
             ),
@@ -513,9 +563,12 @@ class ChamadaEstimar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         leading: Icon(Icons.calculate_outlined, size: t.iconeGrande),
-        title: const Text('Não achou? Estime o gasto'),
-        subtitle: const Text(
-          'Para aparelhos mais antigos (geladeira, máquina de lavar, ar...) ou eletroportáteis como air fryer e secador.',
+        title: Text(tr('Não achou? Estime o gasto', "Can't find it? Estimate the cost")),
+        subtitle: Text(
+          tr(
+            'Para aparelhos mais antigos (geladeira, máquina de lavar, ar...) ou eletroportáteis como air fryer e secador.',
+            'For older appliances (fridge, washing machine, AC...) or small appliances like an air fryer or hair dryer.',
+          ),
         ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TelaEstimar())),
@@ -541,8 +594,13 @@ class _ResumoCasa extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               leading: const Icon(Icons.home_outlined),
-              title: Text('Minha casa: ${reais(casa.custoMes)} por mês'),
-              subtitle: Text('$n ${n == 1 ? 'aparelho' : 'aparelhos'} · toque para ver'),
+              title: Text(tr('Minha casa: ${reais(casa.custoMes)} por mês', 'My home: ${reais(casa.custoMes)} per month')),
+              subtitle: Text(
+                tr(
+                  '$n ${n == 1 ? 'aparelho' : 'aparelhos'} · toque para ver',
+                  '$n ${n == 1 ? 'appliance' : 'appliances'} · tap to view',
+                ),
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => irPara(Aba.casa),
             ),

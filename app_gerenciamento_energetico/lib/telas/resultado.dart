@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
@@ -39,7 +40,7 @@ class _TelaResultadoState extends State<TelaResultado> {
   void _adicionar(Resultado r) {
     casa.adicionar(widget.consulta, r);
     setState(() => _adicionado = true);
-    avisarAdicionado(ScaffoldMessenger.of(context), '${r.nome} foi para a sua casa.');
+    avisarAdicionado(ScaffoldMessenger.of(context), tr('${r.nome} foi para a sua casa.', '${r.nome} was added to your home.'));
   }
 
   @override
@@ -49,16 +50,16 @@ class _TelaResultadoState extends State<TelaResultado> {
       builder: (context, snap) {
         final r = snap.connectionState == ConnectionState.done && !snap.hasError ? snap.data : null;
         return Pagina(
-          titulo: 'Quanto custa',
+          titulo: tr('Quanto custa', 'How much it costs'),
           etapa: etapaDoCalculo(widget.consulta, 6),
           rodape: r == null
               ? null
               : BotaoComConfirmacao(
                   feito: _adicionado,
-                  textoAcao: 'Adicionar à minha casa',
+                  textoAcao: tr('Adicionar à minha casa', 'Add to my home'),
                   iconeAcao: Icons.add_home_outlined,
                   onAcao: () => _adicionar(r),
-                  textoFeito: 'Está na sua casa: ver o total',
+                  textoFeito: tr('Está na sua casa: ver o total', 'It is in your home: see the total'),
                   onFeito: () => irPara(Aba.casa, fecharAtual: true),
                 ),
           filho: _corpo(snap),
@@ -68,7 +69,7 @@ class _TelaResultadoState extends State<TelaResultado> {
   }
 
   Widget _corpo(AsyncSnapshot<Resultado> snap) {
-    if (snap.connectionState != ConnectionState.done) return const Carregando(texto: 'Calculando...');
+    if (snap.connectionState != ConnectionState.done) return Carregando(texto: tr('Calculando...', 'Calculating...'));
     if (snap.hasError) {
       return MensagemErro(
         snap.error.toString(),
@@ -89,19 +90,19 @@ class _TelaResultadoState extends State<TelaResultado> {
               MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta, atual: r)),
             ),
             icon: const Icon(Icons.trending_down),
-            label: const Text('Ver modelos que gastam menos'),
+            label: Text(tr('Ver modelos que gastam menos', 'See models that use less')),
           ),
         if (widget.consulta.portatil)
           OutlinedButton.icon(
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: r))),
             icon: const Icon(Icons.tips_and_updates_outlined),
-            label: const Text('Como gastar menos com ele'),
+            label: Text(tr('Como gastar menos com ele', 'How to spend less on it')),
           ),
         const SizedBox(height: Espaco.p),
         TextButton.icon(
           onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
           icon: const Icon(Icons.restart_alt),
-          label: const Text('Calcular outro aparelho'),
+          label: Text(tr('Calcular outro aparelho', 'Calculate another appliance')),
         ),
       ],
     );
@@ -144,17 +145,26 @@ class DetalhesDoResultado extends StatelessWidget {
         ),
         const SizedBox(height: Espaco.m),
         CartaoDestaque(
-          titulo: r.aproximado ? 'Gasto aproximado por mês' : 'Gasto por mês',
+          titulo: r.aproximado
+              ? tr('Gasto aproximado por mês', 'Approximate cost per month')
+              : tr('Gasto por mês', 'Cost per month'),
           valor: r.custoMes,
           formatar: reais,
           rodape: [
-            if (r.temFaixa) 'Entre ${reais(r.custoMinMes!)} e ${reais(r.custoMaxMes!)}',
-            '${reais(r.custoAno)} por ano',
+            if (r.temFaixa)
+              tr(
+                'Entre ${reais(r.custoMinMes!)} e ${reais(r.custoMaxMes!)}',
+                'Between ${reais(r.custoMinMes!)} and ${reais(r.custoMaxMes!)}',
+              ),
+            tr('${reais(r.custoAno)} por ano', '${reais(r.custoAno)} per year'),
           ].join(' · '),
         ),
         const SizedBox(height: Espaco.p),
         Text(
-          'Consumo de ${numero(r.kwhMes)} kWh por mês, com a energia a ${reais(r.tarifaKwh, casas: 4)} o kWh.',
+          tr(
+            'Consumo de ${numero(r.kwhMes)} kWh por mês, com a energia a ${reais(r.tarifaKwh, casas: 4)} o kWh.',
+            'Uses ${numero(r.kwhMes)} kWh per month, with electricity at ${reais(r.tarifaKwh, casas: 4)} per kWh.',
+          ),
           style: t.secundario,
           textAlign: TextAlign.center,
         ),
@@ -164,14 +174,14 @@ class DetalhesDoResultado extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: ExpansionTile(
             leading: const Icon(Icons.info_outline),
-            title: Text('Como calculamos', style: t.forte),
-            subtitle: Text('Fórmula e fonte da tarifa', style: t.secundario),
+            title: Text(tr('Como calculamos', 'How we calculated'), style: t.forte),
+            subtitle: Text(tr('Fórmula e fonte da tarifa', 'Formula and rate source'), style: t.secundario),
             childrenPadding: const EdgeInsets.fromLTRB(Espaco.m, 0, Espaco.m, Espaco.m),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(r.metodo, style: t.corpo),
               const SizedBox(height: Espaco.pm),
-              Text('Fonte da tarifa', style: t.rotulo),
+              Text(tr('Fonte da tarifa', 'Rate source'), style: t.rotulo),
               Text(r.origemTarifa, style: t.corpo),
             ],
           ),

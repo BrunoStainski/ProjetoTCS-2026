@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../casa.dart';
+import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'comum.dart';
@@ -50,10 +51,10 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text('${item.resultado.nome} saiu da sua casa.'),
+          content: Text(tr('${item.resultado.nome} saiu da sua casa.', '${item.resultado.nome} was removed from your home.')),
           duration: duracaoAviso,
           persist: false,
-          action: SnackBarAction(label: 'Desfazer', onPressed: () => casa.reinserir(item, posicao)),
+          action: SnackBarAction(label: tr('Desfazer', 'Undo'), onPressed: () => casa.reinserir(item, posicao)),
         ),
       );
   }
@@ -63,7 +64,7 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
     return ListenableBuilder(
       listenable: casa,
       builder: (context, _) =>
-          Pagina(titulo: 'Minha casa', rodape: _rodape(), filho: casa.vazia ? const _CasaVazia() : _lista()),
+          Pagina(titulo: tr('Minha casa', 'My home'), rodape: _rodape(), filho: casa.vazia ? const _CasaVazia() : _lista()),
     );
   }
 
@@ -73,14 +74,14 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
       return FilledButton.icon(
         onPressed: () => irPara(Aba.calcular, recomecar: true),
         icon: const Icon(Icons.calculate_outlined),
-        label: const Text('Calcular um aparelho'),
+        label: Text(tr('Calcular um aparelho', 'Calculate an appliance')),
       );
     }
     if (casa.perfil != null) {
       return FilledButton.icon(
         onPressed: () => irPara(Aba.economizar),
         icon: const Icon(Icons.savings_outlined),
-        label: const Text('Ver como economizar'),
+        label: Text(tr('Ver como economizar', 'See how to save')),
       );
     }
     return FilledButton.icon(
@@ -88,7 +89,7 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
       icon: _classificando
           ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.insights),
-      label: Text(_classificando ? 'Comparando...' : 'Comparar com outras casas'),
+      label: Text(_classificando ? tr('Comparando...', 'Comparing...') : tr('Comparar com outras casas', 'Compare with other homes')),
     );
   }
 
@@ -99,37 +100,48 @@ class _TelaMinhaCasaState extends State<TelaMinhaCasa> {
     return ListView(
       children: [
         CartaoDestaque(
-          titulo: 'Sua conta de luz com estes aparelhos',
+          titulo: tr('Sua conta de luz com estes aparelhos', 'Your electricity bill with these appliances'),
           valor: casa.custoMes,
-          formatar: (v) => '${reais(v)} por mês',
-          rodape: '${reais(casa.custoAno)} por ano · $n ${n == 1 ? 'aparelho' : 'aparelhos'}',
+          formatar: (v) => tr('${reais(v)} por mês', '${reais(v)} per month'),
+          rodape: tr(
+            '${reais(casa.custoAno)} por ano · $n ${n == 1 ? 'aparelho' : 'aparelhos'}',
+            '${reais(casa.custoAno)} per year · $n ${n == 1 ? 'appliance' : 'appliances'}',
+          ),
         ),
         Text(
-          'Consumo de ${numero(total)} kWh por mês.',
+          tr('Consumo de ${numero(total)} kWh por mês.', 'Uses ${numero(total)} kWh per month.'),
           style: t.secundario,
           textAlign: TextAlign.center,
         ),
         if (casa.tarifasMisturadas)
-          const Padding(
-            padding: EdgeInsets.only(top: Espaco.p),
-            child: ListaAvisos(['Alguns aparelhos foram calculados com tarifas diferentes; o total soma os dois.']),
+          Padding(
+            padding: const EdgeInsets.only(top: Espaco.p),
+            child: ListaAvisos([
+              tr(
+                'Alguns aparelhos foram calculados com tarifas diferentes; o total soma os dois.',
+                'Some appliances were calculated with different rates; the total adds them together.',
+              ),
+            ]),
           ),
-        const Titulo('O que mais pesa na conta'),
+        Titulo(tr('O que mais pesa na conta', 'What weighs most on the bill')),
         for (final item in casa.porCusto)
           _CartaoItem(item, fracao: total > 0 ? item.kwhMes / total : 0, aoRemover: () => _remover(item)),
         const SizedBox(height: Espaco.p),
         OutlinedButton.icon(
           onPressed: () => irPara(Aba.calcular, recomecar: true),
           icon: const Icon(Icons.add),
-          label: const Text('Adicionar outro aparelho'),
+          label: Text(tr('Adicionar outro aparelho', 'Add another appliance')),
         ),
-        const Titulo('Quantas pessoas moram na casa?'),
-        Text('Usamos para comparar a sua casa com casas parecidas.', style: t.secundario),
+        Titulo(tr('Quantas pessoas moram na casa?', 'How many people live in the home?')),
+        Text(
+          tr('Usamos para comparar a sua casa com casas parecidas.', 'We use it to compare your home with similar homes.'),
+          style: t.secundario,
+        ),
         const SizedBox(height: Espaco.p),
         _Contador(
           valor: casa.moradores,
-          rotulo: casa.moradores == 1 ? 'morador' : 'moradores',
-          descricao: 'moradores',
+          rotulo: casa.moradores == 1 ? tr('morador', 'resident') : tr('moradores', 'residents'),
+          descricao: tr('moradores', 'residents'),
           minimo: 1,
           maximo: 20,
           aoMudar: casa.mudarMoradores,
@@ -160,11 +172,18 @@ class _CasaVazia extends StatelessWidget {
           children: [
             Icon(Icons.home_outlined, size: t.iconeEnorme),
             const SizedBox(height: Espaco.m),
-            Semantics(header: true, child: Text('Sua casa ainda está vazia', style: t.titulo, textAlign: TextAlign.center)),
+            Semantics(
+              header: true,
+              child: Text(tr('Sua casa ainda está vazia', 'Your home is still empty'), style: t.titulo, textAlign: TextAlign.center),
+            ),
             const SizedBox(height: Espaco.p),
             Text(
-              'Calcule um aparelho e toque em "Adicionar à minha casa". '
-              'Com alguns aparelhos, o Iamp mostra o total da conta e onde dá para economizar.',
+              tr(
+                'Calcule um aparelho e toque em "Adicionar à minha casa". '
+                    'Com alguns aparelhos, o Iamp mostra o total da conta e onde dá para economizar.',
+                'Calculate an appliance and tap "Add to my home". '
+                    'With a few appliances, Iamp shows the bill total and where you can save.',
+              ),
               textAlign: TextAlign.center,
               style: t.corpo,
             ),
@@ -201,7 +220,7 @@ class _Contador extends StatelessWidget {
       spacing: Espaco.p,
       children: [
         IconButton.outlined(
-          tooltip: 'Diminuir $descricao',
+          tooltip: tr('Diminuir $descricao', 'Decrease $descricao'),
           onPressed: valor > minimo ? () => aoMudar(valor - 1) : null,
           icon: const Icon(Icons.remove),
         ),
@@ -210,7 +229,7 @@ class _Contador extends StatelessWidget {
           child: Text('$valor $rotulo', style: t.numero),
         ),
         IconButton.outlined(
-          tooltip: 'Aumentar $descricao',
+          tooltip: tr('Aumentar $descricao', 'Increase $descricao'),
           onPressed: valor < maximo ? () => aoMudar(valor + 1) : null,
           icon: const Icon(Icons.add),
         ),
@@ -262,19 +281,22 @@ class _CartaoItem extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: Espaco.pm),
-                  Text('${reais(item.custoMes)} por mês', style: t.valorMedio),
-                  Text('$parte da conta · ${numero(item.kwhMes)} kWh', style: t.secundario),
+                  Text(tr('${reais(item.custoMes)} por mês', '${reais(item.custoMes)} per month'), style: t.valorMedio),
+                  Text(
+                    tr('$parte da conta · ${numero(item.kwhMes)} kWh', '$parte of the bill · ${numero(item.kwhMes)} kWh'),
+                    style: t.secundario,
+                  ),
                   const SizedBox(height: Espaco.p),
-                  ExcludeSemantics(child: BarraParte(fracao, descricao: '$parte da conta')),
+                  ExcludeSemantics(child: BarraParte(fracao, descricao: tr('$parte da conta', '$parte of the bill'))),
                 ],
               ),
             ),
             const SizedBox(height: Espaco.pm),
-            Text('Quantidade', style: t.rotulo),
+            Text(tr('Quantidade', 'Quantity'), style: t.rotulo),
             _Contador(
               valor: item.quantidade,
-              rotulo: item.quantidade == 1 ? 'unidade' : 'unidades',
-              descricao: 'a quantidade de ${r.nome}',
+              rotulo: item.quantidade == 1 ? tr('unidade', 'unit') : tr('unidades', 'units'),
+              descricao: tr('a quantidade de ${r.nome}', 'the quantity of ${r.nome}'),
               minimo: 1,
               maximo: 99,
               aoMudar: (q) => casa.mudarQuantidade(item, q),
@@ -293,24 +315,24 @@ class _CartaoItem extends StatelessWidget {
                       ),
                     ),
                     icon: const Icon(Icons.trending_down),
-                    label: const Text('Ver modelos que gastam menos'),
+                    label: Text(tr('Ver modelos que gastam menos', 'See models that use less')),
                   ),
                 if (item.consulta.portatil)
                   TextButton.icon(
                     onPressed: () =>
                         Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: item.resultado))),
                     icon: const Icon(Icons.tips_and_updates_outlined),
-                    label: const Text('Como gastar menos'),
+                    label: Text(tr('Como gastar menos', 'How to spend less')),
                   ),
                 Semantics(
-                  label: 'Remover ${r.nome} da casa',
+                  label: tr('Remover ${r.nome} da casa', 'Remove ${r.nome} from the home'),
                   excludeSemantics: true,
                   button: true,
                   onTap: aoRemover,
                   child: TextButton.icon(
                     onPressed: aoRemover,
                     icon: const Icon(Icons.delete_outline),
-                    label: const Text('Remover'),
+                    label: Text(tr('Remover', 'Remove')),
                   ),
                 ),
               ],
@@ -335,16 +357,17 @@ class _CartaoPerfil extends StatelessWidget {
     'Ineficiente': Icons.warning_amber_rounded,
   };
 
-  static const _explicacao = {
-    'Consciente': 'A sua casa gasta pouco por pessoa.',
-    'Moderado': 'A sua casa gasta perto da média por pessoa.',
-    'Ineficiente': 'A sua casa gasta mais que a média por pessoa.',
+  static String? _explicacao(String perfil) => switch (perfil) {
+    'Consciente' => tr('A sua casa gasta pouco por pessoa.', 'Your home uses little per person.'),
+    'Moderado' => tr('A sua casa gasta perto da média por pessoa.', 'Your home uses close to the average per person.'),
+    'Ineficiente' => tr('A sua casa gasta mais que a média por pessoa.', 'Your home uses more than the average per person.'),
+    _ => null,
   };
 
-  static const _nomesFracoes = {
-    'frac_chuveiro': 'Chuveiro',
-    'frac_ar': 'Ar-condicionado',
-    'frac_refrigerador': 'Geladeira',
+  static Map<String, String> get _nomesFracoes => {
+    'frac_chuveiro': tr('Chuveiro', 'Electric shower'),
+    'frac_ar': tr('Ar-condicionado', 'Air conditioner'),
+    'frac_refrigerador': tr('Geladeira', 'Fridge'),
   };
 
   @override
@@ -374,9 +397,9 @@ class _CartaoPerfil extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Perfil da casa', style: t.rotulo),
-                      Text(c.perfil, style: t.valor.copyWith(color: cor)),
-                      if (_explicacao[c.perfil] != null) Text(_explicacao[c.perfil]!, style: t.corpo),
+                      Text(tr('Perfil da casa', 'Home profile'), style: t.rotulo),
+                      Text(nomeDoPerfil(c.perfil), style: t.valor.copyWith(color: cor)),
+                      if (_explicacao(c.perfil) case final explicacao?) Text(explicacao, style: t.corpo),
                     ],
                   ),
                 ),
@@ -386,13 +409,13 @@ class _CartaoPerfil extends StatelessWidget {
           const SizedBox(height: Espaco.m),
           LadoALado(
             CartaoInfo(
-              'Sua casa, por pessoa',
-              '${reais(c.kwhPorMorador * tarifaMedia)} por mês',
+              tr('Sua casa, por pessoa', 'Your home, per person'),
+              tr('${reais(c.kwhPorMorador * tarifaMedia)} por mês', '${reais(c.kwhPorMorador * tarifaMedia)} per month'),
               detalhe: '${numero(c.kwhPorMorador, casas: 1)} kWh',
             ),
             CartaoInfo(
-              'Casas parecidas, por pessoa',
-              'cerca de ${reais(c.medianaKwhPorMorador * tarifaMedia)}',
+              tr('Casas parecidas, por pessoa', 'Similar homes, per person'),
+              tr('cerca de ${reais(c.medianaKwhPorMorador * tarifaMedia)}', 'about ${reais(c.medianaKwhPorMorador * tarifaMedia)}'),
               detalhe: '${numero(c.medianaKwhPorMorador, casas: 1)} kWh',
             ),
           ),
@@ -408,7 +431,7 @@ class _CartaoPerfil extends StatelessWidget {
               ],
             ),
           ),
-          const Titulo('Quanto cada um pesa no consumo'),
+          Titulo(tr('Quanto cada um pesa no consumo', 'How much each one weighs in consumption')),
           for (final e in _nomesFracoes.entries)
             Padding(
               padding: const EdgeInsets.only(bottom: Espaco.pm),
@@ -425,13 +448,21 @@ class _CartaoPerfil extends StatelessWidget {
             ),
           const SizedBox(height: Espaco.p),
           Text(
-            'O que mais pesa: ${maior.resultado.nome} '
-            '(${numero(total > 0 ? maior.kwhMes / total * 100 : 0, casas: 0)}% do consumo). '
-            'Veja no cartão dele se existe um modelo que gasta menos.',
+            tr(
+              'O que mais pesa: ${maior.resultado.nome} '
+                  '(${numero(total > 0 ? maior.kwhMes / total * 100 : 0, casas: 0)}% do consumo). '
+                  'Veja no cartão dele se existe um modelo que gasta menos.',
+              'What weighs most: ${maior.resultado.nome} '
+                  '(${numero(total > 0 ? maior.kwhMes / total * 100 : 0, casas: 0)}% of consumption). '
+                  'Check its card to see if there is a model that uses less.',
+            ),
             style: t.corpo,
           ),
           const SizedBox(height: Espaco.m),
-          ListaAvisos([c.aviso, 'O perfil considera só os aparelhos que você adicionou.']),
+          ListaAvisos([
+            c.aviso,
+            tr('O perfil considera só os aparelhos que você adicionou.', 'The profile only counts the appliances you added.'),
+          ]),
         ],
       ),
     );

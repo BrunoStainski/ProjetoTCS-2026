@@ -3,6 +3,8 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+from idioma import t, tr
+
 MODELO = Path(__file__).resolve().parents[1] / "models" / "refrigerador.pkl"
 
 FONTE_PORTARIA_2006 = "Portaria Inmetro 20/2006, RESP/001-REF, Anexo VI"
@@ -76,24 +78,27 @@ def tempo_por_dia(horas):
     total = round(horas * 60)
     h, m = divmod(total, 60)
     texto = f"{m} min" if h == 0 else (f"{h} h" if m == 0 else f"{h} h {m} min")
-    return f"{texto}/dia"
+    return texto + tr("/dia", "/day")
 
 
 def fator_idade(idade):
     if idade < 0:
-        raise ValueError("o ano de compra nao pode ser no futuro")
+        raise ValueError(tr("o ano de compra nao pode ser no futuro", "the year of purchase cannot be in the future"))
     return next(fator for limite, fator in FAIXAS_FI if idade <= limite)
 
 
 def _validar(tipo, volume_total_l, volume_congelador_l, ano_compra, ano_referencia):
     if tipo not in TIPOS:
-        raise ValueError(f"tipo precisa ser um de: {', '.join(TIPOS)}")
+        raise ValueError(tr(f"tipo precisa ser um de: {', '.join(TIPOS)}", f"type must be one of: {', '.join(TIPOS)}"))
     if not 0 < volume_total_l <= VOLUME_MAXIMO_L:
-        raise ValueError(f"o volume total precisa estar entre 1 e {VOLUME_MAXIMO_L} litros")
+        raise ValueError(tr(f"o volume total precisa estar entre 1 e {VOLUME_MAXIMO_L} litros",
+                            f"the total volume must be between 1 and {VOLUME_MAXIMO_L} liters"))
     if volume_congelador_l is not None and not 0 <= volume_congelador_l <= volume_total_l:
-        raise ValueError("o volume do freezer precisa estar entre 0 e o volume total")
+        raise ValueError(tr("o volume do freezer precisa estar entre 0 e o volume total",
+                            "the freezer volume must be between 0 and the total volume"))
     if not ANO_MINIMO <= ano_compra <= ano_referencia:
-        raise ValueError(f"o ano de compra precisa estar entre {ANO_MINIMO} e {ano_referencia}")
+        raise ValueError(tr(f"o ano de compra precisa estar entre {ANO_MINIMO} e {ano_referencia}",
+                            f"the year of purchase must be between {ANO_MINIMO} and {ano_referencia}"))
 
 
 def _segmento(modelo, grade, tipo_inmetro, frost_free):
@@ -125,14 +130,17 @@ def _por_etiqueta(modelo, info, frost_free, kwh_etiqueta, ano_compra, fi):
     if ano_compra >= ANO_ETIQUETA_NOVA:
         base = kwh_etiqueta
         return {"kwh_mes": base * fi, "kwh_min": base * fi, "kwh_max": base * fi,
-                "metodo": f"etiqueta {kwh_etiqueta:g} kWh/mes (metodologia atual) x Fi {fi:.2f}"}
+                "metodo": tr(f"etiqueta {kwh_etiqueta:g} kWh/mes (metodologia atual) x Fi {fi:.2f}",
+                             f"label {kwh_etiqueta:g} kWh/month (current method) x Fi {fi:.2f} (age wear)")}
     conversao = _conversao(modelo, info["tipo_inmetro"], frost_free)
     return {
         "kwh_mes": kwh_etiqueta * conversao["mediana"] * fi,
         "kwh_min": kwh_etiqueta * conversao["p25"] * fi,
         "kwh_max": kwh_etiqueta * conversao["p75"] * fi,
-        "metodo": (f"etiqueta {kwh_etiqueta:g} kWh/mes (metodologia antiga) x {conversao['mediana']:.2f} "
-                   f"(conversao para a metodologia atual) x Fi {fi:.2f}"),
+        "metodo": tr(f"etiqueta {kwh_etiqueta:g} kWh/mes (metodologia antiga) x {conversao['mediana']:.2f} "
+                     f"(conversao para a metodologia atual) x Fi {fi:.2f}",
+                     f"label {kwh_etiqueta:g} kWh/month (old method) x {conversao['mediana']:.2f} "
+                     f"(conversion to the current method) x Fi {fi:.2f} (age wear)"),
     }
 
 
@@ -151,19 +159,23 @@ def _pela_regra_2006(modelo, info, frost_free, volume_total_l, volume_congelador
 
     if ano_compra < ANO_REGRA_2006:
         ie = modelo["ie_2001"]
-        ie_min, ie_ponto, ie_max, epoca = ie["p25"], ie["media"], ie["p75"], "tabela Inmetro 2001"
+        ie_min, ie_ponto, ie_max = ie["p25"], ie["media"], ie["p75"]
+        epoca = tr("tabela Inmetro 2001", "Inmetro 2001 table")
     else:
         ie_min = modelo["ie_regra_2006"].get(categoria, modelo["ie_regra_2006_geral"])["mediana"]
         ie_max = LIMITE_CLASSE_A_2006.get(categoria, LIMITE_CLASSE_A_2006_PADRAO)
-        ie_ponto, epoca = (ie_min + ie_max) / 2, "regra de 2006 (classe A)"
+        ie_ponto, epoca = (ie_min + ie_max) / 2, tr("regra de 2006 (classe A)", "2006 rule (class A)")
     conversao = _conversao(modelo, tipo_inmetro, frost_free)["mediana"]
     return {
         "kwh_mes": ie_ponto * cp * conversao * fi,
         "kwh_min": ie_min * cp * conversao * fi,
         "kwh_max": ie_max * cp * conversao * fi,
-        "metodo": (f"consumo padrao {cp:.1f} kWh/mes ({categoria}, volume ajustado {av:.0f} L) x indice "
-                   f"{ie_ponto:.2f} ({epoca}, faixa {ie_min:.2f} a {ie_max:.2f}) x {conversao:.2f} "
-                   f"(conversao para a metodologia atual) x Fi {fi:.2f}"),
+        "metodo": tr(f"consumo padrao {cp:.1f} kWh/mes ({categoria}, volume ajustado {av:.0f} L) x indice "
+                     f"{ie_ponto:.2f} ({epoca}, faixa {ie_min:.2f} a {ie_max:.2f}) x {conversao:.2f} "
+                     f"(conversao para a metodologia atual) x Fi {fi:.2f}",
+                     f"standard consumption {cp:.1f} kWh/month ({t(categoria)}, adjusted volume {av:.0f} L) x index "
+                     f"{ie_ponto:.2f} ({epoca}, range {ie_min:.2f} to {ie_max:.2f}) x {conversao:.2f} "
+                     f"(conversion to the current method) x Fi {fi:.2f} (age wear)"),
     }
 
 
@@ -175,8 +187,10 @@ def _pelo_modelo_atual(modelo, info, frost_free, volume_total_l, fi):
         "kwh_mes": previsto * fi,
         "kwh_min": max(previsto - erro, 0.0) * fi,
         "kwh_max": (previsto + erro) * fi,
-        "metodo": (f"Random Forest com os modelos atuais do Inmetro: {previsto:.1f} kWh/mes "
-                   f"(erro medio {erro:.1f}) x Fi {fi:.2f}"),
+        "metodo": tr(f"Random Forest com os modelos atuais do Inmetro: {previsto:.1f} kWh/mes "
+                     f"(erro medio {erro:.1f}) x Fi {fi:.2f}",
+                     f"Random Forest with Inmetro's current models: {previsto:.1f} kWh/month "
+                     f"(mean error {erro:.1f}) x Fi {fi:.2f} (age wear)"),
     }
 
 
@@ -185,27 +199,31 @@ def consumo_refrigerador_estimado(tipo, frost_free, volume_total_l, ano_compra, 
     ano_referencia = ano_referencia or date.today().year
     _validar(tipo, volume_total_l, volume_congelador_l, ano_compra, ano_referencia)
     if kwh_etiqueta is not None and kwh_etiqueta <= 0:
-        raise ValueError("o consumo da etiqueta precisa ser maior que zero")
+        raise ValueError(tr("o consumo da etiqueta precisa ser maior que zero", "the label consumption must be greater than zero"))
     modelo = modelo or carregar_modelo()
     info = TIPOS[tipo]
     idade = ano_referencia - ano_compra
     fi = fator_idade(idade)
 
     if kwh_etiqueta is not None:
-        calculo, avisos, fontes = _por_etiqueta(modelo, info, frost_free, kwh_etiqueta, ano_compra, fi), [AVISO_ETIQUETA], [FONTE_FI]
+        calculo, avisos, fontes = _por_etiqueta(modelo, info, frost_free, kwh_etiqueta, ano_compra, fi), [t(AVISO_ETIQUETA)], [FONTE_FI]
     elif ano_compra >= ANO_ETIQUETA_NOVA:
-        calculo, avisos, fontes = _pelo_modelo_atual(modelo, info, frost_free, volume_total_l, fi), [AVISO_APROXIMADO], [modelo["fonte"], FONTE_FI]
+        calculo, avisos, fontes = _pelo_modelo_atual(modelo, info, frost_free, volume_total_l, fi), [t(AVISO_APROXIMADO)], [modelo["fonte"], FONTE_FI]
     else:
         calculo = _pela_regra_2006(modelo, info, frost_free, volume_total_l, volume_congelador_l, ano_compra, fi)
-        avisos, fontes = [AVISO_APROXIMADO], [FONTE_PORTARIA_2006, FONTE_TABELA_2001, FONTE_FI]
+        avisos, fontes = [t(AVISO_APROXIMADO)], [FONTE_PORTARIA_2006, FONTE_TABELA_2001, FONTE_FI]
 
     if idade > modelo["vida_util_anos"]:
-        avisos.append(f"Com {idade} anos, o aparelho passou da vida util media de {modelo['vida_util_anos']} anos.")
-    descricao = f"{info['nome']}{' frost-free' if frost_free else ''}, {volume_total_l:g} L, comprada em {ano_compra}"
+        avisos.append(tr(f"Com {idade} anos, o aparelho passou da vida util media de {modelo['vida_util_anos']} anos.",
+                         f"At {idade} years old, the appliance is past the average lifespan of "
+                         f"{modelo['vida_util_anos']} years."))
+    nome = t(info["nome"])
+    descricao = tr(f"{nome}{' frost-free' if frost_free else ''}, {volume_total_l:g} L, comprada em {ano_compra}",
+                   f"{nome}{' frost-free' if frost_free else ''}, {volume_total_l:g} L, bought in {ano_compra}")
     return {
         **calculo,
         "categoria": "refrigerador",
-        "nome": info["nome"].capitalize(),
+        "nome": nome.capitalize(),
         "tipo": info["tipo_inmetro"],
         "capacidade": float(volume_total_l),
         "detalhe": descricao,
@@ -224,26 +242,26 @@ def consumo_resistivo(padrao, potencia_w=None, horas_dia=None, dias_mes=None):
     horas = padrao["horas_dia"] if horas_dia is None else horas_dia
     dias = padrao["dias_mes"] if dias_mes is None else dias_mes
     if potencia <= 0:
-        raise ValueError("a potencia precisa ser maior que zero")
+        raise ValueError(tr("a potencia precisa ser maior que zero", "the power must be greater than zero"))
     if not 0 <= horas <= 24:
-        raise ValueError("horas por dia precisa estar entre 0 e 24")
+        raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
     if not 0 <= dias <= 31:
-        raise ValueError("dias de uso por mes precisa estar entre 0 e 31")
+        raise ValueError(tr("dias de uso por mes precisa estar entre 0 e 31", "days of use per month must be between 0 and 31"))
 
     return {
         "kwh_mes": potencia / 1000 * horas * dias,
         "metodo": (f"{potencia:g} W ({_origem(potencia_w)}) / 1000 x {tempo_por_dia(horas)} ({_origem(horas_dia)}) "
-                   f"x {dias:g} dias ({_origem(dias_mes)})"),
+                   f"x {dias:g} {tr('dias', 'days')} ({_origem(dias_mes)})"),
         "categoria": categoria,
         "nome": padrao["nome"],
         "detalhe": f"{padrao['nome']}, {potencia:g} W",
         "horas_dia": horas,
         "premissa": horas_dia is None or dias_mes is None,
         "aproximado": None in (potencia_w, horas_dia, dias_mes),
-        "avisos": [] if potencia_w is not None else [AVISO_POTENCIA_TIPICA],
+        "avisos": [] if potencia_w is not None else [t(AVISO_POTENCIA_TIPICA)],
         "fonte": "potencia x tempo de uso" + ("" if potencia_w is not None else f"; potencia tipica: {padrao['fonte']}"),
     }
 
 
 def _origem(informado):
-    return "informado" if informado is not None else "padrao do grupo"
+    return tr("informado", "entered") if informado is not None else tr("padrao do grupo", "group default")

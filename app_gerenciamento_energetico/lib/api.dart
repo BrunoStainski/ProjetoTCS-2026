@@ -10,6 +10,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import 'idioma.dart';
+
 const String _apiUrlInformada = String.fromEnvironment('API_URL');
 
 final String apiUrl = _apiUrlInformada.isNotEmpty
@@ -343,9 +345,12 @@ class Classificacao {
 }
 
 class Api {
+  /// A API responde no idioma do app (avisos, "Como calculamos", plano do Eco-Coach...).
+  static Map<String, String> get _idioma => {'Accept-Language': idioma.value.cabecalho};
+
   static Future<dynamic> _get(String caminho, [Map<String, String>? params]) async {
     final uri = Uri.parse('$apiUrl$caminho').replace(queryParameters: params);
-    return _tratar(() => http.get(uri));
+    return _tratar(() => http.get(uri, headers: _idioma));
   }
 
   static Future<dynamic> _post(
@@ -355,7 +360,7 @@ class Api {
   }) async {
     final uri = Uri.parse('$apiUrl$caminho');
     return _tratar(
-      () => http.post(uri, headers: {'Content-Type': 'application/json'}, body: jsonEncode(corpo)),
+      () => http.post(uri, headers: {'Content-Type': 'application/json', ..._idioma}, body: jsonEncode(corpo)),
       limite: limite,
     );
   }
@@ -368,7 +373,12 @@ class Api {
     try {
       resposta = await chamada().timeout(limite);
     } catch (_) {
-      throw ApiErro('Não consegui me conectar ao Iamp. Confira a internet e tente de novo.');
+      throw ApiErro(
+        tr(
+          'Não consegui me conectar ao Iamp. Confira a internet e tente de novo.',
+          'Could not connect to Iamp. Check your internet connection and try again.',
+        ),
+      );
     }
     final corpo = jsonDecode(utf8.decode(resposta.bodyBytes));
     if (resposta.statusCode >= 400) {
@@ -377,7 +387,7 @@ class Api {
       if (detalhe is List && detalhe.isNotEmpty && detalhe.first is Map) {
         throw ApiErro('${detalhe.first['msg']}');
       }
-      throw ApiErro('Erro ${resposta.statusCode} na API');
+      throw ApiErro(tr('Erro ${resposta.statusCode} na API', 'API error ${resposta.statusCode}'));
     }
     return corpo;
   }
@@ -574,12 +584,13 @@ class EcoCoach {
       aviso = j['aviso'];
 }
 
-/// 1234.5 -> "R$ 1.234,50"
+/// 1234.5 -> "R$ 1.234,50" (em ingles, "R$ 1,234.50": o valor continua em reais)
 String reais(double valor, {int casas = 2}) {
+  final (milhar, decimal) = emIngles ? (',', '.') : ('.', ',');
   final negativo = valor < 0;
   final partes = valor.abs().toStringAsFixed(casas).split('.');
-  final inteiro = partes[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
-  return '${negativo ? '-' : ''}R\$ $inteiro${casas > 0 ? ',${partes[1]}' : ''}';
+  final inteiro = partes[0].replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => milhar);
+  return '${negativo ? '-' : ''}R\$ $inteiro${casas > 0 ? '$decimal${partes[1]}' : ''}';
 }
 
 String duracao(double horas) {
@@ -590,12 +601,20 @@ String duracao(double horas) {
   return m == 0 ? '$h h' : '$h h $m min';
 }
 
-/// 41.25 -> "41,25"
-String numero(double valor, {int casas = 2}) => valor.toStringAsFixed(casas).replaceAll('.', ',');
+/// 41.25 -> "41,25" (em ingles, "41.25")
+String numero(double valor, {int casas = 2}) {
+  final texto = valor.toStringAsFixed(casas);
+  return emIngles ? texto : texto.replaceAll('.', ',');
+}
 
-/// Aceita "0,25", "0.25", "1.299,90" e "R$ 1.299,90"
+/// Aceita "0,25", "0.25", "1.299,90" e "R$ 1.299,90".
+/// Em ingles a virgula separa os milhares ("1,299.90"); quem digita do jeito brasileiro ("0,85" ou
+/// "2.499,90") continua certo: o separador que vem por ultimo e o decimal.
 double? lerNumero(String texto) {
   var t = texto.trim().replaceAll('R\$', '').replaceAll(' ', '');
-  if (t.contains(',')) t = t.replaceAll('.', '').replaceAll(',', '.');
+  final virgulaDecimal = emIngles
+      ? t.lastIndexOf(',') > t.lastIndexOf('.') && !RegExp(r'^\d{1,3}(,\d{3})+$').hasMatch(t)
+      : t.contains(',');
+  t = virgulaDecimal ? t.replaceAll('.', '').replaceAll(',', '.') : t.replaceAll(',', '');
   return double.tryParse(t);
 }

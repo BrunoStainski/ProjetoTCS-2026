@@ -14,7 +14,8 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 - `tema.dart`: `Cores`, `Estilos`, `Espaco` e `temaIamp()`. **Não** use cor, tamanho de fonte ou espaçamento solto nas telas.
 - `telas/comum.dart`: `Pagina` (com `rodape` para a ação principal), `CartaoDestaque`, `CartaoInfo`, `ListaAvisos`, `Titulo`, `MensagemErro`, `CampoTempo`/`ControleTempo`, `BotaoCasa`, `avisarAdicionado`. Reutilize antes de criar widget novo.
 - Uma tela por arquivo em `telas/`, nomes em português e snake_case no arquivo, PascalCase na classe (`TelaBusca`).
-- Só o pacote `http` além do Flutter; não acrescente dependências sem necessidade clara (ex.: o markdown do Eco-Coach é renderizado por `texto_plano.dart`, sem pacote).
+- Só o pacote `http` além do Flutter (e o `flutter_localizations`, que vem com o SDK); não acrescente dependências sem necessidade clara (ex.: o markdown do Eco-Coach é renderizado por `texto_plano.dart`, sem pacote).
+- `idioma.dart`: idioma do app (português nativo, inglês pelo menu). Ver "Idioma" abaixo.
 
 ## Identidade visual (regra 60/30/10)
 
@@ -33,15 +34,24 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 - Campo novo da API deve ser opcional no `fromJson` (o app antigo precisa continuar funcionando e o novo precisa aceitar API antiga quando possível).
 - Timeout do `/eco-coach`: 90 s; o plano fica em `casa.plano` até a casa mudar (poupa o limite gratuito do Gemini).
 
+## Idioma (português e inglês)
+
+- Todo texto que aparece na tela (título, botão, aviso, tooltip, rótulo do leitor de tela, mensagem de erro) é escrito com as duas versões no lugar: `tr('Gasto por mês', 'Cost per month')`. Nada de texto solto: um teste de widget do grupo "Idioma" troca o app inteiro para o inglês.
+- O app sempre abre em português; a troca é no menu (`mudarIdioma`), que redesenha todas as telas. Por isso, texto não pode ser calculado só uma vez e guardado (`const` com texto, campo `final` montado no construtor, mapa `static const`): use getter ou função que chame `tr()` no `build`.
+- Valores: `reais`, `numero` e `lerNumero` já seguem o idioma. Hint de exemplo também: `tr('Ex.: 0,85', 'E.g.: 0.85')`.
+- Texto que vem da API já chega no idioma (o app manda `Accept-Language`). Chaves da API (categoria, perfil, velocidade) não mudam: traduza o nome na tela (`nomeDaCategoria`, `nomeDoPerfil`, `nomeDaVelocidade`).
+- Nomes de idiomas sempre na própria língua ("Português", "English"); nomes próprios (Inmetro, ANEEL, estados, marcas) não se traduzem.
+
 ## Armadilhas conhecidas
 
 - Nunca `setState(() => _f = futuro())` com arrow que devolve `Future`: guarde o future antes e chame `setState` em bloco.
 - SnackBar que navega usa o `NavigatorState` guardado antes, não o `context` da tela. Avisos somem em 5 s (`duracaoAviso`) com `persist: false`.
 - Busca: só a resposta mais recente vale (`_pedido`); acima de 30 por tipo, pedir parte do modelo.
 - Teste de widget com API falsa: `http.runWithClient` + `MockClient`.
+- `tester.pageBack()` procura o tooltip "Back": dentro do `IampApp` em português a seta é "Voltar" (`find.byTooltip('Voltar')`). Em `MaterialApp` sem `locale` (teste de uma tela só) continua "Back".
 
 ## Qualidade
 
 - `flutter analyze` sem avisos e `flutter test` verde antes de abrir PR; teste novo em `test/widget_test.dart` para tela ou regra de formatação nova.
-- Texto da interface em português do Brasil, simples, para uma família comum; unidades sempre visíveis (kWh/mês, R$/mês).
+- Texto da interface em português do Brasil, simples, para uma família comum, com a versão em inglês no `tr()`; unidades sempre visíveis (kWh/mês, R$/mês).
 - Versão em `pubspec.yaml` e `CHANGELOG.md` a cada APK (ver skill `estrutura-projeto-iamp`).
