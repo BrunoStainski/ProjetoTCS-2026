@@ -32,7 +32,9 @@ def _read_env(path):
 
 
 ROOT = _root()
-_ENV = {**_read_env(ROOT / ".env"), **os.environ}  # variavel de ambiente vence o .env
+# Variavel de ambiente vence o .env. O strip tira espaco ou Enter colado junto no painel da nuvem:
+# com ele a chave do Gemini virava cabecalho HTTP invalido (LocalProtocolError) e o Eco-Coach nao carregava.
+_ENV = {**_read_env(ROOT / ".env"), **{k: v.strip() for k, v in os.environ.items()}}
 
 
 def _env(key, default_value=None):
