@@ -8,13 +8,17 @@
 Os dois sobem a mesma aplicação do `docker-compose.yml` (PostgreSQL com pgvector + API FastAPI +
 carga do RAG). A diferença está no *provider*: `kreuzwerker/docker` no local e `oracle/oci` na nuvem.
 
+Para a apresentação, a nuvem escolhida foi o **Render + Neon** (gratuitos, sem cartão), porque a conta
+da Oracle demora até duas semanas para ser liberada. Essa publicação não usa Terraform: o Render lê o
+[`render.yaml`](../render.yaml) da raiz. Passo a passo no README da raiz (Passo 11).
+
 ## Local (Docker)
 
 Pré-requisitos: Terraform ≥ 1.5 (`winget install Hashicorp.Terraform`) e o Docker Desktop aberto.
 
 ```bash
 cd infra/local
-cp terraform.tfvars.example terraform.tfvars   # opcional: gemini_api_key para o /eco-coach
+cp terraform.tfvars.example terraform.tfvars   # gemini_api_key: carga do RAG (embeddings) e /eco-coach
 terraform init
 terraform plan        # mostra o que vai ser criado
 terraform apply       # ~5-10 min na 1ª vez (build da imagem + carga do banco + RAG)
@@ -38,4 +42,5 @@ docker_container iamp_tf_carga_rag  roda scripts/carregar_rag.py uma vez e termi
 - Mudou código? `terraform apply` de novo: só o que mudou é refeito (a imagem, a API e a carga do RAG).
 - A senha do banco é gerada pelo Terraform (`terraform output senha_postgres`) e fica só no
   `terraform.tfstate`, que está no `.gitignore` (assim como o `terraform.tfvars`).
-- Saída da carga do RAG: `docker logs iamp_tf_carga_rag`.
+- Saída da carga do RAG: `docker logs iamp_tf_carga_rag`. Sem a `gemini_api_key`, a carga falha
+  (os vetores vêm da API do Gemini) e o `/eco-coach` responde 503; o resto da API funciona.

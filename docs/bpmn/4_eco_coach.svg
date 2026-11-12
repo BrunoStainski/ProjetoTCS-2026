@@ -56,7 +56,7 @@
 <rect x="330.0" y="72.0" width="180" height="86" rx="10" fill="#EEE3FA" stroke="#000" stroke-width="1.8"/>
 <text x="420.0" y="100.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Buscar trechos oficiais</text>
 <text x="420.0" y="115.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">sobre esses aparelhos</text>
-<text x="420.0" y="130.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(embeddings locais +</text>
+<text x="420.0" y="130.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(embeddings do Gemini +</text>
 <text x="420.0" y="145.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">pgvector)</text>
 <circle cx="345.0" cy="87.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="345.0" cy="87.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="345.0" cy="87.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
 <rect x="540.0" y="75.0" width="160" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>

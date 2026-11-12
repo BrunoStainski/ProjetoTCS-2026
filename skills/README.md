@@ -4,10 +4,10 @@ Instruções permanentes para o agente de código (Claude Code), no formato de s
 
 | Pasta | Equivalente no exemplo do professor | O que cobre |
 |---|---|---|
-| `boas-praticas-python-fastapi/` | `boas-praticas-python-django` | Nomes em português, Pandas, SQL parametrizado, FastAPI, pytest, git |
+| `boas-praticas-python-fastapi/` | `boas-praticas-python-django` | Nomes no código em inglês e textos em português, Pandas, SQL parametrizado, FastAPI, idioma das respostas, pytest, git |
 | `estrutura-projeto-iamp/` | `estrutura-projeto-django` | Camadas, fluxo dos dados, banco, Docker, Terraform, versionamento |
 | `ambiente-virtual/` | `venv` | `.venv` com Python 3.12 no Windows e os três `requirements` (a pasta não se chama `venv/` porque o `.gitignore` bloqueia esse nome) |
-| `boas-praticas-flutter/` | (não havia: o exemplo não tinha frontend) | Tema, padrões de tela, `api.dart`, armadilhas, testes |
+| `boas-praticas-flutter/` | (não havia: o exemplo não tinha frontend) | Tema (escuro e claro), acessibilidade, padrões de tela, `api.dart`, idioma, armadilhas, testes |
 | `regras_negocio/calculo_consumo/` | `regras_negocio/crud_user` e `login` | Ordem das regras de cálculo, premissas, avisos, estimativa fora do catálogo |
 | `regras_negocio/sugestao_troca/` | idem | Equivalência, filtros, payback |
 | `regras_negocio/eco_coach/` | idem | RAG, prompt, fontes, ética do LLM |

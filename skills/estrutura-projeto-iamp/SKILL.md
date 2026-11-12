@@ -10,7 +10,7 @@ Copiloto de eficiência energética residencial (bootcamp TCS 2026). Ao implemen
 ## Fluxo dos dados
 
 ```
-datasets/raw/ (Inmetro, ANEEL, ANP, documentos do RAG)
+datasets/raw/ (Inmetro, ANEEL, documentos do RAG)
   -> scripts/tratar_dados_*.py            limpeza com Pandas, um script por dataset
   -> datasets/processed/*.csv             dados limpos, versionados no git
   -> src/criar_banco.py                   recria as tabelas e carrega (também na 1ª subida da API)
@@ -30,22 +30,22 @@ ML:  scripts/gerar_seed.py -> treinar_ctgan.py -> treinar_kmeans.py -> models/*.
 | Limpeza | `scripts/tratar_dados_*.py`, `scripts/config.py` | Ler `raw`, limpar, salvar em `processed` em snake_case |
 | Treino | `scripts/gerar_seed.py`, `treinar_*.py`, `carregar_rag.py` | Gerar modelos (`models/*.pkl`) e a base vetorial; rodam fora da API |
 | Banco | `src/banco.py`, `src/criar_banco.py` | Esquema (`SCHEMA`), conexão, consultas parametrizadas, carga |
-| Regras | `src/calculadora_residencial.py`, `estimativa.py`, `gas.py`, `ml_pipeline.py`, `rag.py`, `rag_agent.py` | Cálculo, equivalência, estimativa, perfil, RAG. Sem HTTP |
+| Regras | `src/calculadora_residencial.py`, `estimativa.py`, `ml_pipeline.py`, `rag.py`, `rag_agent.py` | Cálculo, equivalência, estimativa, perfil, RAG. Sem HTTP |
 | Serviço | `src/servico.py` | Junta banco + regras em funções reutilizáveis pelas interfaces |
-| API | `src/main.py` | Modelos Pydantic, rotas, erros HTTP, CORS, carga automática no `lifespan` |
+| API | `src/main.py`, `src/idioma.py`, `src/traducoes.py` | Modelos Pydantic, rotas, erros HTTP, CORS, idioma da resposta, carga automática no `lifespan` |
 | App | `app_gerenciamento_energetico/lib/` | `api.dart` (chamadas), `casa.dart` (estado), `tema.dart`, `telas/` |
-| Infra | `Dockerfile`, `docker-compose.yml`, `infra/local/`, `infra/oracle/` | Imagem da API, banco, Terraform local (em uso) e nuvem (pronto) |
+| Infra | `Dockerfile`, `docker-compose.yml`, `render.yaml`, `infra/local/`, `infra/oracle/` | Imagem da API, banco, nuvem gratuita (Render + Neon), Terraform local (em uso) e Oracle (alternativa pronta) |
 | Docs | `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `docs/`, `prompts/` | Instruções, BPMN, gráficos da EDA, documento de processo, registro de prompts |
 
 ## Regras de arquitetura
 
-- Regra de negócio não entra em `main.py` nem no app Flutter: vai para `calculadora_residencial.py`/`estimativa.py`/`gas.py` (puro) ou `servico.py` (com banco). O app só exibe o que a API devolve, incluindo `metodo` e `avisos`.
+- Regra de negócio não entra em `main.py` nem no app Flutter: vai para `calculadora_residencial.py`/`estimativa.py` (puro) ou `servico.py` (com banco). O app só exibe o que a API devolve, incluindo `metodo` e `avisos`.
 - Rota nova: função em `servico.py` + modelos Pydantic + rota com `tags` e `response_model` + teste em `tests/test_api.py` + linha na tabela da API do `README.md` e do `CLAUDE.md`. Se mudar o fluxo de negócio, atualizar o BPMN (`docs/bpmn_processo.bpmn` e `.png`).
 - Tabela ou coluna nova: `banco.SCHEMA` + função de carga em `criar_banco.py` + registro em `cargas` + coluna de fonte. Coluna nova em `aparelhos` também entra em `APPLIANCE_COLUMNS`.
 - Categoria nova de aparelho: script `tratar_dados_<categoria>.py`, entrada em `SPECS`, e decidir `ASSUMPTIONS`, `EQUIVALENCE` ou `NO_SUGGESTION` (ver skills de regra de negócio).
 - Modelos de ML na API são só números em pkl (`kmeans.pkl`, `refrigerador.pkl`): a imagem da API **não** tem scikit-learn, torch ou sdv. Dependência pesada vai para `requirements-ml.txt`.
-- A imagem Docker leva só `src/`, `datasets/processed/`, os dois pkl e o modelo de embeddings baixado no build (`.dockerignore` exclui o resto). Mudou código em `src/`, refaça `docker compose up -d --build`.
-- Configuração vem do `.env` via `config.py` (`POSTGRES_*`, `GEMINI_API_KEY`, `GEMINI_MODELOS`, `RECARREGAR_BANCO`). Segredos só em `.env`, `terraform.tfvars` e `terraform.tfstate`, todos no `.gitignore`.
+- A imagem Docker leva só `src/`, `datasets/processed/`, os dois pkl, `datasets/raw/rag/` e `scripts/carregar_rag.py` (com a base vazia a API carrega o RAG sozinha; os embeddings vêm da API do Gemini, sem modelo local). `.dockerignore` exclui o resto. Mudou código em `src/`, refaça `docker compose up -d --build`.
+- Configuração vem do `.env` via `config.py` (`POSTGRES_*` ou `DATABASE_URL`, `GEMINI_API_KEY`, `GEMINI_MODELOS`, `GEMINI_EMBEDDING_MODEL`, `RECARREGAR_BANCO`, `PORT`). Segredos só em `.env`, `terraform.tfvars`, `terraform.tfstate` (todos no `.gitignore`) e no painel do Render.
 - Compose e Terraform convivem: compose usa portas 8000 (API) e 5434 (banco); `infra/local` usa 8080 e 5435 com prefixo `iamp_tf`. No Windows o provider Docker exige `docker_host = "npipe:////./pipe/dockerDesktopLinuxEngine"`.
 - Documentação da API é o Swagger gerado pelo FastAPI em `/docs`; mantenha descrições nos modelos em vez de documentar à parte.
 
