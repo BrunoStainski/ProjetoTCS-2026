@@ -5,7 +5,7 @@ description: Use o ambiente virtual .venv (Python 3.12) da raiz do iamp para rod
 
 # Usar o ambiente virtual `.venv`
 
-Use sempre o ambiente virtual `.venv` da raiz do projeto (`C:\iamp\.venv`) para qualquer tarefa Python. Ele é Python **3.12**, o mesmo da imagem Docker; não use o 3.14 nem o Python global.
+Use sempre o ambiente virtual `.venv` da raiz do repositório (a pasta onde está o `README.md`) para qualquer tarefa Python. Ele é Python **3.12**, o mesmo da imagem Docker; não use o 3.14 nem o Python global.
 
 ## Regras
 

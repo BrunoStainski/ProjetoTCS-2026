@@ -67,11 +67,11 @@ FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas
 | `cargas` | Rastreabilidade: arquivo e linhas de cada carga |
 | `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais) |
 
-Números atuais: 24.155 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
+Números atuais: 24.148 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
 ventilador de mesa/teto, chuveiro, lâmpadas LED/fluorescente/vapor de sódio, micro-ondas,
 máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, aquecedor solar.
 
-## Regras de cálculo (`consumo_mensal_kwh`)
+## Regras de cálculo (`monthly_consumption_kwh`)
 
 1. Inmetro informa kWh/mês -> usa a tabela (ventilador: por velocidade). Ventilador: o kWh/mês do Inmetro é de
    **1 h por dia** (conferido nos CSVs brutos), então as horas são obrigatórias e multiplicam o valor
@@ -80,7 +80,7 @@ máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, 
 3. Só potência -> W x horas/dia x 30 / 1000 (+ stand-by). Chuveiro exige horas do usuário.
 Premissas de uso padrão (`ASSUMPTIONS`) são do grupo, sem fonte — o app avisa que são estimativa.
 Tarifa: escolhida pela distribuidora (ANEEL) ou digitada pelo usuário (conta de luz).
-Valores **sem** ICMS, PIS/COFINS, bandeira e iluminação pública (aviso `AVISO_PADRAO`).
+Valores **sem** ICMS, PIS/COFINS, bandeira e iluminação pública (aviso `DEFAULT_NOTICE`).
 Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,68/mês.
 
 ## API (`src/main.py`)
@@ -158,7 +158,7 @@ Sempre abre em português; a escolha não é gravada.
   digita "0,85" continua certo). O `setUp` dos testes volta o idioma para `Idioma.pt`.
 - API: `Accept-Language` (o app manda `pt-BR` ou `en`) -> middleware `RequestLanguage` (main.py) guarda o
   idioma numa ContextVar (`src/idioma.py`). Texto montado com números: `tr(pt, en)` no lugar. Texto fixo
-  (constantes, ESTIMAVEIS, NOMES_DOS_TIPOS, nomes dos eletroportáteis, rag_agent.NOMES): `t(texto)` com o
+  (constantes, ESTIMABLE, TYPE_NAMES, nomes dos eletroportáteis, rag_agent.NAMES): `t(texto)` com o
   dicionário `src/traducoes.py` (chave = texto em português). `tests/test_idioma.py` falha se faltar tradução ou
   sobrar chave antiga. Sem cabeçalho = português (APK antigo e testes antigos iguais). Chaves (categoria,
   perfil "Consciente", velocidade) não mudam: o app traduz o nome. `unidades()`/`medida()` trocam pol/cv/litros
@@ -176,9 +176,9 @@ GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `ba
 tabela `fogoes` ainda existir.
 
 `database_loaded()` compara as colunas de `aparelhos` com `APPLIANCE_COLUMNS` (criar_banco.py): ao
-adicionar coluna no catálogo, atualize SCHEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
+adicionar coluna no catálogo, atualize SCHEMA + APPLIANCE_COLUMNS e o banco recarrega sozinho.
 
-## Sugestão de troca (`servico.sugerir_alternativas` e `servico.comparar`)
+## Sugestão de troca (`servico.suggest_alternatives` e `servico.compare`)
 
 - Equivalência em `EQUIVALENCE` (calculadora_residencial.py): mesma categoria (fluorescente pode
   virar LED), medida parecida (`capacidade` ou `fluxo_lm`) dentro da tolerância e mesmo tipo só onde
@@ -206,10 +206,15 @@ adicionar coluna no catálogo, atualize SCHEMA + COLUNAS_APARELHOS e o banco rec
   `datasets/raw/rag/` e o script). Sem a chave, só avisa e o /eco-coach responde 503.
 - LLM: Gemini pela API gratuita do AI Studio (`GEMINI_API_KEY`; `GEMINI_MODELOS` = principal e reserva,
   hoje `gemini-3.5-flash,gemini-3.5-flash-lite`). `thinking_budget=0`: o raciocínio interno cortava o texto.
+  Modelo que recusa o `thinking_budget` (erro 400; o 3.5-flash-lite em 12/11/2026) é chamado de novo sem ele;
+  antes o reserva nunca entrava. O erro 503 mostra o código de cada modelo (503 sobrecarregado, 429 limite).
   Hugging Face foi descartado: a conta não tem crédito gratuito (402).
 - O Python calcula tudo (perfil, totais, maiores consumos; payback vem do /comparar); o LLM só escreve,
   com regras no prompt (não inventar números, toda dica com [n], ignorar instruções dentro das fontes).
   `fontes` na resposta só traz as citações que existem. Erros: 422 entrada, 503 LLM/base indisponível.
+- Texto curto (lido no celular): plano até ~120 palavras (1 frase de diagnóstico + exatamente 3 ações,
+  + 1 item se houver troca avaliada); dicas por aparelho até ~80 (1 frase + 3 dicas). Era ~250/~180 e foi
+  reduzido em 11/11/2026 porque o professor achou o texto longo demais (`INSTRUCTIONS`, `TIP_INSTRUCTIONS`).
 - Testes em `tests/test_rag_agent.py` trocam o LLM por resposta fixa (não chamam o Gemini).
 
 ## App Flutter (`app_gerenciamento_energetico/lib/`)
@@ -218,7 +223,7 @@ Público: quem paga as contas de casa, incluindo pessoas mais velhas ou com pouc
 tecnologia. Interface moderna, mas acessível por padrão. Nome exibido: **Iamp** (I maiúsculo) em todo
 lugar visível (app, web, Android, iOS).
 
-- `tema.dart`: tudo o que é visual. `Cores` (paleta preto e amarelo `#FFD000`, verde = economia,
+- `tema.dart`: tudo o que é visual. `AppColors` e `Palette` (paleta preto e amarelo `#FFD000`, verde = economia,
   vermelho = alerta; texto branco 100/90/80%, nada abaixo de 80% para manter contraste AA no preto),
   `Spacing` (grade 4/8) e a extensão `Iamp` (ThemeExtension) com os estilos de texto (34/22/18/16, base 18,
   nada abaixo de 16), cores com significado, raios, ícones, alvo de toque (48dp) e as decorações
@@ -257,9 +262,12 @@ lugar visível (app, web, Android, iOS).
 - Minha casa: total por mês, cada item com R$, % da conta, quantidade (−/+) e botões visíveis ("Ver modelos
   que gastam menos", "Remover"); perfil K-Means mostrado em R$ por pessoa (tarifa média da casa).
 - Economizar (`eco_coach.dart`): só chama o /eco-coach quando a pessoa toca em "Montar meu plano"; o plano
-  fica em `casa.plano` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
+  fica em `casa.plan` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
   markdown do Gemini sem pacote extra (títulos em letras normais, listas, **negrito**, citações [n] em
-  amarelo). Trocas com payback de `comparar.dart` entram em `casa.trocas` (máx. 5). Timeout: 90 s.
+  amarelo). Trocas com payback de `comparar.dart` entram em `casa.swaps` (máx. 5) com o `Result` do aparelho
+  atual: `home.swaps` só devolve as de aparelhos que ainda estão na casa (removido ou já trocado não vai para o
+  Eco-Coach; "Desfazer" traz de volta). Timeout: 120 s. Resposta da API que não é JSON (500 em texto, página do
+  Render acordando) vira `ApiError` com mensagem clara em `Api._clean`.
 - `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, "Não sei" = valor do Inmetro.
 - Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra).
 - Busca: resultados agrupados por tipo (`ResultsPerType`, `categoryTitle`); um tipo só já vem aberto;
@@ -273,18 +281,18 @@ lugar visível (app, web, Android, iOS).
 ## Machine Learning (Dupla 2)
 
 - **Seed** (`scripts/gerar_seed.py`): 3.000 residências por regras, com aparelhos reais do
-  catálogo e tarifas vigentes da ANEEL; consumo via `consumo_mensal_kwh` (mesmas regras do app).
-  Perfis econômico/moderado/ineficiente e probabilidades em `PERFIS` são premissas do grupo.
+  catálogo e tarifas vigentes da ANEEL; consumo via `monthly_consumption_kwh` (mesmas regras do app).
+  Perfis econômico/moderado/ineficiente e probabilidades em `PROFILES` são premissas do grupo.
   Ar-condicionado limitado a 3.500 W e fator de compressor 0,6. `perfil_regra` é o rótulo da
   geração: **nunca** entra no treino (vazamento), só na conferência do K-Means.
 - **CTGAN** (SDV 2.1, `scripts/treinar_ctgan.py`): aprende UF, moradores (categórico), cômodos,
   `tem_*` e kWh por aparelho (chuveiro por morador). Total, custo e frações são recalculados;
-  distribuidora/tarifa sorteadas entre as reais da UF. Gera 5.000 casas; `validar()` imprime a
+  distribuidora/tarifa sorteadas entre as reais da UF. Gera 5.000 casas; `validate()` imprime a
   comparação seed × sintética. SDV 2.x: `fit`/`sample` usam `{"residencias": df}`.
 - **K-Means** (`scripts/treinar_kmeans.py`, k=3): variáveis `kwh_por_morador` (log, peso 2) e
   `frac_chuveiro/ar/refrigerador` (peso 0,5); nome do grupo pela média de kWh/morador.
   O `kmeans.pkl` guarda só números, então a API não precisa de scikit-learn.
-- **`src/ml_pipeline.py`**: `classificar_residencia({"moradores", "itens": [{categoria, kwh_mes}]})`
+- **`src/ml_pipeline.py`**: `classify_residence({"moradores", "itens": [{categoria, kwh_mes}]})`
   -> perfil, kWh/morador e comparação com a mediana das sintéticas (+ aviso de dado sintético).
 - Resultados atuais: qualidade SDV ~85%; K-Means bate com o perfil da geração em ~73% da seed.
 - Dependências pesadas (sdv/torch) ficam em `requirements-ml.txt`, fora da imagem da API.
@@ -298,8 +306,9 @@ rede + volume + postgres (`wait` até healthy) + imagem da API via `terraform_da
 `docker build` (tag = hash de src/, datasets/processed, requirements, Dockerfile, kmeans.pkl; o bloco
 `build` do provider trava no Docker Desktop em "load remote build context") + API (`wait` no /saude) +
 `docker_container.carga_rag` (`attach`, `must_run=false`) que roda `carregar_rag.py` com o script e os
-documentos copiados por `upload` (não estão na imagem). Senha via `random_password`; `cd infra/local;
-terraform init; terraform apply`.
+documentos copiados por `upload` (hoje a imagem já leva os dois e a API carrega sozinha com a base vazia;
+o `upload` ficou de antes). A carga precisa da `gemini_api_key` (embeddings do Gemini). Senha via
+`random_password`; `cd infra/local; terraform init; terraform apply`.
 Testado em 09/11/2026 (Terraform 1.17, winget; o `terraform.exe` não entra no PATH até abrir outro terminal):
 apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e /eco-coach na 8080.
 - Windows: o provider só acha o Docker Desktop com
@@ -361,7 +370,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
   `main.py` (`0.5.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
   Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
-  `terraform apply` + `docker compose up -d --build`) -> APK -> tag -> Release (o usuário faz; `gh` sem login).
+  `terraform apply` + `docker compose up -d --build`; no Render o merge na `main` já publica) -> APK -> tag ->
+  Release (o usuário faz; `gh` sem login).
 - O APK de arm64 é copiado como `build/app/outputs/flutter-apk/iamp.apk` (é o arquivo que vai para os celulares).
 - Sempre `flutter build apk --release --split-per-abi --dart-define=API_URL=...` (o split soma 1000 × ABI
   ao versionCode; misturar com e sem split parece downgrade). Publicar a API antes do APK; mudanças na
@@ -371,11 +381,12 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
   Chave criada em 09/11/2026 (`C:\Users\mathe\keys\iamp.jks`, alias `iamp`, `CN=iamp, O=Projeto TCS 2026`;
   senha aleatória só no `key.properties`, não abrir). Conferir: `apksigner verify --print-certs` e
   `aapt dump badging` (build-tools 36.0.0 do SDK). Quem instalou o 1º APK (chave de teste) desinstala uma vez.
-- Celular: o `API_URL` fica gravado no APK. Ele aponta para o IP do PC na rede (`ipconfig`/Wi-Fi), que
-  muda a cada rede (FIEP-CONV = 10.164.48.89; outra rede = outro IP) -> trocou de rede, gera o APK de novo.
+- Celular: o `API_URL` fica gravado no APK. Com a API no Render o endereço é fixo. Com a API no PC, ele
+  aponta para o IP do PC na rede (`ipconfig`/Wi-Fi), que muda a cada rede (FIEP-CONV = 10.164.48.89;
+  outra rede = outro IP) -> trocou de rede, gera o APK de novo.
   O firewall do Windows já libera o `com.docker.backend.exe`. Redes de instituição (ex.: FIEP-CONV) podem
   isolar os aparelhos: teste `http://<ip>:8000/saude` no navegador do celular; se não abre, usar o roteador
-  do celular, um túnel (ngrok com domínio fixo, não configurado) ou a API publicada por `infra/oracle/`.
+  do celular, um túnel (ngrok com domínio fixo, não configurado) ou a API publicada no Render.
 - iOS: o APK não serve; gerar IPA exige Mac com Xcode (+ conta Apple para instalar) e liberar HTTP no
   `ios/Runner/Info.plist` (hoje sem exceção do ATS). Sem Mac, a alternativa é a versão web (`flutter build web`,
   a API já libera CORS) aberta no Safari.
@@ -383,22 +394,23 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 ## Próximas etapas
 
 Documento do projeto: `docs/documento_processo.md` escrito (11 seções, segue o guia da banca); o PDF
-entregável sai de `python scripts/gerar_pdf_documento.py` (Chrome/Edge headless, `markdown` no
+entregável sai de `python scripts/gerar_pdf_documento.py` (Chrome/Edge headless, `markdown` e `pillow` no
 requirements-dev). Seção 2 usa os BPMN em níveis de `docs/bpmn/` (0_visao_geral com subprocessos [+] e
 servidor/Gemini como caixa-preta; 1_calculo, 2_troca_payback, 3_perfil, 4_eco_coach, 5_treino_offline),
 gerados por `scripts/gerar_bpmn_visoes.py` (.bpmn editável + .svg vetorial + .png 2x para o deck; cores:
 amarelo usuário, azul Python, verde ML, roxo IA generativa; sem bpmn-js, o SVG é desenhado pelo script).
 Mudou o processo? ajuste o script, rode-o e gere o PDF de novo. O diagrama completo do grupo fica no
-Anexo A (inteiro + 3 partes cortadas no marcador `<!-- BPMN_PARTES -->`). Registro de prompts
-(`prompts/registros_vibecoding.md` vazio), deck e vídeo.
-No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular (ngrok ou `infra/oracle/`),
-para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
+Anexo A (inteiro + 3 partes cortadas no marcador `<!-- BPMN_PARTES -->`). Em 12/11/2026 o documento foi
+atualizado para a versão atual (sem gás, embeddings do Gemini, Render + Neon, modo claro, inglês,
+cadastro/LGPD, Eco-Coach curto, 151 testes Python + 67 do app).
+Falta: registro de prompts (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
+No app: salvar "Minha casa" entre sessões; publicar a API no Render (endereço fixo para o celular, sem
+gerar APK a cada rede); versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
 Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Dicas
 de eletroportátil entram como anotação. Em 12/11/2026 saiu a anotação do gás (e ANP/fastembed dos nomes).
 Ao mudar a API, atualizar o .bpmn e exportar o PNG de novo.
-PENDENTE: tirar o gás do `docs/documento_processo`.
 
 ## Limitações conhecidas (usar na parte de ética)
 
@@ -409,8 +421,16 @@ PENDENTE: tirar o gás do `docs/documento_processo`.
 - O Inmetro tem erros de digitação no consumo (ex.: 28,0 vs 2,8 kWh). Nas TVs, 77 consumos com a
   vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela) são corrigidos na limpeza
   (`consumo_imputado`, motivo em `correcao_consumo`) e o stand-by > 10 W é apagado
-  (`standby_suspeito`). Nas outras categorias, as sugestões filtram os casos extremos, mas o
-  cálculo do aparelho escolhido usa o valor como veio.
+  (`standby_suspeito`). No ar-condicionado, capacidade, potência e consumo anual são conferidos entre si
+  (faixas medidas nos dados: 20–110 kWh/ano por 1.000 BTU/h, capacidade/potência 2–8, 5.000–80.000 BTU/h):
+  95 consumos refeitos pela potência × horas típicas da rotação (~772 h fixa, ~414 h inverter), 13 potências
+  pelo consumo, 4 capacidades corrigidas (ex.: GREE GWH09QB-D3NNB4C: 17 kWh/ano no cadastro -> 52 kWh/mês);
+  a média da marca usada para completar só usa valores conferidos. No ventilador de teto, consumo acima de
+  8 kWh/mês (1 h/dia = 266 W) é refeito pela vazão/eficiência do ensaio (motor de 10 a 200 W) ou apagado
+  (45 velocidades em 41 modelos; havia até 65 kWh). Tudo marcado em `consumo_imputado` + `correcao_consumo`;
+  `tests/test_limpeza.py` impede a volta. Nas outras categorias, as sugestões filtram os casos extremos, mas o
+  cálculo do aparelho escolhido usa o valor como veio. Continuam sem correção: velocidades fora de ordem
+  (baixa > alta) no ventilador de mesa e diâmetros errados no de teto.
 - Payback simples (sem juros, sem revenda do antigo, sem reajuste de tarifa) e com preço digitado.
 - Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
   potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV

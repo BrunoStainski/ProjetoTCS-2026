@@ -69,6 +69,8 @@ class _CompareScreenState extends State<CompareScreen> {
           alternative: comparison.rewritten.name,
           monthlySavings: comparison.monthlySavings,
           paybackMonths: comparison.payback?.months,
+          // o aparelho de "Minha casa" ou o resultado que a pessoa pode adicionar depois (o mesmo objeto)
+          current: widget.item?.result ?? widget.current,
         ),
       );
       if (!mounted) return;

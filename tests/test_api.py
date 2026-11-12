@@ -183,6 +183,21 @@ def test_register_false_does_not_save_history(api, con, shower_5500):
     assert count() == before
 
 
+@pytest.mark.parametrize("category, usage", [
+    ("lampada_led", {"horas_dia": 0}),
+    ("televisor", {"horas_dia": 0}),
+    ("maquina_de_lavar", {"ciclos_mes": 0}),
+])
+@pytest.mark.banco
+def test_suggestions_with_zero_use_explain_instead_of_error_500(api, category_id, category, usage):
+    """O app aceita 0 h 0 min (e 0 ciclos): a economia em % dividia por zero e a API respondia 500."""
+    r = api.post("/sugestoes", json={"aparelho_id": category_id(category), "tarifa_manual": 1.0, **usage})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["sugestoes"] == [] and body["atual"]["kwh_mes"] == 0
+    assert "não gasta energia" in body["mensagem"]
+
+
 @pytest.mark.parametrize("body", [
     {"aparelho_id": 1, "tarifa_manual": 1.0, "distribuidora_id": 1},  # as duas tarifas
     {"aparelho_id": 1},                                                # nenhuma tarifa

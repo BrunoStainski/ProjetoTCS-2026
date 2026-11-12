@@ -1159,6 +1159,30 @@ void main() {
       expect(home.swaps, hasLength(5)); // so as 5 mais recentes
     });
 
+    test('troca de aparelho removido ou ja trocado nao vai para o Eco-Coach', () {
+      final fridge = home.add(query('refrigerador'), result('refrigerador', 40, 32));
+      final tv = home.add(query('televisor', id: 2), result('televisor', 10, 8));
+      home.registerSwap(
+        EvaluatedSwap(appliance: 'geladeira', alternative: 'nova', monthlySavings: 9, current: fridge.result),
+      );
+      home.registerSwap(EvaluatedSwap(appliance: 'tv', alternative: 'nova', monthlySavings: 2, current: tv.result));
+      expect(home.swaps, hasLength(2));
+
+      final position = home.remove(fridge);
+      expect(home.swaps.map((s) => s.appliance), ['tv']);
+      home.reinsert(fridge, position); // "Desfazer" traz a troca de volta
+      expect(home.swaps, hasLength(2));
+
+      home.replace(tv, query('televisor', id: 3), result('televisor', 6, 5)); // a troca foi feita
+      expect(home.swaps.map((s) => s.appliance), ['geladeira']);
+      // a troca do calculo que ainda nao foi para a casa so conta quando o resultado for adicionado
+      final calculated = result('chuveiro', 41.25, 31.68);
+      home.registerSwap(EvaluatedSwap(appliance: 'chuveiro', alternative: 'x', monthlySavings: 1, current: calculated));
+      expect(home.swaps, hasLength(1));
+      home.add(query('chuveiro', id: 4), calculated);
+      expect(home.swaps, hasLength(2));
+    });
+
     test('plano guardado some quando a casa muda', () {
       home.add(query('televisor'), result('televisor', 10, 8));
       home.storePlan(EcoCoach.fromJson(examplePlan));
@@ -1348,6 +1372,18 @@ void main() {
     await tester.pump(const Duration(seconds: 6));
     await tester.pumpAndSettle();
     expect(find.text('Foi.'), findsNothing);
+  });
+
+  test('erro da API sem JSON (500 em texto, pagina do servidor acordando) vira mensagem clara', () async {
+    for (final (status, body) in [(500, 'Internal Server Error'), (502, '<html>waking up</html>'), (200, '<html>')]) {
+      await http.runWithClient(
+        () => expectLater(
+          Api.categories(),
+          throwsA(isA<ApiError>().having((e) => e.message, 'message', contains('Tente de novo em instantes'))),
+        ),
+        () => MockClient((_) async => http.Response(body, status)),
+      );
+    }
   });
 }
 

@@ -20,7 +20,10 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 - Soma vários aparelhos em "Minha casa" e mostra o que mais pesa na conta.
 - Classifica o perfil de consumo da casa com Machine Learning (K-Means).
 - Sugere modelos equivalentes que gastam menos e calcula o payback da troca.
+- Estima aparelhos antigos ou fora do catálogo (geladeiras, eletros grandes e eletroportáteis).
+- Monta um plano de economia com IA (Eco-Coach: RAG + Gemini), com dicas de documentos oficiais e as fontes citadas.
 - Mostra também como o valor foi calculado e de onde veio cada dado.
+- Funciona em português e em inglês, no modo escuro ou claro.
 
 ---
 
@@ -42,17 +45,19 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
  PostgreSQL (Docker)                   docker-compose.yml
             |
             v
- Regras de cálculo e de equivalência   src/calculadora_residencial.py
+ Regras de cálculo e de equivalência   src/calculadora_residencial.py, src/estimativa.py
             |
             v
  Funções para as telas                 src/servico.py      Perfil (K-Means)  src/ml_pipeline.py
-            |                                                      |
+            |                                              Eco-Coach (RAG)   src/rag.py, src/rag_agent.py -> API do Gemini
             +--------------------------------------+---------------+
             v                                      v
  API FastAPI (Docker)  src/main.py      App de terminal (testes)  src/app_terminal.py
             |
             v
  App Flutter                           app_gerenciamento_energetico/
+
+ Base do Eco-Coach: datasets/raw/rag/ -> scripts/carregar_rag.py -> tabela trechos_rag (pgvector)
 ```
 
 ### Tecnologias
@@ -61,12 +66,15 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 |---|---|
 | Linguagem | Python 3.12 |
 | Limpeza e análise | Pandas |
-| Banco de dados | PostgreSQL 15 |
-| Acesso ao banco | SQLAlchemy + psycopg2 |
+| Banco de dados | PostgreSQL 15 com pgvector |
+| Acesso ao banco | SQLAlchemy Core + psycopg2 (SQL parametrizado, sem ORM) |
 | API | FastAPI + Uvicorn |
-| Machine Learning | SDV (CTGAN) e scikit-learn (K-Means) |
+| Machine Learning | SDV (CTGAN), scikit-learn (K-Means e Random Forest) |
+| IA generativa | Gemini (`google-genai`): embeddings e texto do Eco-Coach |
 | App | Flutter (Dart) |
 | Containers | Docker e Docker Compose |
+| Infraestrutura como código | Terraform |
+| Nuvem | Render (API) + Neon (banco) |
 
 ### Tabelas do banco
 
@@ -78,12 +86,18 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 | `vw_tarifa_vigente` | Visão com a tarifa que vale hoje para cada distribuidora |
 | `cargas` | De qual arquivo veio cada dado e quando foi carregado |
 | `consultas` | Histórico dos cálculos feitos no app (sem dados pessoais) |
+| `portateis` | Eletroportáteis (air fryer, secador...) com potência e uso típicos e a fonte de cada um |
+| `trechos_rag` | Trechos dos documentos oficiais e seus vetores, para a busca do Eco-Coach |
+
+O diagrama do banco (DER) está em [docs/der.png](docs/der.png).
 
 ### Aparelhos incluídos
 
 Geladeira, TV, ar-condicionado, ventilador de mesa, ventilador de teto, chuveiro, lâmpada LED, lâmpada fluorescente, lâmpada de vapor de sódio, micro-ondas, máquina de lavar e bomba d'água.
 
-Ficaram de fora: aquecedores e fogões a gás (não usam energia elétrica), fornos elétricos comerciais (não são de uso residencial) e aquecedores solares (geram economia, não consomem).
+Fora do catálogo, o Iamp também estima eletroportáteis (air fryer, secador de cabelo, ferro de passar...) e aparelhos antigos.
+
+Ficaram de fora: fornos elétricos comerciais (não são de uso residencial) e aquecedores solares (geram economia, não consomem).
 
 ---
 
@@ -94,18 +108,23 @@ iamp/
 ├── datasets/
 │   ├── raw/              # dados originais do Inmetro e da ANEEL
 │   └── processed/        # dados limpos, prontos para o banco (+ residências da seed e sintéticas)
-├── scripts/              # limpeza dos dados (um script por dataset) e treino dos modelos
-├── src/                  # aplicação: banco, cálculo, API e app de terminal
+├── scripts/              # limpeza dos dados (um script por dataset), treino dos modelos e carga do RAG
+├── src/                  # aplicação: banco, cálculo, estimativa, ML, Eco-Coach, API e app de terminal
+├── tests/                # testes da API e das regras (pytest)
+├── notebooks/            # análise exploratória (eda.ipynb)
 ├── app_gerenciamento_energetico/   # app Flutter
-├── docs/                 # BPMN e documentação
+├── docs/                 # documento do processo (md e PDF), BPMN, DER e gráficos da EDA
 ├── infra/                # Terraform: local/ (Docker, em uso) e oracle/ (nuvem, pronto)
-├── models/               # modelos treinados (ctgan.pkl e kmeans.pkl)
+├── models/               # modelos treinados (ctgan.pkl, kmeans.pkl e refrigerador.pkl)
 ├── prompts/              # registro dos prompts usados com IA
+├── skills/               # instruções permanentes para o agente de código (Claude Code)
 ├── Dockerfile            # imagem da API
 ├── docker-compose.yml    # sobe o PostgreSQL e a API
+├── render.yaml           # publicação da API no Render
 ├── requirements.txt      # bibliotecas Python da API
+├── requirements-dev.txt  # bibliotecas para os testes (pytest)
 ├── requirements-ml.txt   # bibliotecas para treinar os modelos (sdv, torch)
-└── .env.example          # modelo das credenciais do banco
+└── .env.example          # modelo das credenciais do banco e da chave do Gemini
 ```
 
 ---
@@ -163,7 +182,8 @@ Copie o arquivo de exemplo:
 - Windows: `copy .env.example .env`
 - Linux ou Mac: `cp .env.example .env`
 
-Abra o `.env` e troque a senha em `POSTGRES_PASSWORD`. Esse arquivo não vai para o GitHub.
+Abra o `.env` e troque a senha em `POSTGRES_PASSWORD`. Para o Eco-Coach funcionar, coloque também a
+`GEMINI_API_KEY` (gerada de graça no Google AI Studio). Esse arquivo não vai para o GitHub.
 
 ### Passo 5: subir o banco e a API
 
@@ -178,7 +198,8 @@ Isso sobe dois containers:
 - `postgres_iamp`: o banco PostgreSQL (porta 5434)
 - `api_iamp`: a API FastAPI (porta 8000)
 
-Na primeira vez, a API carrega os dados de `datasets/processed/` no banco sozinha (leva cerca de 1 minuto).
+Na primeira vez, a API carrega os dados de `datasets/processed/` no banco sozinha (leva cerca de 1 minuto)
+e, se a `GEMINI_API_KEY` estiver no `.env`, também a base do Eco-Coach.
 Ela também recarrega sozinha quando o banco foi criado por uma versão antiga do código (falta alguma coluna nova).
 Depois de um `git pull`, rode o mesmo comando de novo para a API usar o código novo.
 
@@ -215,7 +236,7 @@ O resultado esperado é parecido com:
 
 ```
 Banco criado: postgresql+psycopg2://admin:***@localhost:5434/banco_projeto
-  aparelhos:      24155
+  aparelhos:      24148
   distribuidoras: 99
 ```
 
@@ -251,7 +272,13 @@ flutter run -d chrome
 - No emulador Android, o app já usa `http://10.0.2.2:8000` (o computador visto pelo emulador).
 - Em outro endereço: `flutter run -d chrome --dart-define=API_URL=http://192.168.0.10:8000`.
 
-Testes do app: `flutter test`.
+Testes do app: `flutter test`. Testes da API e das regras (na raiz do projeto):
+
+```bash
+pip install -r requirements-dev.txt
+pytest                 # tudo (os testes de banco são pulados se o PostgreSQL não estiver no ar)
+pytest -m "not banco"  # só os rápidos
+```
 
 ### Passo 10 (opcional): subir tudo com Terraform
 
@@ -300,16 +327,26 @@ Documentação interativa: **http://localhost:8000/docs** (dá para testar cada 
 | Endereço | Para que serve |
 |---|---|
 | `GET /aparelhos?busca=brastemp` | Busca aparelhos por marca e/ou modelo (opcional: `categoria`, `limite` por tipo de aparelho; cada item traz `total_categoria`) |
+| `GET /marcas?categoria=refrigerador` | Marcas de um tipo de aparelho, com a quantidade de modelos |
+| `GET /modelos?categoria=refrigerador&marca=consul` | Modelos de uma marca (até 50 por padrão) |
 | `GET /aparelhos/{id}/uso` | Diz o que o app precisa perguntar: `horas`, `ciclos`, `velocidade` ou nada (`null`) |
 | `GET /distribuidoras?uf=PR` | Lista as distribuidoras com tarifa vigente (opcional: `busca=copel`) |
 | `POST /calcular` | Devolve o consumo (kWh/mês) e o custo (R$/mês e R$/ano) |
 | `POST /sugestoes` | Modelos equivalentes que gastam menos, com a economia por mês e por ano |
 | `POST /comparar` | Aparelho atual x modelo novo: economia e, com o preço, o payback em meses |
 | `POST /classificar` | Perfil de consumo da casa (K-Means): Consciente, Moderado ou Ineficiente |
+| `POST /eco-coach` | Plano de economia da casa escrito por IA, com as fontes citadas `[n]` |
+| `POST /eco-coach/aparelho` | Dicas de economia para um aparelho (usado nos eletroportáteis) |
+| `POST /calcular/refrigerador-antigo` | Geladeira fora do catálogo: pela etiqueta ou estimada pelo tipo, volume e ano de compra |
+| `GET /estimativa/categorias`, `POST /calcular/estimado` | Eletro grande fora do catálogo: pelo número da etiqueta ou da plaqueta, ou pelos modelos parecidos |
+| `POST /sugestoes/estimado`, `POST /comparar/estimado` | Sugestão de troca e payback para um aparelho estimado |
+| `GET /resistivos`, `POST /calcular/resistivo` | Eletroportáteis (air fryer, secador, ferro...) por potência e tempo de uso |
 | `GET /categorias`, `GET /ufs` | Listas para preencher filtros no app |
 | `GET /saude` | Diz se a API e o banco estão no ar |
 
-Fluxo do app: buscar o aparelho → perguntar o uso → escolher a distribuidora → calcular → adicionar à casa ou ver modelos mais econômicos.
+Com o cabeçalho `Accept-Language: en`, os textos das respostas (método, avisos, mensagens e o plano do Eco-Coach) vêm em inglês; sem ele, em português. As chaves do JSON e os números não mudam.
+
+Fluxo do app: escolher o tipo, a marca e o modelo → perguntar o uso → escolher o estado e a distribuidora → calcular → adicionar à casa ou ver modelos mais econômicos.
 
 Exemplo de `POST /calcular` (chuveiro Bosch EWI 5.5, 15 min por dia, Copel):
 
@@ -352,7 +389,7 @@ Regras do corpo:
 - Envie `distribuidora_id` **ou** `tarifa_manual` (R$/kWh da conta de luz), nunca os dois.
 - `horas_dia` (0 a 24), `ciclos_mes` ou `velocidade` (`baixa`, `media`, `alta`) conforme o `GET /uso`. Se faltar, usa o valor padrão quando existe.
 - `registrar` (padrão `true`, só no `/calcular`) grava o cálculo na tabela `consultas`.
-- Erros: `404` quando o aparelho ou a distribuidora não existe, `422` quando falta ou sobra algum dado, `503` quando o banco ou o modelo não está disponível.
+- Erros: `404` quando o aparelho ou a distribuidora não existe, `422` quando falta ou sobra algum dado, `503` quando o banco, o modelo ou o Gemini não está disponível.
 
 Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 
@@ -363,6 +400,14 @@ Os ids mudam se o banco for recriado: o app deve sempre pegar o id pela busca.
 O **Iamp** é para quem paga as contas de casa e quer economizar, incluindo pessoas mais velhas ou com pouca familiaridade com tecnologia. A interface é moderna, mas acessível por padrão.
 
 Identidade visual: fundo preto, amarelo nos destaques (a cor da energia) e texto branco, pensada primeiro para celular Android. Cores, tamanhos de texto, espaçamentos e medidas ficam todos no tema (`lib/tema.dart`); as telas não usam valores soltos.
+
+No menu (☰) a pessoa também escolhe:
+
+- **Aparência:** escuro (padrão) ou claro. No modo claro o amarelo fica só nos preenchimentos e os detalhes usam um âmbar escuro, para manter o contraste.
+- **Idioma:** português (padrão) ou inglês, para apresentar a quem não fala português. Os textos da API vêm no mesmo idioma.
+- **Cadastro (opcional):** nome e e-mail, só para o app cumprimentar a pessoa. Fica só na memória do celular e não vai para a API nem para o banco.
+
+As escolhas não ficam gravadas: o app sempre abre escuro, em português e sem cadastro.
 
 | Regra | Como aparece no app |
 |---|---|
@@ -392,7 +437,8 @@ A barra de baixo tem 3 abas, com ícone e texto: **Calcular**, **Minha casa** e 
 | Minha casa | Total da conta, o que mais pesa, quantidade de cada aparelho e comparação com casas parecidas |
 | Gastar menos | Modelos equivalentes que gastam menos |
 | Vale a pena trocar? | Compara os dois modelos e mostra em quanto tempo a troca se paga, com o preço digitado |
-| Economizar | Plano de economia escrito por IA com dicas oficiais (Inmetro e Cemig), com as fontes citadas. Os números são calculados pelo Iamp |
+| Economizar | Plano de economia escrito por IA com dicas oficiais (Inmetro e Cemig), curto (3 ações) e com as fontes citadas. Os números são calculados pelo Iamp |
+| Como gastar menos | Dicas para um eletroportátil (eles não têm etiqueta do Inmetro, então não há sugestão de modelo) |
 
 A lista da casa fica só na memória: ao fechar o app, ela recomeça vazia.
 
@@ -440,12 +486,13 @@ O arquivo que vai para os celulares é copiado como `build/app/outputs/flutter-a
 
 Para o app falar com a API:
 
-- O endereço da API fica gravado no APK (`API_URL`). Hoje é o IP do computador na rede Wi-Fi, que
-  **muda a cada rede**: trocou de rede, gere o APK de novo com o IP novo.
-- O celular precisa estar na mesma rede que o computador, com o Docker ligado.
+- O endereço da API fica gravado no APK (`API_URL`). Com a API no Render (Passo 11), o endereço é
+  fixo e o app funciona em qualquer rede.
+- Com a API no computador, o endereço é o IP dele na rede Wi-Fi, que **muda a cada rede**: trocou de
+  rede, gere o APK de novo com o IP novo. O celular precisa estar na mesma rede, com o Docker ligado.
 - Algumas redes de instituição bloqueiam a comunicação entre aparelhos. Para testar, abra
   `http://<ip-do-computador>:8000/saude` no navegador do celular. Se não abrir, use o roteador de um
-  celular ou publique a API (`infra/oracle/`) para ter um endereço fixo.
+  celular ou a API publicada no Render.
 
 **iPhone:** o APK não funciona no iPhone. A versão de iOS precisa ser gerada num Mac com Xcode, e para
 instalar sem App Store é preciso uma conta Apple. Sem Mac, a alternativa é a versão web do app
@@ -522,6 +569,9 @@ python scripts/treinar_kmeans.py
 - O perfil da casa vem de um modelo treinado com residências sintéticas: serve como referência, não como avaliação oficial.
 - O payback é simples: não considera juros, a venda do aparelho antigo nem reajustes da tarifa.
 - O filtro de consumo suspeito (40% da mediana) é uma regra do grupo para evitar recomendar um modelo por causa de um erro no dado.
+- A estimativa de aparelho fora do catálogo é aproximada e vem com uma faixa. Fora a geladeira, não há dado de época: sem o número da etiqueta, ela usa modelos atuais e pode subestimar um aparelho antigo.
+- O plano do Eco-Coach é escrito por IA e pode errar mesmo com as regras do prompt; por isso cita as fontes e traz um aviso. Os números do plano são calculados pelo Iamp, não pela IA.
+- Para o Google (Gemini) vão só números de consumo, trechos de documentos públicos e nomes de aparelhos, nada pessoal. No plano gratuito, o Google pode usar esse conteúdo para melhorar os produtos.
 
 ---
 
@@ -531,6 +581,9 @@ python scripts/treinar_kmeans.py
 |---|---|
 | Consumo dos aparelhos | Inmetro, Programa Brasileiro de Etiquetagem (PBE) |
 | Tarifas de energia | ANEEL, tarifas homologadas das distribuidoras |
+| Geladeiras antigas | Portaria Inmetro 20/2006 e tabela do Inmetro de 2001 (Queiroz et al., ACEEE 2003) |
+| Dicas do Eco-Coach | Páginas do Inmetro (dicas, etiqueta, PBE) e cartilha de eficiência energética da Cemig (2025), listadas em `datasets/raw/rag/fontes.csv` |
+| Eletroportáteis | Potência e uso típicos com a fonte de cada linha em `datasets/processed/eletroportateis.csv` (premissas do grupo) |
 
 ---
 
@@ -543,18 +596,12 @@ python scripts/treinar_kmeans.py
 - API FastAPI no Docker, subindo junto com o banco (`docker compose up -d`)
 - Machine Learning: residências sintéticas (CTGAN) e perfil de consumo (K-Means)
 - App Flutter ligado à API: cálculo, "Minha casa", perfil da casa, sugestão de troca e payback
-- Diagrama BPMN em `docs/`
+- Diagramas BPMN em níveis (`docs/bpmn/`) e o completo (`docs/bpmn_processo.bpmn`), DER do banco (`docs/der.png`)
 - Análise exploratória com gráficos (`notebooks/eda.ipynb`, imagens em `docs/graficos/`)
 - Eco-Coach: plano de economia com RAG (pgvector + Gemini) e tela no app
+- Estimativa de aparelhos fora do catálogo (geladeira com Random Forest e regra do Inmetro, eletros grandes, eletroportáteis)
 - Terraform: infraestrutura local no Docker testada (API, banco, RAG) e a da Oracle Cloud pronta
-- Busca separada por tipo de aparelho, atualizando sozinha ao trocar o tipo
-- Versionamento (`CHANGELOG.md`, tags `v1.1.0` e `v1.1.1`) e APK Android assinado com a chave do projeto
-
-## 15. Próximas etapas
-
-- Documentação de processo, ética e governança; registro dos prompts
-- Atualizar o BPMN com `/sugestoes`, `/comparar` e `/eco-coach`
-- Endereço fixo da API para o celular (publicar na Oracle Cloud ou usar um túnel), para não depender da rede
-- Salvar "Minha casa" entre uma abertura e outra do app
-- Versão web para quem usa iPhone
-- Deck e vídeo de apresentação
+- App redesenhado para o público geral (acessibilidade, uma decisão por tela, 3 abas), com modo claro e versão em inglês
+- API pronta para a nuvem gratuita (Render + Neon, `render.yaml`)
+- Documento do processo, com ética e governança (`docs/documento_processo.md` e o PDF)
+- Versionamento (`CHANGELOG.md`, tags no GitHub) e APK Android assinado com a chave do projeto

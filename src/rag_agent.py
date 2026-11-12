@@ -169,19 +169,30 @@ def call_llm(prompt):
     from google.genai import types
     client = genai.Client(api_key=key)
     errors = []
-    # thinking_budget=0: sem "raciocinio" interno, que consumia o limite de tokens e cortava o
-    # texto no meio. O plano e curto e os numeros ja vem prontos, entao nao precisa.
-    cfg = types.GenerateContentConfig(temperature=0.3, max_output_tokens=2048,
-                                      thinking_config=types.ThinkingConfig(thinking_budget=0))
+    configs = (
+        # thinking_budget=0: sem "raciocinio" interno, que consumia o limite de tokens e cortava o
+        # texto no meio. O plano e curto e os numeros ja vem prontos, entao nao precisa.
+        types.GenerateContentConfig(temperature=0.3, max_output_tokens=2048,
+                                    thinking_config=types.ThinkingConfig(thinking_budget=0)),
+        # alguns modelos recusam o thinking_budget com erro 400 (o gemini-3.5-flash-lite, em 12/11/2026),
+        # e sem isso o modelo reserva nunca entrava: tenta de novo sem ele
+        types.GenerateContentConfig(temperature=0.3, max_output_tokens=2048),
+    )
     for model in _models():
-        try:
-            r = client.models.generate_content(model=model, contents=prompt, config=cfg)
-            end = str(r.candidates[0].finish_reason) if r.candidates else ""
-            if r.text and r.text.strip() and "MAX_TOKENS" not in end:
-                return r.text.strip(), model
-            errors.append(idioma.tr(f"{model}: resposta vazia ou cortada ({end})", f"{model}: empty or cut-off answer ({end})"))
-        except Exception as error:  # modelo sobrecarregado, limite do plano gratuito etc.
-            errors.append(f"{model}: {type(error).__name__}")
+        for cfg in configs:
+            try:
+                r = client.models.generate_content(model=model, contents=prompt, config=cfg)
+                end = str(r.candidates[0].finish_reason) if r.candidates else ""
+                if r.text and r.text.strip() and "MAX_TOKENS" not in end:
+                    return r.text.strip(), model
+                errors.append(idioma.tr(f"{model}: resposta vazia ou cortada ({end})",
+                                        f"{model}: empty or cut-off answer ({end})"))
+            except Exception as error:  # modelo sobrecarregado, limite do plano gratuito etc.
+                code = getattr(error, "code", None)  # 503 = sobrecarregado, 429 = limite, 400 = pedido recusado
+                errors.append(f"{model}: {type(error).__name__}" + (f" {code}" if code else ""))
+                if code == 400:
+                    continue
+            break  # proximo modelo
     raise RuntimeError(idioma.tr("LLM indisponivel (", "LLM unavailable (") + "; ".join(errors) + ")")
 
 
