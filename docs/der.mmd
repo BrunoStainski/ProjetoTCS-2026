@@ -14,13 +14,14 @@ erDiagram
 
     aparelhos {
         serial id PK
-        text categoria "UK com marca e modelo"
+        text categoria "UK com marca, modelo e tensao"
         text marca
         text modelo
         text tipo
         float capacidade "L, pol, BTU/h, W, kg ou cv"
         text unidade
         text detalhe
+        text tensao "127/220 só se o consumo muda; vazio = vale para as duas"
         float kwh_mes
         float kwh_mes_baixa "ventilador"
         float kwh_mes_media "ventilador"

@@ -6,6 +6,15 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Tensão 127 V × 220 V: o catálogo guardava só a primeira versão de cada modelo e o chuveiro de 220 V sumia
+  (ex.: Cardal Ducha 5 Luxo, 5500 W em 127 V e 7600 W em 220 V; ficava a de 127 V em 77 de 84 modelos). Agora,
+  quando a versão de outra tensão gasta diferente, as duas aparecem, com a tensão no detalhe ("7600 W · 220 V"):
+  55 chuveiros, 19 máquinas de lavar e 6 micro-ondas. As sugestões de troca só comparam modelos da mesma tensão.
+  Catálogo: 24.148 -> 24.228 aparelhos (o banco recarrega sozinho no deploy e os ids mudam).
+- Casas salvas: ao trazer uma casa da conta, o id de cada aparelho é conferido pelo nome (categoria, marca e
+  modelo) e corrigido se o catálogo foi recarregado; sem isso, "Ver modelos que gastam menos" podia usar outro
+  aparelho. Aparelho que saiu do catálogo volta com id 0 (sem sugestão de troca).
+
 - Conta e várias casas na nuvem: a pessoa cria uma conta (nome, e-mail e senha, com o aceite do aviso de
   privacidade) ou entra, e as casas ficam salvas no servidor. Uma conta pode ter várias casas (ex.: a casa e a casa
   da praia), cada uma com os próprios aparelhos e moradores; dá para criar, trocar, renomear e apagar. Sem conta,

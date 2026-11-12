@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 
+import banco
 import contas
 
 
@@ -169,3 +170,24 @@ def test_sair_e_apagar_a_conta(api_contas, con):
         column = "id" if table == "usuarios" else "usuario_id"
         assert con.exec_driver_sql(f"SELECT COUNT(*) FROM {table} WHERE {column} = %(u)s",
                                    {"u": user_id}).scalar_one() == 0
+
+
+@pytest.mark.banco
+def test_old_appliance_id_is_fixed_by_name(con):
+    """Recarregar o catalogo muda os ids: o item salvo volta com o id certo do mesmo aparelho."""
+    a = banco.run(con, "SELECT id, categoria, marca, modelo, detalhe FROM aparelhos "
+                       "WHERE categoria = 'refrigerador' ORDER BY id LIMIT 1").mappings().one()
+    other = banco.run(con, "SELECT id FROM aparelhos WHERE categoria = 'televisor' ORDER BY id LIMIT 1").scalar_one()
+
+    def item(appliance, estimate=None):
+        return {"consulta": {"aparelho": appliance, "estimativa": estimate}, "resultado": {}}
+
+    moved = contas.refresh_appliance_id(con, item({**a, "id": other}))  # id antigo que hoje e de outro aparelho
+    gone = contas.refresh_appliance_id(con, item({"id": other, "categoria": "refrigerador", "marca": "NAO EXISTE", "modelo": "X"}))
+    estimated = contas.refresh_appliance_id(con, item({"id": 0, "categoria": "refrigerador", "marca": "Geladeira", "modelo": ""},
+                                                      {"rota": "/calcular/refrigerador-antigo", "dados": {}}))
+    same = contas.refresh_appliance_id(con, item(dict(a)))
+    assert moved["consulta"]["aparelho"]["id"] == a["id"]
+    assert gone["consulta"]["aparelho"]["id"] == 0
+    assert estimated["consulta"]["aparelho"]["id"] == 0
+    assert same["consulta"]["aparelho"]["id"] == a["id"]

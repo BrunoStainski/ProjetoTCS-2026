@@ -39,7 +39,8 @@ CREATE TABLE aparelhos (
     tipo            TEXT,
     capacidade      DOUBLE PRECISION,  -- litros, polegadas, BTU/h, W, kg ou cv
     unidade         TEXT,
-    detalhe         TEXT,              -- texto pronto para a tela, ex.: "375 L"
+    detalhe         TEXT,              -- texto pronto para a tela, ex.: "375 L" ou "7600 W · 220 V"
+    tensao          TEXT NOT NULL DEFAULT '',  -- "127"/"220" so quando a versao de outra tensao gasta diferente
     kwh_mes         DOUBLE PRECISION,
     kwh_mes_baixa   DOUBLE PRECISION,
     kwh_mes_media   DOUBLE PRECISION,
@@ -51,7 +52,7 @@ CREATE TABLE aparelhos (
     origem_dado     TEXT NOT NULL,     -- "informado" ou "derivado ou estimado na limpeza"
     arquivo_origem  TEXT NOT NULL,
     busca           TEXT NOT NULL,     -- marca + modelo sem acento, minusculo
-    UNIQUE (categoria, marca, modelo),
+    UNIQUE (categoria, marca, modelo, tensao),
     CHECK (kwh_mes IS NOT NULL OR kwh_ciclo IS NOT NULL OR potencia_w IS NOT NULL)
 );
 CREATE INDEX idx_aparelhos_categoria ON aparelhos (categoria, busca);

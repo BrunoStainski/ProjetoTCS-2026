@@ -267,8 +267,34 @@ def _home(con, user_id, home_id):
         "id": int(row["id"]), "nome": row["nome"], "moradores": int(row["moradores"]),
         "ultima_tarifa": _json(row["ultima_tarifa"]), "atualizado_em": row["atualizado_em"].isoformat(),
         "itens": [{"quantidade": int(i["quantidade"]), "categoria": i["categoria"], "kwh_mes": float(i["kwh_mes"]),
-                   "custo_mes": float(i["custo_mes"]), "dados": _json(i["dados"])} for _, i in items.iterrows()],
+                   "custo_mes": float(i["custo_mes"]), "dados": refresh_appliance_id(con, _json(i["dados"]))}
+                  for _, i in items.iterrows()],
     }
+
+
+def refresh_appliance_id(con, data):
+    """Os ids do catalogo mudam quando os dados sao recarregados (ex.: coluna nova, limpeza refeita). Ao devolver
+    um item salvo, confere se o id ainda aponta para o mesmo aparelho (categoria + marca + modelo); se nao, acha o
+    aparelho pelo nome e corrige o id. Sumiu do catalogo: id 0 (o app mostra o item, sem sugestao de troca).
+    Item estimado (fora do catalogo) ja tem id 0 e fica como esta."""
+    query = data.get("consulta") if isinstance(data, dict) else None
+    appliance = query.get("aparelho") if isinstance(query, dict) else None
+    if not isinstance(appliance, dict) or query.get("estimativa") or not isinstance(appliance.get("id"), int):
+        return data
+    if appliance["id"] <= 0:
+        return data
+    key = (appliance.get("categoria"), appliance.get("marca"), appliance.get("modelo"))
+    row = banco.run(con, "SELECT categoria, marca, modelo FROM aparelhos WHERE id = ?", (appliance["id"],)).first()
+    if row is not None and tuple(row) == key:
+        return data
+    found = banco.run(
+        con,
+        "SELECT id FROM aparelhos WHERE categoria = ? AND marca = ? AND modelo = ? "
+        "ORDER BY (detalhe = ?) DESC, id LIMIT 1",
+        (*key, appliance.get("detalhe") or ""),
+    ).scalar()
+    appliance["id"] = int(found) if found is not None else 0
+    return data
 
 
 def list_homes(con, user_id):
