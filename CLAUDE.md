@@ -389,7 +389,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 ## Próximas etapas
 
 Documento do projeto: `docs/documento_processo.md` escrito (11 seções, segue o guia da banca); o PDF
-entregável sai de `python scripts/gerar_pdf_documento.py` (Chrome/Edge headless, `markdown` no
+entregável sai de `python scripts/gerar_pdf_documento.py` (Chrome/Edge headless, `markdown` e `pillow` no
 requirements-dev). Seção 2 usa os BPMN em níveis de `docs/bpmn/` (0_visao_geral com subprocessos [+] e
 servidor/Gemini como caixa-preta; 1_calculo, 2_troca_payback, 3_perfil, 4_eco_coach, 5_treino_offline),
 gerados por `scripts/gerar_bpmn_visoes.py` (.bpmn editável + .svg vetorial + .png 2x para o deck; cores:

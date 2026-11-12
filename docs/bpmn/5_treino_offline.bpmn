@@ -13,7 +13,7 @@
     <bpmn:serviceTask id="ctgan" name="Treinar CTGAN e gerar 5.000 casas sintéticas"><bpmn:incoming>F_seed_ctgan</bpmn:incoming><bpmn:outgoing>F_ctgan_kmeans</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:serviceTask id="kmeans" name="Treinar K-Means com 3 grupos (kmeans.pkl)"><bpmn:incoming>F_ctgan_kmeans</bpmn:incoming><bpmn:outgoing>F_kmeans_junta</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:serviceTask id="rf" name="Treinar Random Forest de geladeiras (refrigerador.pkl)"><bpmn:incoming>F_abre_rf</bpmn:incoming><bpmn:outgoing>F_rf_junta</bpmn:outgoing></bpmn:serviceTask>
-    <bpmn:serviceTask id="emb" name="Gerar embeddings dos documentos (fastembed)"><bpmn:incoming>F_abre_emb</bpmn:incoming><bpmn:outgoing>F_emb_pgv</bpmn:outgoing></bpmn:serviceTask>
+    <bpmn:serviceTask id="emb" name="Gerar embeddings dos documentos (Gemini)"><bpmn:incoming>F_abre_emb</bpmn:incoming><bpmn:outgoing>F_emb_pgv</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:serviceTask id="pgv" name="Gravar trechos no pgvector (carregar_rag.py)"><bpmn:incoming>F_emb_pgv</bpmn:incoming><bpmn:outgoing>F_pgv_junta</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:serviceTask id="eda" name="Gerar os gráficos da EDA (notebook)"><bpmn:incoming>F_abre_eda</bpmn:incoming><bpmn:outgoing>F_eda_junta</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:parallelGateway id="junta"><bpmn:incoming>F_kmeans_junta</bpmn:incoming><bpmn:incoming>F_rf_junta</bpmn:incoming><bpmn:incoming>F_pgv_junta</bpmn:incoming><bpmn:incoming>F_eda_junta</bpmn:incoming><bpmn:outgoing>F_junta_fim</bpmn:outgoing></bpmn:parallelGateway>

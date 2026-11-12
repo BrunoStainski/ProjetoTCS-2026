@@ -592,7 +592,7 @@ def eco_coach():
     Y, Y2 = 115, 275
     d.no("P_Srv", "ini", "inicio_msg", "Casa recebida (consumos, custos e trocas)", 95, Y)
     d.no("P_Srv", "numeros", "servico", "Calcular perfil, totais e os 3 maiores consumos (Python)", 220, Y, w=160)
-    d.no("P_Srv", "busca", "ia", "Buscar trechos oficiais sobre esses aparelhos (embeddings locais + pgvector)", 420, Y, w=180)
+    d.no("P_Srv", "busca", "ia", "Buscar trechos oficiais sobre esses aparelhos (embeddings do Gemini + pgvector)", 420, Y, w=180)
     d.no("P_Srv", "prompt", "servico", "Montar o prompt: regras + DADOS DA CASA + FONTES [n]", 620, Y, w=160)
     d.no("P_Srv", "gerar", "ia", "Gerar o texto do plano com o Gemini", 820, Y, w=160)
     d.no("P_Srv", "g_ok", "xor", "Resposta completa?", 980, Y)
@@ -632,7 +632,7 @@ def offline_training():
     d.no("P_Off", "ctgan", "ml", "Treinar CTGAN e gerar 5.000 casas sintéticas", 850, lines["seed"], w=160)
     d.no("P_Off", "kmeans", "ml", "Treinar K-Means com 3 grupos (kmeans.pkl)", 1050, lines["seed"], w=160)
     d.no("P_Off", "rf", "ml", "Treinar Random Forest de geladeiras (refrigerador.pkl)", 650, lines["rf"], w=160)
-    d.no("P_Off", "emb", "ia", "Gerar embeddings dos documentos (fastembed)", 650, lines["rag"], w=160)
+    d.no("P_Off", "emb", "ia", "Gerar embeddings dos documentos (Gemini)", 650, lines["rag"], w=160)
     d.no("P_Off", "pgv", "servico", "Gravar trechos no pgvector (carregar_rag.py)", 850, lines["rag"], w=160)
     d.no("P_Off", "eda", "servico", "Gerar os gráficos da EDA (notebook)", 650, lines["eda"], w=160)
     d.no("P_Off", "junta", "and", "", 1200, Y)
