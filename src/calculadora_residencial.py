@@ -236,6 +236,7 @@ SPECS = [
         # o consumo mensal da tabela do Inmetro depende de um tempo de banho padrao;
         # usamos a potencia e pedimos ao usuario o tempo de banho por dia
         "potencia_w": ["potencia_w"],
+        "tensao": "tensao_v",  # versao 220 V costuma ter outra potencia (ver keep_voltage_versions)
     },
     {
         "arquivo": "lampadas_led_limpo.csv", "categoria": "lampada_led",
@@ -257,11 +258,13 @@ SPECS = [
         "capacidade": ("volume_l", "L"),
         "potencia_w": ["potencia_nominal_w"],
         "standby_dia": "consumo_modo_espera_stand_by_kwh_dia",
+        "tensao": "tensao_v",
     },
     {
         "arquivo": "maquinas-de-lavar_limpo.csv", "categoria": "maquina_de_lavar",
         "tipo": "tipo_de_lavadora", "capacidade": ("capacidade_de_lavagem_kg", "kg"),
         "kwh_ciclo": ["consumo_de_energia_kwh_ciclo_agua_fria"],
+        "tensao": "tensao_v",
     },
     {
         "arquivo": "bombas-e-motobombas_limpo.csv", "categoria": "bomba",
@@ -299,6 +302,11 @@ def _build(df, spec):
     out["marca"] = df["marca"].astype(str).str.strip()
     out["modelo"] = df["modelo"].astype(str).str.strip()
     out["tipo"] = df[spec["tipo"]].fillna("").astype(str).str.strip() if spec.get("tipo") else ""
+    if spec.get("tensao"):  # 127 ou 220 (texto); vazio = nao informada ou nao muda o consumo
+        volts = pd.to_numeric(df[spec["tensao"]], errors="coerce")
+        out["tensao"] = volts.map(lambda v: "" if pd.isna(v) else f"{v:g}")
+    else:
+        out["tensao"] = ""
 
     if spec.get("capacidade"):
         column, unit = spec["capacidade"]
@@ -379,10 +387,32 @@ def load_catalog(folder=None):
             print(f"[aviso] {spec['arquivo']}: coluna {error} nao existe, arquivo ignorado")
     if not parts:
         raise FileNotFoundError(f"nenhum dataset carregado em {folder}")
-    catalog = pd.concat(parts, ignore_index=True)
-    catalog = catalog.drop_duplicates(subset=["categoria", "marca", "modelo"], keep="first")
+    catalog = keep_voltage_versions(pd.concat(parts, ignore_index=True))
     catalog["busca"] = (catalog["marca"] + " " + catalog["modelo"]).map(normalize)
     return catalog.reset_index(drop=True)
+
+
+# Colunas que mudam o calculo: se diferem entre a versao 127 V e a 220 V, as duas ficam no catalogo.
+VOLTAGE_CONSUMPTION = ["kwh_mes", "kwh_ciclo", "potencia_w", "standby_kwh_mes"]
+
+
+def keep_voltage_versions(catalog):
+    """Um modelo por linha, como antes, menos quando a versao de outra tensao gasta diferente.
+
+    Antes ficava so a 1a linha de cada marca + modelo, e o chuveiro de 220 V sumia: ele costuma ter outra
+    potencia (ex.: Cardal Ducha 5 Luxo, 5500 W em 127 V e 7600 W em 220 V) e o catalogo ficava com a de 127 V
+    em 77 de 84 modelos. Agora cada tensao vira uma linha, com "220 V" no detalhe, para a pessoa escolher a do
+    aparelho dela. Quando o consumo e igual nas duas, fica uma linha so e a tensao fica vazia (vale para as duas).
+    """
+    key = ["categoria", "marca", "modelo"]
+    versions = catalog.drop_duplicates(subset=key + ["tensao"], keep="first")
+    signature = versions[VOLTAGE_CONSUMPTION].round(4).fillna(-1).astype(str).agg("|".join, axis=1)
+    differs = (signature.groupby([versions[k] for k in key]).transform("nunique") > 1) & (versions["tensao"] != "")
+    split = versions[differs].copy()
+    split["detalhe"] = [f"{d} · {v} V" if d else f"{v} V" for d, v in zip(split["detalhe"], split["tensao"])]
+    single = catalog[~catalog.set_index(key).index.isin(split.set_index(key).index)]
+    single = single.drop_duplicates(subset=key, keep="first").assign(tensao="")
+    return pd.concat([single, split]).sort_index()
 
 
 def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, speed=None, days=DAYS_PER_MONTH):

@@ -68,9 +68,19 @@ e as das contas (`sessoes`/`casas -> usuarios`, `itens_casa -> casas`, com casca
 | `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais) |
 | `usuarios`, `sessoes`, `casas`, `itens_casa` | Contas e casas salvas na nuvem (`src/contas.py`, `CREATE IF NOT EXISTS`: não são apagadas na recarga) |
 
-Números atuais: 24.148 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
+Números atuais: 24.228 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
 ventilador de mesa/teto, chuveiro, lâmpadas LED/fluorescente/vapor de sódio, micro-ondas,
 máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, aquecedor solar.
+
+## Tensão (127 V × 220 V)
+
+A tarifa da ANEEL não muda com a tensão e a maioria dos aparelhos gasta igual nas duas. Mas o catálogo guardava só
+a 1ª linha de cada marca + modelo e o chuveiro de 220 V sumia (potência mediana +24%). `keep_voltage_versions`
+(calculadora_residencial.py): quando a versão de outra tensão gasta diferente (`VOLTAGE_CONSUMPTION`), cada
+tensão vira uma linha com "· 220 V" no detalhe e a coluna `tensao` preenchida; consumo igual = uma linha, tensão
+vazia. Só chuveiro, micro-ondas e máquina de lavar têm `"tensao"` no SPECS. Sugestões: `_candidates` só aceita a
+mesma tensão (ou vazia). Não há pergunta de tensão no app: a pessoa escolhe a versão escrita no aparelho.
+Recarregar o catálogo muda os ids: `contas.refresh_appliance_id` corrige o id dos itens das casas salvas pelo nome.
 
 ## Regras de cálculo (`monthly_consumption_kwh`)
 

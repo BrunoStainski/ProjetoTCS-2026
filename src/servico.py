@@ -410,6 +410,10 @@ def _candidates(con, current, rule, speed):
     if rule["mesmo_tipo"] and kind:
         sql += " AND tipo = ?"
         params.append(kind)
+    volts = _text(current.get("tensao"))
+    if volts:  # quem tem a versao 220 V nao recebe sugestao de 127 V (vazio = vale para as duas)
+        sql += " AND tensao IN ('', ?)"
+        params.append(volts)
     if speed in SPEEDS:  # ventilador: precisa ter o consumo na mesma velocidade
         sql += f" AND kwh_mes_{speed} IS NOT NULL"
     return banco.query(con, sql, params)
