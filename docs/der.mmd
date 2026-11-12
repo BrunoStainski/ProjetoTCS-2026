@@ -1,4 +1,4 @@
-%% DER do banco do iamp (PostgreSQL 15 + pgvector). Fonte: src/banco.py (ESQUEMA) e src/rag.py (ESQUEMA_RAG).
+%% DER do banco do iamp (PostgreSQL 15 + pgvector). Fonte: src/banco.py (SCHEMA) e src/rag.py (RAG_SCHEMA).
 %% Linha cheia = chave estrangeira no banco. Linha tracejada = ligação lógica (mesmo valor, sem FK).
 %% Gerar a imagem: npx -p @mermaid-js/mermaid-cli mmdc -i docs/der.mmd -o docs/der.png -b white -s 2
 erDiagram
@@ -7,8 +7,6 @@ erDiagram
     tarifas ||..o| vw_tarifa_vigente : "vigência mais recente"
     aparelhos ||..o{ consultas : "copia categoria, marca, modelo"
     distribuidoras ||..o{ consultas : "copia nome e UF"
-    fogoes ||..o{ consultas_gas : "copia marca e modelo"
-    precos_glp ||..o{ consultas_gas : "preço por UF"
     cargas ||..o{ aparelhos : "arquivo_origem"
 
     aparelhos {
@@ -92,40 +90,8 @@ erDiagram
         text fonte
     }
 
-    fogoes {
-        serial id PK
-        text marca "UK com modelo"
-        text modelo
-        text tipo
-        int bocas
-        float rendimento_pct
-        float forno_litros
-        float consumo_forno_kg_h
-        text classe_mesa
-        text classe_forno
-        text detalhe
-        text busca
-    }
 
-    precos_glp {
-        char2 uf PK
-        int ano PK
-        float preco_kg
-        text fonte "ANP"
-    }
 
-    consultas_gas {
-        serial id PK
-        timestamp criado_em
-        text marca
-        text modelo
-        text uf
-        float kg_mes
-        float preco_kg
-        text origem_preco
-        float custo_mes
-        text metodo
-    }
 
     trechos_rag {
         serial id PK
@@ -137,6 +103,6 @@ erDiagram
         text secao
         int pagina
         text texto
-        vector384 embedding "pgvector"
+        vector768 embedding "pgvector, gemini-embedding-001"
         timestamp carregado_em
     }
