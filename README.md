@@ -305,7 +305,7 @@ Para o app funcionar no celular em qualquer rede, com o computador desligado:
 | [Neon](https://neon.com) | PostgreSQL com pgvector (o banco) | grátis, sem cartão, 1 GB (o banco usa ~20 MB) |
 | [Render](https://render.com) | Roda a API a partir do `Dockerfile` do GitHub, com endereço HTTPS fixo | grátis, 512 MB (a API usa ~150 MB) |
 
-1. **Neon:** crie a conta (login pelo GitHub) e um projeto na região **AWS US East (N. Virginia)**.
+1. **Neon:** crie a conta (login pelo GitHub) e um projeto na região **AWS US East 2 (Ohio)**, a mesma do `render.yaml`.
    Copie o endereço de conexão (`postgresql://...?sslmode=require`).
 2. **Render:** crie a conta (login pelo GitHub), **New > Blueprint** e escolha este repositório. O Render lê o
    [render.yaml](render.yaml) e pede dois segredos: `DATABASE_URL` (o endereço do Neon) e `GEMINI_API_KEY`.
