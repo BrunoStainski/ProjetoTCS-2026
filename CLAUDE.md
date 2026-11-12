@@ -395,9 +395,10 @@ No app: salvar "Minha casa" entre sessões; endereço fixo da API para o celular
 para não gerar APK a cada rede; versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
-Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Gás e
-dicas de eletroportátil entram como anotação. Ao mudar a API, atualizar o .bpmn e exportar o PNG de novo.
-PENDENTE: o gás saiu do projeto; tirar a anotação de gás do BPMN e do `docs/documento_processo`.
+Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Dicas
+de eletroportátil entram como anotação. Em 12/11/2026 saiu a anotação do gás (e ANP/fastembed dos nomes).
+Ao mudar a API, atualizar o .bpmn e exportar o PNG de novo.
+PENDENTE: tirar o gás do `docs/documento_processo`.
 
 ## Limitações conhecidas (usar na parte de ética)
 

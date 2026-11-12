@@ -14,9 +14,6 @@
     <bpmn:messageFlow id="MF_class_resp" name="perfil e comparação" sourceRef="Ml_Fim" targetRef="App_Perfil" />
     <bpmn:messageFlow id="MF_eco_req" name="POST /eco-coach" sourceRef="App_EnviarEco" targetRef="Eco_Inicio" />
     <bpmn:messageFlow id="MF_eco_resp" name="plano com fontes [n]" sourceRef="Eco_Fim" targetRef="App_Plano" />
-    <bpmn:textAnnotation id="Nota_Gas">
-      <bpmn:text>Gás de cozinha é um fluxo à parte: escolhe o fogão e o estado → POST /calcular/gas (Inmetro + preço da ANP). É outra conta: não entra na Minha casa.</bpmn:text>
-    </bpmn:textAnnotation>
     <bpmn:textAnnotation id="Nota_Dicas">
       <bpmn:text>Eletroportátil (sem etiqueta do Inmetro): no lugar das sugestões de troca, dicas do Eco-Coach para o aparelho (POST /eco-coach/aparelho).</bpmn:text>
     </bpmn:textAnnotation>
@@ -213,7 +210,7 @@
     <bpmn:startEvent id="Eco_Inicio" name="POST /eco-coach recebido">
       <bpmn:messageEventDefinition id="MED_Eco_Inicio" />
     </bpmn:startEvent>
-    <bpmn:serviceTask id="Eco_Rag" name="Buscar trechos parecidos (embeddings locais + pgvector)">
+    <bpmn:serviceTask id="Eco_Rag" name="Buscar trechos parecidos (embedding do Gemini + pgvector)">
       <bpmn:property id="Prop_Rag" name="__targetRef_placeholder" />
       <bpmn:dataInputAssociation id="DIA_Rag">
         <bpmn:sourceRef>DS_Vetorial</bpmn:sourceRef>
@@ -258,7 +255,7 @@
     <bpmn:sequenceFlow id="F_k7" sourceRef="Eco_Fontes" targetRef="Eco_Fim" />
   </bpmn:process>
   <bpmn:process id="Proc_Offline" isExecutable="false">
-    <bpmn:startEvent id="Off_Inicio" name="Novos dados Inmetro / ANEEL / ANP" />
+    <bpmn:startEvent id="Off_Inicio" name="Novos dados Inmetro / ANEEL" />
     <bpmn:serviceTask id="Off_Limpar" name="Limpar e tratar nulos (tratar_dados_*.py, Pandas)" />
     <bpmn:serviceTask id="Off_Carregar" name="Carregar no PostgreSQL (criar_banco.py)" />
     <bpmn:parallelGateway id="Off_Divide" />
@@ -266,7 +263,7 @@
     <bpmn:serviceTask id="Off_Ctgan" name="Treinar CTGAN e gerar 5.000 casas sintéticas" />
     <bpmn:serviceTask id="Off_Kmeans" name="Treinar K-Means (kmeans.pkl)" />
     <bpmn:serviceTask id="Off_Rf" name="Treinar Random Forest de geladeiras (refrigerador.pkl)" />
-    <bpmn:serviceTask id="Off_Embed" name="Gerar embeddings dos documentos (fastembed)" />
+    <bpmn:serviceTask id="Off_Embed" name="Gerar embeddings dos documentos (Gemini)" />
     <bpmn:serviceTask id="Off_Pgvector" name="Gravar trechos no pgvector (carregar_rag.py)" />
     <bpmn:serviceTask id="Off_Eda" name="Gerar gráficos da EDA (notebook)" />
     <bpmn:parallelGateway id="Off_Junta" />
@@ -957,9 +954,6 @@
         <di:waypoint x="1240" y="1640" />
         <di:waypoint x="1280" y="1640" />
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNShape id="S_Nota_Gas" bpmnElement="Nota_Gas">
-        <dc:Bounds x="1120" y="295" width="340" height="80" />
-      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_Nota_Dicas" bpmnElement="Nota_Dicas">
         <dc:Bounds x="1510" y="295" width="360" height="80" />
       </bpmndi:BPMNShape>
