@@ -17,13 +17,15 @@ from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 import banco
 import config
+import contas
 import estimativa
 import idioma
 import ml_pipeline
@@ -37,6 +39,8 @@ from criar_banco import APPLIANCE_COLUMNS
 # Contrato com o app: o JSON da API continua com os nomes em portugues (o app le essas chaves como
 # texto). No codigo os campos tem nome em ingles; o alias liga um ao outro nas duas direcoes.
 JSON_NAMES = {
+    "accepted_privacy": "aceite_privacidade",
+    "account": "conta",
     "agency": "orgao",
     "alternative": "alternativa",
     "alternative_id": "alternativa_id",
@@ -48,9 +52,12 @@ JSON_NAMES = {
     "by_similar": "pelos_parecidos",
     "capacity": "capacidade",
     "category": "categoria",
+    "consent_at": "consentimento_em",
+    "created_at": "criado_em",
     "criterion": "criterio",
     "current": "atual",
     "daily_hours": "horas_dia",
+    "data": "dados",
     "data_source": "fonte_dados",
     "days_per_month": "dias_mes",
     "default_value": "padrao",
@@ -64,6 +71,7 @@ JSON_NAMES = {
     "field": "campo",
     "fractions": "fracoes",
     "freezer_volume_l": "volume_congelador_l",
+    "homes": "casas",
     "items": "itens",
     "kind": "tipo",
     "kwh_label": "kwh_etiqueta",
@@ -72,6 +80,7 @@ JSON_NAMES = {
     "label_field": "campo_etiqueta",
     "label_value": "valor_etiqueta",
     "largest_consumptions": "maiores_consumos",
+    "last_tariff": "ultima_tarifa",
     "limit": "limite",
     "manual_tariff": "tarifa_manual",
     "maximum": "maximo",
@@ -99,18 +108,21 @@ JSON_NAMES = {
     "optional": "opcional",
     "options": "opcoes",
     "page": "pagina",
+    "password": "senha",
     "payback_months": "payback_meses",
     "percentage": "percentual",
     "percentage_difference": "diferenca_percentual",
     "percentage_savings": "economia_percentual",
     "plan": "plano",
     "power_w": "potencia_w",
+    "privacy_version": "versao_aviso",
     "profile": "perfil",
     "purchase_year": "ano_compra",
+    "quantity": "quantidade",
     "question": "pergunta",
-    "save_query": "registrar",
     "required_value": "valor_obrigatorio",
     "residents": "moradores",
+    "save_query": "registrar",
     "section": "secao",
     "shapes": "formas",
     "sizes": "tamanhos",
@@ -130,6 +142,7 @@ JSON_NAMES = {
     "total_cost": "custo_total",
     "types": "tipos",
     "unit": "unidade",
+    "updated_at": "atualizado_em",
     "usage": "uso",
     "value": "valor",
     "where": "onde",
@@ -204,6 +217,7 @@ async def life_cycle(app):
         if os.getenv("RECARREGAR_BANCO") == "1" or not database_loaded(con):
             print("banco vazio ou desatualizado, carregando os dados...", flush=True)
             load_data(con)
+        contas.create_tables(con)  # IF NOT EXISTS: as contas sobrevivem a recarga do catalogo
         rag_empty = not rag.base_loaded(con)
     finally:
         con.close()
@@ -215,7 +229,7 @@ async def life_cycle(app):
 app = FastAPI(
     title="iamp API",
     description="Estima o consumo e o custo mensal de energia de aparelhos eletricos residenciais.",
-    version="0.5.0",
+    version="0.6.0",
     lifespan=life_cycle,
 )
 
@@ -807,3 +821,175 @@ def eco_coach_appliance(payload: TipsInput, con=Depends(connection)):
     except (LookupError, RuntimeError) as error:
         raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponivel: {error}",
                                                               f"Eco-Coach unavailable: {error}")) from error
+
+
+# Contas e casas na nuvem (contas.py) ---------------------------------------------------------
+# Login opcional: sem conta o app continua funcionando com uma casa so na memoria.
+
+_bearer = HTTPBearer(auto_error=False, description="Token devolvido por POST /contas ou POST /login.")
+
+
+def current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer), con=Depends(connection)):
+    """Id do usuario do token 'Authorization: Bearer ...'. Sem token ou com token vencido: 401."""
+    user_id = contas.user_from_token(con, credentials.credentials if credentials else None)
+    if user_id is None:
+        raise HTTPException(status_code=401, detail=idioma.tr("entre na sua conta de novo", "please log in again"),
+                            headers={"WWW-Authenticate": "Bearer"})
+    return user_id
+
+
+def account_error(error):
+    return HTTPException(status_code=error.status, detail=str(error))
+
+
+class SignUpInput(ApiModel):
+    name: str = Field(..., max_length=80)
+    email: str = Field(..., max_length=254)
+    password: str = Field(..., max_length=contas.MAX_PASSWORD)
+    accepted_privacy: bool = Field(..., description="true = a pessoa leu e aceitou o aviso de privacidade.")
+
+
+class LoginInput(ApiModel):
+    email: str = Field(..., max_length=254)
+    password: str = Field(..., max_length=contas.MAX_PASSWORD)
+
+
+class AccountData(ApiModel):
+    id: int
+    name: str
+    email: str
+    created_at: str
+    consent_at: str
+    privacy_version: str
+
+
+class Session(ApiModel):
+    token: str = Field(..., description="Mande em 'Authorization: Bearer <token>'. Vale 30 dias.")
+    account: AccountData
+
+
+class AccountChange(ApiModel):
+    name: Optional[str] = Field(None, max_length=80)
+    email: Optional[str] = Field(None, max_length=254)
+
+
+class HomeItem(ApiModel):
+    quantity: int = Field(..., ge=1, le=99)
+    category: str = Field(..., max_length=40)
+    monthly_kwh: float = Field(..., ge=0, description="De 1 unidade.")
+    monthly_cost: float = Field(..., ge=0, description="De 1 unidade.")
+    data: dict = Field(..., description="Pergunta e resultado do calculo, no formato do app.")
+
+
+class NewHome(ApiModel):
+    name: str = Field(..., max_length=80)
+    residents: int = Field(2, ge=1, le=20)
+
+
+class HomeInput(NewHome):
+    last_tariff: Optional[dict] = Field(None, description="Ultima tarifa usada nessa casa (o app oferece de novo).")
+    items: list[HomeItem] = Field(default_factory=list, max_length=contas.MAX_ITEMS)
+
+
+class SavedHome(HomeInput):
+    id: int
+    updated_at: str
+
+
+class ExportedData(ApiModel):
+    account: AccountData
+    homes: list[SavedHome]
+
+
+@app.get("/privacidade", tags=["Contas"])
+def privacy_notice():
+    """Versao do aviso de privacidade que o cadastro aceita (o texto fica no app)."""
+    return {"versao": contas.PRIVACY_VERSION}
+
+
+@app.post("/contas", response_model=Session, status_code=201, tags=["Contas"])
+def sign_up(payload: SignUpInput, con=Depends(connection)):
+    """Cria a conta (precisa aceitar o aviso de privacidade) e ja devolve o token da sessao."""
+    try:
+        token, data = contas.sign_up(con, payload.name, payload.email, payload.password, payload.accepted_privacy)
+    except contas.AccountError as error:
+        raise account_error(error) from error
+    return {"token": token, "account": data}
+
+
+@app.post("/login", response_model=Session, tags=["Contas"])
+def log_in(payload: LoginInput, con=Depends(connection)):
+    try:
+        token, data = contas.log_in(con, payload.email, payload.password)
+    except contas.AccountError as error:
+        raise account_error(error) from error
+    return {"token": token, "account": data}
+
+
+@app.post("/logout", status_code=204, tags=["Contas"])
+def log_out(credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer), con=Depends(connection)):
+    """Encerra a sessao deste aparelho (o token deixa de valer)."""
+    if credentials:
+        contas.log_out(con, credentials.credentials)
+    return Response(status_code=204)
+
+
+@app.get("/conta", response_model=AccountData, tags=["Contas"])
+def get_account(user_id=Depends(current_user), con=Depends(connection)):
+    return contas.account(con, user_id)
+
+
+@app.patch("/conta", response_model=AccountData, tags=["Contas"])
+def change_account(payload: AccountChange, user_id=Depends(current_user), con=Depends(connection)):
+    """Corrige nome e/ou e-mail."""
+    try:
+        return contas.update_account(con, user_id, payload.name, payload.email)
+    except contas.AccountError as error:
+        raise account_error(error) from error
+
+
+@app.get("/conta/dados", response_model=ExportedData, tags=["Contas"])
+def export_account(user_id=Depends(current_user), con=Depends(connection)):
+    """Tudo o que o iamp guarda da pessoa (conta e casas), sem a senha."""
+    return contas.export_data(con, user_id)
+
+
+@app.delete("/conta", status_code=204, tags=["Contas"])
+def delete_account(user_id=Depends(current_user), con=Depends(connection)):
+    """Apaga a conta, as sessoes, as casas e os aparelhos delas. Nao tem volta."""
+    contas.delete_account(con, user_id)
+    return Response(status_code=204)
+
+
+@app.get("/casas", response_model=list[SavedHome], tags=["Contas"])
+def list_homes(user_id=Depends(current_user), con=Depends(connection)):
+    return contas.list_homes(con, user_id)
+
+
+@app.post("/casas", response_model=SavedHome, status_code=201, tags=["Contas"])
+def create_home(payload: NewHome, user_id=Depends(current_user), con=Depends(connection)):
+    try:
+        return contas.create_home(con, user_id, payload.name, payload.residents)
+    except contas.AccountError as error:
+        raise account_error(error) from error
+
+
+@app.put("/casas/{casa_id}", response_model=SavedHome, tags=["Contas"])
+def save_home(payload: HomeInput, home_id: int = Path(alias="casa_id"), user_id=Depends(current_user),
+              con=Depends(connection)):
+    """Grava a casa inteira: nome, moradores, ultima tarifa e a lista de itens (substitui a anterior)."""
+    data = payload.model_dump(by_alias=True)
+    try:
+        return contas.save_home(con, user_id, home_id, data["nome"], data["moradores"], data["ultima_tarifa"],
+                                data["itens"])
+    except contas.AccountError as error:
+        raise account_error(error) from error
+
+
+@app.delete("/casas/{casa_id}", status_code=204, tags=["Contas"])
+def delete_home(home_id: int = Path(alias="casa_id"), user_id=Depends(current_user), con=Depends(connection)):
+    try:
+        contas.delete_home(con, user_id, home_id)
+    except contas.AccountError as error:
+        raise account_error(error) from error
+    return Response(status_code=204)

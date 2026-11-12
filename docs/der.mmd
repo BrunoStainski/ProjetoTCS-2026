@@ -8,6 +8,9 @@ erDiagram
     aparelhos ||..o{ consultas : "copia categoria, marca, modelo"
     distribuidoras ||..o{ consultas : "copia nome e UF"
     cargas ||..o{ aparelhos : "arquivo_origem"
+    usuarios ||--o{ sessoes : "tem (FK usuario_id, cascata)"
+    usuarios ||--o{ casas : "tem (FK usuario_id, cascata)"
+    casas ||--o{ itens_casa : "tem (FK casa_id, cascata)"
 
     aparelhos {
         serial id PK
@@ -92,6 +95,44 @@ erDiagram
 
 
 
+
+    usuarios {
+        serial id PK
+        text nome
+        text email UK "minúsculas"
+        text senha_hash "scrypt com sal, nunca a senha"
+        timestamptz consentimento_em "aceite do aviso"
+        text versao_aviso
+        timestamptz criado_em
+    }
+
+    sessoes {
+        text token_hash PK "SHA-256 do token"
+        int usuario_id FK
+        timestamptz criada_em
+        timestamptz expira_em "30 dias"
+    }
+
+    casas {
+        serial id PK
+        int usuario_id FK
+        text nome
+        int moradores
+        jsonb ultima_tarifa
+        timestamptz criado_em
+        timestamptz atualizado_em
+    }
+
+    itens_casa {
+        serial id PK
+        int casa_id FK "UK com posicao"
+        int posicao
+        int quantidade
+        text categoria
+        float kwh_mes "de 1 unidade"
+        float custo_mes
+        jsonb dados "pergunta + resultado (formato do app)"
+    }
 
     trechos_rag {
         serial id PK

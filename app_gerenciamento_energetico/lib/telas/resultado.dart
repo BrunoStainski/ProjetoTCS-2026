@@ -40,7 +40,7 @@ class _ResultScreenState extends State<ResultScreen> {
   void _add(Result r) {
     home.add(widget.query, r);
     setState(() => _added = true);
-    notifyAdded(ScaffoldMessenger.of(context), tr('${r.name} foi para a sua casa.', '${r.name} was added to your home.'));
+    notifyAdded(ScaffoldMessenger.of(context), tr('${r.name} foi para "${home.name}".', '${r.name} was added to "${home.name}".'));
   }
 
   @override

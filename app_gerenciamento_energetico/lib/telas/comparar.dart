@@ -98,7 +98,7 @@ class _CompareScreenState extends State<CompareScreen> {
     }
     home.add(newQuery, c.rewritten);
     setState(() => _done = true);
-    notifyAdded(notices, tr('${c.rewritten.name} foi para a sua casa.', '${c.rewritten.name} was added to your home.'));
+    notifyAdded(notices, tr('${c.rewritten.name} foi para "${home.name}".', '${c.rewritten.name} was added to "${home.name}".'));
   }
 
   @override

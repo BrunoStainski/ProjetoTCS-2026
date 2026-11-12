@@ -28,6 +28,11 @@ class ApiError implements Exception {
   String toString() => message;
 }
 
+/// 401: o token da conta venceu ou a conta foi apagada em outro aparelho.
+class SessionExpired extends ApiError {
+  SessionExpired(super.message);
+}
+
 double _real(dynamic v) => (v as num).toDouble();
 double? _realOrNull(dynamic v) => v == null ? null : (v as num).toDouble();
 
@@ -79,6 +84,9 @@ class Appliance {
 
   String get name => '$brand $model';
   String get readableCategory => readable(category);
+
+  /// Para guardar a casa na nuvem (o mesmo formato de fromJson).
+  Map<String, dynamic> toJson() => {'id': id, 'categoria': category, 'marca': brand, 'modelo': model, 'detalhe': detail};
 }
 
 /// O que o app precisa perguntar antes de calcular.
@@ -135,8 +143,12 @@ class Result {
   final double? capacity;
   final bool bySimilar; // gasto da mediana dos modelos parecidos (sem o numero do aparelho)
 
+  /// O JSON como veio da API: a casa na nuvem guarda o resultado assim e le de volta com fromJson.
+  final Map<String, dynamic> json;
+
   Result.fromJson(Map<String, dynamic> j)
-    : category = j['categoria'],
+    : json = j,
+      category = j['categoria'],
       brand = j['marca'],
       model = j['modelo'],
       detail = j['detalhe'] ?? '',
@@ -350,7 +362,13 @@ const requestLimit = Duration(seconds: 75);
 
 class Api {
   /// A API responde no idioma do app (avisos, "Como calculamos", plano do Eco-Coach...).
-  static Map<String, String> get _language => {'Accept-Language': language.value.header};
+  static Map<String, String> get _language => {
+    'Accept-Language': language.value.header,
+    if (token != null) 'Authorization': 'Bearer $token',
+  };
+
+  /// Token da conta (POST /contas ou /login). So na memoria: fechar o app sai da conta.
+  static String? token;
 
   /// Acorda o servidor assim que o app abre (enquanto a pessoa ainda esta nas boas-vindas).
   /// Nao mostra nada e ignora erro: se falhar, a proxima chamada tenta de novo.
@@ -377,6 +395,24 @@ class Api {
     );
   }
 
+  static Future<dynamic> _put(String path, Map<String, dynamic> body) => _clean(
+    () => http.put(
+      Uri.parse('$apiUrl$path'),
+      headers: {'Content-Type': 'application/json', ..._language},
+      body: jsonEncode(body),
+    ),
+  );
+
+  static Future<dynamic> _patch(String path, Map<String, dynamic> body) => _clean(
+    () => http.patch(
+      Uri.parse('$apiUrl$path'),
+      headers: {'Content-Type': 'application/json', ..._language},
+      body: jsonEncode(body),
+    ),
+  );
+
+  static Future<dynamic> _delete(String path) => _clean(() => http.delete(Uri.parse('$apiUrl$path'), headers: _language));
+
   static Future<dynamic> _clean(
     Future<http.Response> Function() call, {
     Duration limit = requestLimit,
@@ -394,6 +430,7 @@ class Api {
     }
     // erro 500 da API vem em texto puro e o Render responde com uma pagina HTML enquanto acorda:
     // sem isso, a pessoa via "FormatException" (ou nada, nas telas que so tratam ApiError)
+    if (response.statusCode == 204) return null; // apagar, sair: resposta sem corpo
     final dynamic body;
     try {
       body = jsonDecode(utf8.decode(response.bodyBytes));
@@ -407,6 +444,9 @@ class Api {
     }
     if (response.statusCode >= 400) {
       final detail = body is Map ? body['detail'] : null;
+      if (response.statusCode == 401) {
+        throw SessionExpired(detail is String ? detail : tr('Entre na sua conta de novo.', 'Please log in again.'));
+      }
       if (detail is String) throw ApiError(detail);
       if (detail is List && detail.isNotEmpty && detail.first is Map) {
         throw ApiError('${detail.first['msg']}');
@@ -417,6 +457,32 @@ class Api {
   }
 
   static Future<List<String>> categories() async => List<String>.from(await _get('/categorias'));
+
+  // Conta e casas na nuvem (conta.dart chama; as telas nao chamam direto) ---------------------
+
+  static Future<Map<String, dynamic>> signUp(String name, String email, String password) async =>
+      await _post('/contas', {'nome': name, 'email': email, 'senha': password, 'aceite_privacidade': true});
+
+  static Future<Map<String, dynamic>> logIn(String email, String password) async =>
+      await _post('/login', {'email': email, 'senha': password});
+
+  static Future<void> logOut() async => _post('/logout', const {});
+
+  static Future<Map<String, dynamic>> updateAccount({String? name, String? email}) async =>
+      await _patch('/conta', {'nome': ?name, 'email': ?email});
+
+  static Future<void> deleteAccount() async => _delete('/conta');
+
+  static Future<List<Map<String, dynamic>>> savedHomes() async =>
+      List<Map<String, dynamic>>.from(await _get('/casas'));
+
+  static Future<Map<String, dynamic>> createHome(String name, int residents) async =>
+      await _post('/casas', {'nome': name, 'moradores': residents});
+
+  static Future<Map<String, dynamic>> saveHome(int id, Map<String, dynamic> body) async =>
+      await _put('/casas/$id', body);
+
+  static Future<void> deleteHome(int id) async => _delete('/casas/$id');
 
   static Future<List<Appliance>> searchAppliances(String searchText, {String? category}) async {
     // limite por tipo de aparelho: uma marca com varios tipos traz todos

@@ -55,8 +55,8 @@ pytest                               # tudo;   pytest -m "not banco"  # só os r
 
 ## Banco (definido em `src/banco.py`, constante SCHEMA)
 
-DER: fonte Mermaid em `docs/der.mmd` e imagem em `docs/der.png` (comando para gerar no topo do .mmd). Só há uma
-FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas). Ao mudar o SCHEMA, atualizar o DER.
+DER: fonte Mermaid em `docs/der.mmd` e imagem em `docs/der.png` (comando para gerar no topo do .mmd). FKs: `tarifas -> distribuidoras`
+e as das contas (`sessoes`/`casas -> usuarios`, `itens_casa -> casas`, com cascata); as demais ligações são lógicas (tracejadas). Ao mudar o SCHEMA, atualizar o DER.
 
 | Tabela | Conteúdo |
 |---|---|
@@ -66,6 +66,7 @@ FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas
 | `vw_tarifa_vigente` | Tarifa válida hoje por distribuidora |
 | `cargas` | Rastreabilidade: arquivo e linhas de cada carga |
 | `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais) |
+| `usuarios`, `sessoes`, `casas`, `itens_casa` | Contas e casas salvas na nuvem (`src/contas.py`, `CREATE IF NOT EXISTS`: não são apagadas na recarga) |
 
 Números atuais: 24.148 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
 ventilador de mesa/teto, chuveiro, lâmpadas LED/fluorescente/vapor de sódio, micro-ondas,
@@ -98,6 +99,10 @@ no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética),
 catálogo), `GET /estimativa/categorias`, `POST /sugestoes/estimado`, `POST /comparar/estimado`,
 `POST /calcular/resistivo` + `GET /resistivos` (eletroportáteis, tabela `portateis`), `POST /eco-coach/aparelho`
 (dicas para um aparelho).
+Contas (tag "Contas", `Authorization: Bearer <token>`): `POST /contas` (nome, email, senha, aceite_privacidade) e
+`POST /login` -> {token, conta}; `POST /logout`; `GET/PATCH/DELETE /conta`; `GET /conta/dados` (tudo da pessoa);
+`GET/POST /casas`, `PUT/DELETE /casas/{id}` (PUT grava a casa inteira e substitui os itens). 401 sem token,
+409 e-mail repetido, 404 casa de outra pessoa (igual a não existir).
 Os corpos de /calcular, /sugestoes e /comparar herdam de `UsageAndTariff` (main.py); os de estimativa, de `Tariff`.
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
 A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
@@ -340,14 +345,25 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 - Transições: `StepTransition` (tema.dart) no `pageTransitionsTheme` de todas as plataformas (280 ms, desliza
   + apaga); barra de etapa com `TweenAnimationBuilder` na `AppPage`; perguntas da estimativa com
   `AnimatedSwitcher` (`_forward` dá o lado). Tudo respeita `MediaQuery.disableAnimationsOf`.
-- Cadastro: `conta.dart` (`account` = ValueNotifier<Account?>, nome + e-mail) e `telas/cadastro.dart`
-  (`SignUpScreen`), aberto pelas boas-vindas e pelo menu. Opcional, só em memória, **sem chamada à API**
-  (há teste disso). O menu ficou mais comprido: nos testes, rolar com `scrollUntilVisible` até Aparência/Idioma.
-- Cadastro e LGPD: nome e e-mail são dados pessoais; a LGPD vale mesmo em projeto de curso gratuito (a exceção
-  acadêmica do art. 4º é parcial e não cobre um app distribuído a terceiros). Para ligar o cadastro ao banco
-  falta: consentimento registrado e aviso de privacidade, senha com hash (argon2/bcrypt), HTTPS (o Render dá),
-  rotas para ver/corrigir/apagar os dados, não mandar dado pessoal ao Gemini e, na tabela `consultas`, decidir
-  se o histórico fica ligado à pessoa. Enquanto isso não existir, o cadastro não sai do aparelho.
+- Conta (opcional) e várias casas, salvas na nuvem (12/11/2026):
+  - API: `src/contas.py` + rotas em main.py; testes em `tests/test_contas.py`. Senha com scrypt da biblioteca padrão
+    (sal por senha, `hmac.compare_digest`; sem dependência nova), sessão = token aleatório e o banco guarda só o
+    SHA-256 (30 dias, `POST /logout` apaga). Login errado tem a mesma mensagem e o mesmo tempo com ou sem e-mail.
+    Itens da casa: colunas para consulta (categoria, kWh, R$) + `dados` JSONB com a pergunta e o resultado no formato
+    do app. Limites: 10 casas, 100 itens.
+  - App: `casa.dart` tem `Homes` (lista + casa aberta, sempre ≥ 1) e `Home get home => homes.active`, então as telas
+    usam `home` como antes; quem escuta mudanças escuta `homes` (repassa as de todas as casas). Cada `Home` tem
+    `name`, `cloudId` e `version` (sobe a cada mudança que vai para a nuvem; perfil e plano não contam).
+    `conta.dart`: `signUp`/`logIn`/`logOut`/`deleteAccount`/`removeHome` e gravação automática (`saveDelay` 600 ms,
+    uma gravação para vários toques; `syncState`). Entrar junta as casas da nuvem com as que a pessoa montou antes.
+    Token só na memória (`Api.token`): fechar o app sai da conta. 401 sai da conta sem travar.
+  - Telas: `telas/cadastro.dart` (`SignUpScreen`: criar / entrar / "Minha conta" com sair e apagar) e
+    `telas/casas.dart` (`HomesScreen`, `HomeSwitcher` no topo de Minha casa). Testes com `CloudFake` e `finish()`
+    (o tempo do teste é falso: `tester.runAsync` sai da zona do `http.runWithClient`).
+  - LGPD: aviso de privacidade antes de criar (o que guarda, para quê, servidor nos EUA, Gemini só recebe números);
+    sem o aceite a API responde 422 e grava data + versão do aviso (`PRIVACY_VERSION`). Corrigir (`PATCH /conta`),
+    ver (`GET /conta/dados`) e apagar tudo (`DELETE /conta`, cascata). `consultas` continua anônima (sem ligação
+    com a conta). HTTPS vem do Render.
 
 ## Nuvem: Render (API) + Neon (banco)
 
@@ -367,7 +383,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
 - Versão do app em `pubspec.yaml` (hoje `2.0.0+6`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.5.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
+  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
   Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
   `terraform apply` + `docker compose up -d --build`; no Render o merge na `main` já publica) -> APK -> tag ->

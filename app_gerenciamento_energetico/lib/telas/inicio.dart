@@ -80,7 +80,7 @@ class _TabBar extends StatelessWidget {
         builder: (context) {
           final height = MediaQuery.textScalerOf(context).scale(80).clamp(80.0, 104.0);
           return ListenableBuilder(
-            listenable: Listenable.merge([currentTab, home]),
+            listenable: Listenable.merge([currentTab, homes]),
             builder: (context, _) => NavigationBar(
               height: height,
               selectedIndex: currentTab.value.index,

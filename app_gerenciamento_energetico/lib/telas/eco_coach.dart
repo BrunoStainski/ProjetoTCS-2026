@@ -40,7 +40,7 @@ class _EcoCoachScreenState extends State<EcoCoachScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: home,
+      listenable: homes,
       builder: (context, _) {
         final plan = home.plan;
         return AppPage(title: tr('Economizar', 'Save energy'), footer: _footer(plan), child: _body(plan));
