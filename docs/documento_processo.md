@@ -237,7 +237,7 @@ ficam em `/docs`.
 
 | Fonte | Conteúdo | Uso |
 |---|---|---|
-| Inmetro / PBE | Consumo de 24.148 modelos em 12 categorias (geladeira, TV, ar-condicionado, ventiladores, chuveiro, lâmpadas, micro-ondas, máquina de lavar, bomba) | Catálogo principal |
+| Inmetro / PBE | Consumo de 24.228 modelos em 12 categorias (geladeira, TV, ar-condicionado, ventiladores, chuveiro, lâmpadas, micro-ondas, máquina de lavar, bomba) | Catálogo principal |
 | ANEEL | Tarifa B1 residencial convencional (TUSD + TE) de 99 distribuidoras, com vigência | Custo em R$ |
 | Portaria Inmetro 20/2006 e tabela Inmetro 2001 (Queiroz et al., 2003) | Regra de consumo de geladeiras antigas | Estimativa fora do catálogo |
 | Inmetro (4 páginas) e cartilha Cemig 2025 | Dicas oficiais de economia | Base do RAG (45 trechos) |
@@ -260,6 +260,7 @@ e como foram tratados:
 | Geladeiras medidas em duas metodologias do Inmetro (antiga e 2025) | 610 modelos só com o valor antigo convertidos para a escala atual pela mediana da razão entre as duas medições; antes, a mistura de escalas exagerava a economia das trocas |
 | Volume total de geladeira menor que o do próprio refrigerador | Refeito pela soma dos compartimentos (ex.: Consul CRM44, de 94 L para 377 L) |
 | Distribuidoras sem estado | UF obtida pelo CNPJ (`distribuidoras_uf.csv`) |
+| Mesmo modelo nas versões 127 V e 220 V com consumo diferente (ex.: chuveiro Cardal Ducha 5 Luxo: 5.500 W em 127 V e 7.600 W em 220 V) | Antes ficava só a primeira versão (no chuveiro, a de 127 V em 77 de 84 modelos), e quem tem 220 V via um custo menor que o real. Agora as duas versões aparecem, com a tensão no nome ("7600 W · 220 V"): 55 chuveiros, 19 máquinas de lavar e 6 micro-ondas. A troca só sugere modelos da mesma tensão |
 | Erros de digitação extremos fora das TVs (ex.: 2,8 em vez de 28,0 kWh) | Filtrados nas sugestões (consumo abaixo de 40% da mediana dos equivalentes é descartado) |
 
 ### 4.3 Persistência e consultas SQL
@@ -543,6 +544,7 @@ e Eco-Coach funcionando, pico de 150 MB).
 | O consumo do Inmetro é medido em laboratório, não em uso real | O app apresenta o valor como estimativa e mostra o método do cálculo |
 | Parte dos consumos foi imputada na limpeza | Marcada em `origem_dado`; o app avisa e esses modelos não entram nas sugestões |
 | Erros de digitação na base oficial | Corrigidos quando o padrão é claro (TVs) e filtrados nas sugestões; o aparelho escolhido usa o valor como veio |
+| A tensão (127 V ou 220 V) muda a potência de chuveiros e de algumas máquinas de lavar e micro-ondas | As duas versões aparecem no catálogo com a tensão no nome; o app não pergunta a tensão da casa (ela varia por cidade e muita gente não sabe), a pessoa escolhe a versão escrita no aparelho |
 | Horas de uso padrão e eletroportáteis são premissas do grupo, sem fonte oficial | Sinalizados no app como estimativa; o usuário pode informar o próprio uso |
 | Valores sem ICMS, PIS/COFINS, bandeira tarifária e iluminação pública | Aviso fixo em todo resultado; a conta real será maior |
 | Payback simples (sem juros, sem revenda do aparelho antigo, sem reajuste de tarifa) e com preço digitado pelo usuário | Explicado na tela de comparação |
@@ -632,7 +634,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 | Item | Resultado |
 |---|---|
-| Catálogo | 24.148 aparelhos em 12 categorias; 99 distribuidoras com tarifa vigente |
+| Catálogo | 24.228 aparelhos em 12 categorias; 99 distribuidoras com tarifa vigente |
 | Qualidade do CTGAN (SDV) | cerca de 85% |
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |

@@ -4,7 +4,7 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
-## Próxima versão (ainda sem número)
+## App 2.1.0+7 / API 0.6.0
 
 - Tensão 127 V × 220 V: o catálogo guardava só a primeira versão de cada modelo e o chuveiro de 220 V sumia
   (ex.: Cardal Ducha 5 Luxo, 5500 W em 127 V e 7600 W em 220 V; ficava a de 127 V em 77 de 84 modelos). Agora,
