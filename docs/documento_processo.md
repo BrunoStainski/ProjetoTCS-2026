@@ -514,7 +514,7 @@ isso a publicação passou para dois serviços gratuitos, sem cartão e com logi
 | Serviço | Papel | Plano gratuito |
 |---|---|---|
 | Render | Roda a API a partir do `Dockerfile`, com endereço HTTPS fixo; publica de novo a cada merge na `main` | 512 MB de memória (a API usa ~150 MB) |
-| Neon | PostgreSQL com pgvector, na mesma região da API (AWS us-east-1) | 1 GB (o banco usa ~20 MB) |
+| Neon | PostgreSQL com pgvector, na mesma região da API (AWS us-east-2, Ohio) | 1 GB (o banco usa ~20 MB) |
 
 A configuração está em `render.yaml` (Blueprint); os segredos (`DATABASE_URL` e `GEMINI_API_KEY`)
 ficam só no painel do Render. O servidor gratuito dorme depois de 15 minutos sem uso e leva cerca
