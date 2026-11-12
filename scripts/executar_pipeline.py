@@ -9,21 +9,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-PASTA_SCRIPTS = Path(__file__).resolve().parent
+SCRIPTS_FOLDER = Path(__file__).resolve().parent
 
 
 def main() -> int:
-    scripts = sorted(PASTA_SCRIPTS.glob("tratar_dados_*.py"))
+    scripts = sorted(SCRIPTS_FOLDER.glob("tratar_dados_*.py"))
 
-    falhas = []
+    failures = []
     for script in scripts:
         print(f"\n===== {script.name} =====")
-        resultado = subprocess.run([sys.executable, str(script)], cwd=PASTA_SCRIPTS)
-        if resultado.returncode != 0:
-            falhas.append(script.name)
+        result = subprocess.run([sys.executable, str(script)], cwd=SCRIPTS_FOLDER)
+        if result.returncode != 0:
+            failures.append(script.name)
 
-    print("\n" + ("✓ Pipeline concluído sem erros." if not falhas else f"❌ Falharam: {', '.join(falhas)}"))
-    return 1 if falhas else 0
+    print("\n" + ("✓ Pipeline concluído sem erros." if not failures else f"❌ Falharam: {', '.join(failures)}"))
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":

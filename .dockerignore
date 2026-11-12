@@ -5,11 +5,13 @@ __pycache__
 *.pyc
 .vscode
 app_gerenciamento_energetico
-datasets/raw
+datasets/raw/*
+!datasets/raw/rag
 models/*
 !models/kmeans.pkl
 !models/refrigerador.pkl
 docs
 infra
 prompts
-scripts
+scripts/*
+!scripts/carregar_rag.py

@@ -25,76 +25,76 @@ import numpy as np
 
 from idioma import t, tr
 
-MODELO = Path(__file__).resolve().parents[1] / "models" / "kmeans.pkl"
-AVISO_ML = ("Perfil estimado por um modelo treinado com residencias sinteticas; "
+MODEL = Path(__file__).resolve().parents[1] / "models" / "kmeans.pkl"
+ML_NOTICE = ("Perfil estimado por um modelo treinado com residencias sinteticas; "
             "serve como referencia, nao como avaliacao oficial.")
 
 
 @lru_cache(maxsize=1)
-def carregar_modelo(caminho=MODELO):
-    if not Path(caminho).exists():
-        raise FileNotFoundError(f"{caminho} nao existe. Rode: python scripts/treinar_kmeans.py")
-    with open(caminho, "rb") as f:
+def load_model(path=MODEL):
+    if not Path(path).exists():
+        raise FileNotFoundError(f"{path} nao existe. Rode: python scripts/treinar_kmeans.py")
+    with open(path, "rb") as f:
         return pickle.load(f)
 
 
-def variaveis_da_residencia(inventario):
+def residence_variables(inventory):
     """Inventario -> kwh_total e as variaveis por morador usadas pelo K-Means."""
-    moradores = inventario.get("moradores")
-    if not isinstance(moradores, (int, float)) or moradores < 1:
+    residents = inventory.get("moradores")
+    if not isinstance(residents, (int, float)) or residents < 1:
         raise ValueError(tr("informe quantos moradores (1 ou mais)", "enter how many residents (1 or more)"))
-    itens = inventario.get("itens") or []
-    if not itens:
+    items = inventory.get("itens") or []
+    if not items:
         raise ValueError(tr("informe pelo menos um aparelho com categoria e kwh_mes",
                             "enter at least one appliance with categoria and kwh_mes"))
 
-    por_categoria = {}
-    for item in itens:
+    by_category = {}
+    for item in items:
         kwh = float(item["kwh_mes"])
         if kwh < 0:
             raise ValueError(tr("kwh_mes nao pode ser negativo", "kwh_mes cannot be negative"))
-        por_categoria[item["categoria"]] = por_categoria.get(item["categoria"], 0.0) + kwh
-    total = sum(por_categoria.values())
+        by_category[item["categoria"]] = by_category.get(item["categoria"], 0.0) + kwh
+    total = sum(by_category.values())
     if total <= 0:
         raise ValueError(tr("o consumo total precisa ser maior que zero", "the total consumption must be greater than zero"))
 
     return total, {
-        "kwh_por_morador": total / moradores,
-        "frac_chuveiro": por_categoria.get("chuveiro", 0.0) / total,
-        "frac_ar": por_categoria.get("ar_condicionado", 0.0) / total,
-        "frac_refrigerador": por_categoria.get("refrigerador", 0.0) / total,
+        "kwh_por_morador": total / residents,
+        "frac_chuveiro": by_category.get("chuveiro", 0.0) / total,
+        "frac_ar": by_category.get("ar_condicionado", 0.0) / total,
+        "frac_refrigerador": by_category.get("refrigerador", 0.0) / total,
     }
 
 
-def perfil_das_variaveis(variaveis, modelo=None):
+def variables_profile(variables, model=None):
     """Grupo do centroide mais proximo (mesma conta do KMeans.predict)."""
-    modelo = modelo or carregar_modelo()
-    x = np.array([np.log1p(variaveis[v]) if v in modelo["log"] else variaveis[v]
-                  for v in modelo["variaveis"]], dtype=float)
-    xz = (x - np.array(modelo["media"])) / np.array(modelo["escala"]) * np.array(modelo["pesos"])
-    distancias = np.linalg.norm(np.array(modelo["centroides"]) - xz, axis=1)
-    return modelo["nome_do_grupo"][int(distancias.argmin())]
+    model = model or load_model()
+    x = np.array([np.log1p(variables[v]) if v in model["log"] else variables[v]
+                  for v in model["variaveis"]], dtype=float)
+    xz = (x - np.array(model["media"])) / np.array(model["escala"]) * np.array(model["pesos"])
+    distances = np.linalg.norm(np.array(model["centroides"]) - xz, axis=1)
+    return model["nome_do_grupo"][int(distances.argmin())]
 
 
-def classificar_residencia(inventario):
+def classify_residence(inventory):
     """{moradores, itens:[{categoria, kwh_mes}]} -> {perfil, kwh_por_morador, comparacao_media}"""
-    modelo = carregar_modelo()
-    total, variaveis = variaveis_da_residencia(inventario)
-    media = modelo["mediana_kwh_por_morador"]  # mediana: a media e puxada pelas casas extremas
-    diferenca = (variaveis["kwh_por_morador"] - media) / media * 100
+    model = load_model()
+    total, variables = residence_variables(inventory)
+    mean = model["mediana_kwh_por_morador"]  # mediana: a media e puxada pelas casas extremas
+    difference = (variables["kwh_por_morador"] - mean) / mean * 100
     return {
-        "perfil": perfil_das_variaveis(variaveis, modelo),
+        "perfil": variables_profile(variables, model),
         "kwh_total": round(total, 2),
-        "kwh_por_morador": round(variaveis["kwh_por_morador"], 2),
+        "kwh_por_morador": round(variables["kwh_por_morador"], 2),
         "comparacao_media": {
-            "mediana_kwh_por_morador": round(media, 2),
-            "diferenca_percentual": round(diferenca, 1),
-            "texto": tr(f"{abs(diferenca):.0f}% {'acima' if diferenca > 0 else 'abaixo'} da mediana por morador "
+            "mediana_kwh_por_morador": round(mean, 2),
+            "diferenca_percentual": round(difference, 1),
+            "texto": tr(f"{abs(difference):.0f}% {'acima' if difference > 0 else 'abaixo'} da mediana por morador "
                         "(residencias sinteticas)",
-                        f"{abs(diferenca):.0f}% {'above' if diferenca > 0 else 'below'} the median per resident "
+                        f"{abs(difference):.0f}% {'above' if difference > 0 else 'below'} the median per resident "
                         "(synthetic homes)"),
         },
-        "fracoes": {k: round(v, 3) for k, v in variaveis.items() if k.startswith("frac_")},
-        "aviso": t(AVISO_ML),
-        "fonte": modelo["fonte"],
+        "fracoes": {k: round(v, 3) for k, v in variables.items() if k.startswith("frac_")},
+        "aviso": t(ML_NOTICE),
+        "fonte": model["fonte"],
     }

@@ -9,57 +9,57 @@ import 'comum.dart';
 
 /// Modelos equivalentes que gastam menos (POST /sugestoes), com o mesmo uso e a mesma tarifa.
 /// item: quando veio de "Minha casa", permite trocar o aparelho la.
-class TelaSugestoes extends StatefulWidget {
-  final Consulta consulta;
-  final ItemCasa? item;
-  final Resultado? atual;
+class SuggestionScreen extends StatefulWidget {
+  final Query query;
+  final ItemHome? item;
+  final Result? current;
 
-  const TelaSugestoes({super.key, required this.consulta, this.item, this.atual});
+  const SuggestionScreen({super.key, required this.query, this.item, this.current});
 
   @override
-  State<TelaSugestoes> createState() => _TelaSugestoesState();
+  State<SuggestionScreen> createState() => _SuggestionScreenState();
 }
 
-class _TelaSugestoesState extends State<TelaSugestoes> {
-  late Future<Sugestoes> _sugestoes;
+class _SuggestionScreenState extends State<SuggestionScreen> {
+  late Future<Suggestions> _suggestions;
 
   @override
   void initState() {
     super.initState();
-    _sugestoes = _buscar();
+    _suggestions = _search();
   }
 
-  Future<Sugestoes> _buscar() => widget.consulta.estimado
-      ? Api.sugestoesEstimado(widget.atual!, widget.consulta.paraApi())
-      : Api.sugestoes(widget.consulta.aparelho.id, widget.consulta.paraApi());
+  Future<Suggestions> _search() => widget.query.estimated
+      ? Api.estimatedSuggestions(widget.current!, widget.query.toApi())
+      : Api.suggestions(widget.query.appliance.id, widget.query.toApi());
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final aparelho = widget.consulta.aparelho;
-    final nome = widget.atual?.nome ?? aparelho.nome;
-    return Pagina(
-      titulo: tr('Gastar menos', 'Spend less'),
-      filho: FutureBuilder<Sugestoes>(
-        future: _sugestoes,
+    final appliance = widget.query.appliance;
+    final name = widget.current?.name ?? appliance.name;
+    return AppPage(
+      title: tr('Gastar menos', 'Spend less'),
+      child: FutureBuilder<Suggestions>(
+        future: _suggestions,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return Carregando(texto: tr('Procurando modelos que gastam menos...', 'Looking for models that use less...'));
+            return Loading(text: tr('Procurando modelos que gastam menos...', 'Looking for models that use less...'));
           }
           if (snap.hasError) {
-            return MensagemErro(
+            return ErrorMessage(
               snap.error.toString(),
-              tentarDeNovo: () => setState(() {
-                _sugestoes = _buscar();
+              tryAgain: () => setState(() {
+                _suggestions = _search();
               }),
             );
           }
           final s = snap.data!;
           return ListView(
             children: [
-              CabecalhoPergunta(
+              QuestionHeader(
                 tr('Modelos parecidos que gastam menos', 'Similar models that use less'),
-                ajuda: tr(
+                help: tr(
                   'Mesmo tamanho, mesmo uso e a mesma tarifa do seu aparelho. Toque num modelo para comparar.',
                   'Same size, same use and the same rate as your appliance. Tap a model to compare.',
                 ),
@@ -67,44 +67,44 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
               MergeSemantics(
                 child: Card(
                   child: ListTile(
-                    leading: Icon(iconeDaCategoria(aparelho.categoria)),
-                    title: Text(tr('Seu aparelho: $nome', 'Your appliance: $nome')),
+                    leading: Icon(categoryIcon(appliance.category)),
+                    title: Text(tr('Seu aparelho: $name', 'Your appliance: $name')),
                     subtitle: Text(
                       tr(
-                        '${reais(s.custoAtual)} por mês · ${numero(s.kwhAtual)} kWh',
-                        '${reais(s.custoAtual)} per month · ${numero(s.kwhAtual)} kWh',
+                        '${reais(s.currentCost)} por mês · ${number(s.currentKwh)} kWh',
+                        '${reais(s.currentCost)} per month · ${number(s.currentKwh)} kWh',
                       ),
                     ),
                   ),
                 ),
               ),
-              if (s.criterio != null) ...[
-                Titulo(tr('Comparando com modelos de', 'Comparing with models of')),
-                Text(s.criterio!, style: t.corpo),
+              if (s.criterion != null) ...[
+                SectionTitle(tr('Comparando com modelos de', 'Comparing with models of')),
+                Text(s.criterion!, style: t.body),
               ],
-              const SizedBox(height: Espaco.pm),
-              if (s.mensagem != null)
+              const SizedBox(height: Spacing.pm),
+              if (s.message != null)
                 Card(
-                  color: t.fundoDestaque,
+                  color: t.highlightBackground,
                   child: Padding(
-                    padding: const EdgeInsets.all(Espaco.m),
+                    padding: const EdgeInsets.all(Spacing.m),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Icons.tips_and_updates_outlined),
-                        const SizedBox(width: Espaco.pm),
-                        Expanded(child: Text(s.mensagem!, style: t.corpo)),
+                        const SizedBox(width: Spacing.pm),
+                        Expanded(child: Text(s.message!, style: t.body)),
                       ],
                     ),
                   ),
                 ),
-              for (final sugerido in s.sugestoes) _CartaoSugestao(sugerido, onTap: () => _abrir(sugerido)),
-              if (s.suspeitosDescartados > 0) ...[
-                const SizedBox(height: Espaco.p),
-                ListaAvisos([
+              for (final suggested in s.suggestions) _SuggestionCard(suggested, onTap: () => _open(suggested)),
+              if (s.discardedSuspects > 0) ...[
+                const SizedBox(height: Spacing.p),
+                NoticeList([
                   tr(
-                    '${s.suspeitosDescartados} modelo(s) com consumo irreal (erro do Inmetro) ficaram de fora.',
-                    '${s.suspeitosDescartados} model(s) with unrealistic consumption (Inmetro data error) were left out.',
+                    '${s.discardedSuspects} modelo(s) com consumo irreal (erro do Inmetro) ficaram de fora.',
+                    '${s.discardedSuspects} model(s) with unrealistic consumption (Inmetro data error) were left out.',
                   ),
                 ]),
               ],
@@ -115,70 +115,70 @@ class _TelaSugestoesState extends State<TelaSugestoes> {
     );
   }
 
-  void _abrir(AparelhoSugerido sugerido) {
+  void _open(SuggestedAppliance suggested) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) =>
-            TelaComparar(consulta: widget.consulta, sugerido: sugerido, item: widget.item, atual: widget.atual),
+            CompareScreen(query: widget.query, suggested: suggested, item: widget.item, current: widget.current),
       ),
     );
   }
 }
 
-class _CartaoSugestao extends StatelessWidget {
-  final AparelhoSugerido s;
+class _SuggestionCard extends StatelessWidget {
+  final SuggestedAppliance s;
   final VoidCallback onTap;
 
-  const _CartaoSugestao(this.s, {required this.onTap});
+  const _SuggestionCard(this.s, {required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final a = s.aparelho;
-    final economia = tr('${reais(s.economiaMes)} a menos por mês', '${reais(s.economiaMes)} less per month');
+    final a = s.appliance;
+    final savings = tr('${reais(s.monthlySavings)} a menos por mês', '${reais(s.monthlySavings)} less per month');
     return MergeSemantics(
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(Espaco.m),
+            padding: const EdgeInsets.all(Spacing.m),
             child: Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(a.nome, style: t.forte),
-                      if (a.detalhe.isNotEmpty || s.tipo.isNotEmpty)
-                        Text([if (a.detalhe.isNotEmpty) a.detalhe, if (s.tipo.isNotEmpty) s.tipo].join(' · '),
-                            style: t.secundario),
-                      const SizedBox(height: Espaco.p),
+                      Text(a.name, style: t.strong),
+                      if (a.detail.isNotEmpty || s.kind.isNotEmpty)
+                        Text([if (a.detail.isNotEmpty) a.detail, if (s.kind.isNotEmpty) s.kind].join(' · '),
+                            style: t.secondary),
+                      const SizedBox(height: Spacing.p),
                       // economia em verde e escrita por extenso ("a menos"), nao so pela cor
-                      Text(economia, style: t.valorMedio.copyWith(color: t.economia)),
-                      const SizedBox(height: Espaco.pp),
+                      Text(savings, style: t.averageValue.copyWith(color: t.savings)),
+                      const SizedBox(height: Spacing.pp),
                       Wrap(
-                        spacing: Espaco.p,
-                        runSpacing: Espaco.pp,
+                        spacing: Spacing.p,
+                        runSpacing: Spacing.pp,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: Espaco.p, vertical: 2),
-                            decoration: t.selo(t.economia),
+                            padding: const EdgeInsets.symmetric(horizontal: Spacing.p, vertical: 2),
+                            decoration: t.badge(t.savings),
                             child: Text(
-                              tr('${numero(s.economiaPercentual, casas: 0)}% menos', '${numero(s.economiaPercentual, casas: 0)}% less'),
-                              style: t.rotulo.copyWith(color: t.economia),
+                              tr('${number(s.percentageSavings, homes: 0)}% menos', '${number(s.percentageSavings, homes: 0)}% less'),
+                              style: t.label.copyWith(color: t.savings),
                             ),
                           ),
-                          Text(tr('Gasta ${reais(s.custoMes)} por mês', 'Costs ${reais(s.custoMes)} per month'), style: t.secundario),
+                          Text(tr('Gasta ${reais(s.monthlyCost)} por mês', 'Costs ${reais(s.monthlyCost)} per month'), style: t.secondary),
                         ],
                       ),
-                      Text(tr('${numero(s.kwhMes)} kWh por mês', '${numero(s.kwhMes)} kWh per month'), style: t.secundario),
+                      Text(tr('${number(s.monthlyKwh)} kWh por mês', '${number(s.monthlyKwh)} kWh per month'), style: t.secondary),
                     ],
                   ),
                 ),
-                const SizedBox(width: Espaco.p),
+                const SizedBox(width: Spacing.p),
                 const Icon(Icons.chevron_right),
               ],
             ),

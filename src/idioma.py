@@ -21,96 +21,96 @@ from contextvars import ContextVar
 
 from traducoes import EN
 
-IDIOMAS = ("pt", "en")
-PADRAO = "pt"
+LANGUAGES = ("pt", "en")
+DEFAULT = "pt"
 
-_atual = ContextVar("idioma", default=PADRAO)
+_current = ContextVar("idioma", default=DEFAULT)
 
 
-def do_cabecalho(valor):
+def from_header(value):
     """Accept-Language -> "pt" ou "en". Ex.: "en-US,en;q=0.9,pt;q=0.8" -> "en".
     Vale a lingua conhecida com o maior peso (q); empate, a que veio primeiro."""
-    opcoes = []
-    for posicao, parte in enumerate((valor or "").split(",")):
-        lingua, *parametros = parte.strip().split(";")
-        peso = 1.0
-        for parametro in parametros:
-            chave, _, numero = parametro.strip().partition("=")
-            if chave == "q":
+    options = []
+    for position, piece in enumerate((value or "").split(",")):
+        lang, *parameters = piece.strip().split(";")
+        weight = 1.0
+        for parameter in parameters:
+            key, _, number = parameter.strip().partition("=")
+            if key == "q":
                 try:
-                    peso = float(numero)
+                    weight = float(number)
                 except ValueError:
-                    peso = 0.0
-        codigo = lingua.strip().lower().split("-")[0]
-        if codigo in IDIOMAS and peso > 0:
-            opcoes.append((-peso, posicao, codigo))
-    return min(opcoes)[2] if opcoes else PADRAO
+                    weight = 0.0
+        code = lang.strip().lower().split("-")[0]
+        if code in LANGUAGES and weight > 0:
+            options.append((-weight, position, code))
+    return min(options)[2] if options else DEFAULT
 
 
-def definir(idioma):
+def define(language):
     """Usa o idioma ate restaurar(token). Lingua desconhecida vira o padrao."""
-    return _atual.set(idioma if idioma in IDIOMAS else PADRAO)
+    return _current.set(language if language in LANGUAGES else DEFAULT)
 
 
-def restaurar(token):
-    _atual.reset(token)
+def restore(token):
+    _current.reset(token)
 
 
 @contextmanager
-def usando(idioma):
+def using(language):
     """with idioma.usando("en"): ...  (testes e scripts)."""
-    token = definir(idioma)
+    token = define(language)
     try:
         yield
     finally:
-        restaurar(token)
+        restore(token)
 
 
-def atual():
-    return _atual.get()
+def current():
+    return _current.get()
 
 
-def em_ingles():
-    return _atual.get() == "en"
+def in_english():
+    return _current.get() == "en"
 
 
 def tr(pt, en):
     """Texto montado na hora, nas duas linguas."""
-    return en if em_ingles() else pt
+    return en if in_english() else pt
 
 
-def t(texto):
+def t(text):
     """Texto fixo: a traducao de traducoes.EN em ingles; sem traducao (ou em portugues), o proprio texto."""
-    if not em_ingles() or not isinstance(texto, str):
-        return texto
-    return EN.get(texto, texto)
+    if not in_english() or not isinstance(text, str):
+        return text
+    return EN.get(text, text)
 
 
-def numero(valor, casas=1):
+def number(value, homes=1):
     """1234.5 -> "1.234,5" em portugues e "1,234.5" em ingles."""
-    texto = f"{valor:,.{casas}f}"
-    return texto if em_ingles() else texto.replace(",", "X").replace(".", ",").replace("X", ".")
+    text = f"{value:,.{homes}f}"
+    return text if in_english() else text.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-_SEPARADOR = re.compile(r"(?<=\d)[.,](?=\d)")
-_UNIDADES = [(re.compile(r"\bpolegadas\b"), "inches"), (re.compile(r"\bpol\b"), "in"),
+_SEPARATOR = re.compile(r"(?<=\d)[.,](?=\d)")
+_UNITS = [(re.compile(r"\bpolegadas\b"), "inches"), (re.compile(r"\bpol\b"), "in"),
              (re.compile(r"\blitros\b"), "liters"), (re.compile(r"\bcv\b"), "hp")]
 
 
-def unidades(texto):
+def units(text):
     """Unidades escritas em portugues -> ingles ("43 pol" -> "43 in", "1/2 cv" -> "1/2 hp").
     Nao mexe nos numeros: o detalhe do catalogo ja usa ponto decimal ("1.5 cv")."""
-    if not em_ingles() or not isinstance(texto, str):
-        return texto
-    for padrao, troca in _UNIDADES:
-        texto = padrao.sub(troca, texto)
-    return texto
+    if not in_english() or not isinstance(text, str):
+        return text
+    for default_value, replacement in _UNITS:
+        text = default_value.sub(replacement, text)
+    return text
 
 
-def medida(texto):
+def measure(text):
     """Medida escrita do jeito brasileiro ("7.500 BTU/h", "1,5 cv", "Ex.: 0,25") -> ingles
     ("7,500 BTU/h", "1.5 hp", "E.g.: 0.25"): troca os separadores dos numeros e as unidades."""
-    if not em_ingles() or not isinstance(texto, str):
-        return texto
-    texto = _SEPARADOR.sub(lambda m: "," if m.group() == "." else ".", texto)
-    return unidades(texto.replace("Ex.:", "E.g.:"))
+    if not in_english() or not isinstance(text, str):
+        return text
+    text = _SEPARATOR.sub(lambda m: "," if m.group() == "." else ".", text)
+    return units(text.replace("Ex.:", "E.g.:"))

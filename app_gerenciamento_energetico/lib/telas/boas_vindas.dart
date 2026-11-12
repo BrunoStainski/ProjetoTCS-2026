@@ -1,23 +1,25 @@
 // Boas-vindas: primeira tela ao abrir o app (e pelo menu, em "Início").
-// So a marca (icone grande com o nome ao lado) e o botao "Comece a economizar",
-// que leva para o calculo (aba Calcular, etapa 1).
+// So a marca (icone grande com o nome ao lado), o botao "Comece a economizar", que leva para o
+// calculo (aba Calcular, etapa 1), e o cadastro (opcional). Quem se cadastrou ve "Olá, <nome>".
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../conta.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
+import 'cadastro.dart';
 import 'comum.dart';
 
-class TelaBoasVindas extends StatelessWidget {
+class WelcomeScreen extends StatelessWidget {
   /// Aberta junto com o app: o voltar do Android fecha o app (em vez de mostrar as abas por baixo).
-  final bool aoAbrir;
+  final bool onOpen;
 
-  const TelaBoasVindas({super.key, this.aoAbrir = false});
+  const WelcomeScreen({super.key, this.onOpen = false});
 
-  void _comecar(BuildContext context) {
-    irPara(Aba.calcular, recomecar: true);
+  void _start(BuildContext context) {
+    goTo(AppTab.calculate, restart: true);
     Navigator.pop(context); // as abas ja estao embaixo desta tela
   }
 
@@ -25,16 +27,32 @@ class TelaBoasVindas extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return PopScope(
-      canPop: !aoAbrir,
-      onPopInvokedWithResult: (saiu, _) {
-        if (!saiu) SystemNavigator.pop();
+      canPop: !onOpen,
+      onPopInvokedWithResult: (left, _) {
+        if (!left) SystemNavigator.pop();
       },
       child: Scaffold(
-        body: const SafeArea(
+        body: SafeArea(
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(Espaco.g),
-              child: MarcaIamp(tamanho: 120, tamanhoNome: 56),
+              padding: const EdgeInsets.all(Spacing.g),
+              child: ValueListenableBuilder<Account?>(
+                valueListenable: account,
+                builder: (context, registered, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const IampBrand(size: 120, nameSize: 56),
+                    if (registered != null) ...[
+                      const SizedBox(height: Spacing.g),
+                      Text(
+                        tr('Olá, ${registered.firstName}!', 'Hello, ${registered.firstName}!'),
+                        style: t.question,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -42,20 +60,39 @@ class TelaBoasVindas extends StatelessWidget {
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            border: Border(top: BorderSide(color: t.borda)),
+            border: Border(top: BorderSide(color: t.border)),
           ),
           child: SafeArea(
             top: false,
             child: Center(
               heightFactor: 1,
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: t.larguraMaxima),
+                constraints: BoxConstraints(maxWidth: t.maxWidth),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, Espaco.m),
-                  child: FilledButton.icon(
-                    onPressed: () => _comecar(context),
-                    icon: const Icon(Icons.bolt),
-                    label: Text(tr('Comece a economizar', 'Start saving')),
+                  padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.m),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => _start(context),
+                        icon: const Icon(Icons.bolt),
+                        label: Text(tr('Comece a economizar', 'Start saving')),
+                      ),
+                      const SizedBox(height: Spacing.p),
+                      // cadastro opcional: quem nao quiser segue direto pelo botao de cima
+                      ValueListenableBuilder<Account?>(
+                        valueListenable: account,
+                        builder: (context, registered, _) => OutlinedButton.icon(
+                          onPressed: () =>
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
+                          icon: Icon(registered == null ? Icons.person_add_alt : Icons.person_outline),
+                          label: Text(
+                            registered == null ? tr('Criar cadastro', 'Sign up') : tr('Meu cadastro', 'My account'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

@@ -182,6 +182,10 @@ Na primeira vez, a API carrega os dados de `datasets/processed/` no banco sozinh
 Ela também recarrega sozinha quando o banco foi criado por uma versão antiga do código (falta alguma coluna nova).
 Depois de um `git pull`, rode o mesmo comando de novo para a API usar o código novo.
 
+Se o build falhar com `failed to execute bake` (Docker Desktop novo no Windows pede uma permissão
+`--allow=fs.read=Dockerfile`), rode assim no PowerShell:
+`$env:BUILDX_BAKE_ENTITLEMENTS_FS="0"; docker compose up -d --build`.
+
 Para conferir se os dois estão `healthy`:
 
 ```bash
@@ -264,6 +268,28 @@ terraform apply     # ~5 min na 1ª vez
   `docker_host = "npipe:////./pipe/dockerDesktopLinuxEngine"`.
 - A `gemini_api_key` do `terraform.tfvars` precisa ser igual à do `.env`, numa linha só. Senão o
   `/eco-coach` responde 503.
+
+### Passo 11: publicar na nuvem (Render + Neon)
+
+Para o app funcionar no celular em qualquer rede, com o computador desligado:
+
+| Serviço | O que faz no Iamp | Plano |
+|---|---|---|
+| [Neon](https://neon.com) | PostgreSQL com pgvector (o banco) | grátis, sem cartão, 1 GB (o banco usa ~20 MB) |
+| [Render](https://render.com) | Roda a API a partir do `Dockerfile` do GitHub, com endereço HTTPS fixo | grátis, 512 MB (a API usa ~150 MB) |
+
+1. **Neon:** crie a conta (login pelo GitHub) e um projeto na região **AWS US East (N. Virginia)**.
+   Copie o endereço de conexão (`postgresql://...?sslmode=require`).
+2. **Render:** crie a conta (login pelo GitHub), **New > Blueprint** e escolha este repositório. O Render lê o
+   [render.yaml](render.yaml) e pede dois segredos: `DATABASE_URL` (o endereço do Neon) e `GEMINI_API_KEY`.
+   O dono do repositório (ou quem tem acesso de administrador) precisa autorizar o Render no GitHub.
+3. Na primeira subida, com o banco vazio, a API carrega sozinha o catálogo e a base do Eco-Coach (~1 a 2 min).
+   Teste em `https://<nome-do-servico>.onrender.com/saude`.
+4. Gere o APK com esse endereço: `flutter build apk --release --split-per-abi --dart-define=API_URL=https://<nome-do-servico>.onrender.com`.
+
+A cada merge na `main`, o Render publica a API de novo sozinho. No plano grátis o servidor **dorme depois de
+15 min sem uso** e leva até ~1 min para acordar: o app chama a API assim que abre e, se a espera passar de
+8 s, avisa que o servidor está acordando. Na apresentação, abra o app uns minutos antes.
 
 ---
 

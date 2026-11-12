@@ -6,10 +6,10 @@ datasets/raw/chuveiros-eletricos.pdf publicado pelo INMETRO).
 
 import pandas as pd
 
-from config import ler_csv_inmetro, salvar_processado
+from config import read_csv_inmetro, save_processed
 
-df = ler_csv_inmetro("chuveiros-eletricos.csv")
-qtd_inicial = len(df)
+df = read_csv_inmetro("chuveiros-eletricos.csv")
+initial_qty = len(df)
 
 # Remove espaços extras só nos textos (sem transformar nulos na string "nan")
 for col in df.select_dtypes(include=["object", "str"]).columns:
@@ -35,15 +35,15 @@ df = df.rename(columns={
 df = df.dropna(subset=["marca", "modelo"]).drop_duplicates()
 
 # Tipos numéricos (Int64 aceita nulos, ao contrário de int)
-colunas_numericas = [
+numeric_columns = [
     "tensao_v", "potencia_w", "consumo_mensal_max_kwh",
     "elevacao_temperatura_c", "consumo_mensal_min_kwh", "vazao_l_min",
 ]
-for col in colunas_numericas:
+for col in numeric_columns:
     df[col] = pd.to_numeric(df[col].astype("string").str.replace(",", "."), errors="coerce")
 df["tensao_v"] = df["tensao_v"].astype("Int64")
 df["potencia_w"] = df["potencia_w"].astype("Int64")
 
-print(f"- Linhas processadas: {qtd_inicial}")
-print(f"- Linhas removidas: {qtd_inicial - len(df)}")
-salvar_processado(df, "chuveiros_eletricos_limpo.csv")
+print(f"- Linhas processadas: {initial_qty}")
+print(f"- Linhas removidas: {initial_qty - len(df)}")
+save_processed(df, "chuveiros_eletricos_limpo.csv")

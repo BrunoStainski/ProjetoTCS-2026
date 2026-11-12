@@ -13,7 +13,7 @@ datasets/raw/ (Inmetro + ANEEL)
   -> scripts/tratar_dados_*.py (Pandas, um por dataset; scripts/executar_pipeline.py roda todos)
   -> datasets/processed/*_limpo.csv  (+ distribuidoras_uf.csv: UF de cada distribuidora via CNPJ)
   -> src/criar_banco.py (recria as tabelas e carrega)       -> PostgreSQL 15 (Docker)
-  -> src/calculadora_residencial.py (catálogo + regras de cálculo + EQUIVALENCIA para sugestões)
+  -> src/calculadora_residencial.py (catálogo + regras de cálculo + EQUIVALENCE para sugestões)
   -> src/servico.py (funções usadas por qualquer interface)
   -> src/main.py (API FastAPI)  |  src/app_terminal.py (teste no terminal)
   -> app_gerenciamento_energetico/ (app Flutter ligado à API; ver seção "App Flutter")
@@ -75,10 +75,10 @@ máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, 
 
 1. Inmetro informa kWh/mês -> usa a tabela (ventilador: por velocidade). Ventilador: o kWh/mês do Inmetro é de
    **1 h por dia** (conferido nos CSVs brutos), então as horas são obrigatórias e multiplicam o valor
-   (`HORAS_REFERENCIA_INMETRO`; TV: 6,59 h). Sem horas, o `metodo` diz que é o valor do ensaio.
+   (`INMETRO_REFERENCE_HOURS`; TV: 6,59 h). Sem horas, o `metodo` diz que é o valor do ensaio.
 2. Informa kWh/ciclo -> kWh/ciclo x ciclos/mês (máquina de lavar)
 3. Só potência -> W x horas/dia x 30 / 1000 (+ stand-by). Chuveiro exige horas do usuário.
-Premissas de uso padrão (`PREMISSAS`) são do grupo, sem fonte — o app avisa que são estimativa.
+Premissas de uso padrão (`ASSUMPTIONS`) são do grupo, sem fonte — o app avisa que são estimativa.
 Tarifa: escolhida pela distribuidora (ANEEL) ou digitada pelo usuário (conta de luz).
 Valores **sem** ICMS, PIS/COFINS, bandeira e iluminação pública (aviso `AVISO_PADRAO`).
 Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,68/mês.
@@ -88,7 +88,7 @@ Exemplo de referência: chuveiro 5500 W, 15 min/dia, Copel = 41,25 kWh = R$ 31,6
 `GET /aparelhos?busca=` (`limite` vale **por tipo** de aparelho, padrão 15, + `total_categoria`; antes era
 no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética), `GET /marcas?categoria=`
 (marcas do tipo + nº de modelos, agrupa por `UPPER(TRIM(marca))`), `GET /modelos?categoria=&marca=&limite=`
-(modelos da marca, padrão 50 = `LIMITE_MODELOS_MARCA`), `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
+(modelos da marca, padrão 50 = `BRAND_MODEL_LIMIT`), `GET /aparelhos/{id}/uso`, `GET /distribuidoras?uf=|busca=`,
 `POST /calcular` (distribuidora_id **ou** tarifa_manual), `GET /categorias`, `GET /ufs`, `GET /saude`,
 `POST /classificar` ({moradores, itens:[{categoria, kwh_mes}]} -> perfil do K-Means; não usa o banco),
 `POST /sugestoes` (mesmo corpo do /calcular + limite -> modelos equivalentes mais econômicos),
@@ -98,7 +98,7 @@ no total e uma marca com vários tipos só mostrava o 1º em ordem alfabética),
 catálogo), `GET /estimativa/categorias`, `POST /sugestoes/estimado`, `POST /comparar/estimado`,
 `POST /calcular/resistivo` + `GET /resistivos` (eletroportáteis, tabela `portateis`), `POST /eco-coach/aparelho`
 (dicas para um aparelho).
-Os corpos de /calcular, /sugestoes e /comparar herdam de `UsoETarifa` (main.py); os de estimativa, de `Tarifa`.
+Os corpos de /calcular, /sugestoes e /comparar herdam de `UsageAndTariff` (main.py); os de estimativa, de `Tariff`.
 Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
 A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
 
@@ -126,13 +126,13 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
 - Limpeza das geladeiras: o consumo antigo não é mais imputado nas linhas que têm o consumo do padrão 2025 (antes
   recebiam a média do grupo, ex.: 41,831608 nas Consul CRM); volume total menor que o do refrigerador é refeito
   pela soma dos compartimentos (`volume_corrigido`; caso real: Consul CRM44 com 94 L -> 377 L).
-- Eletro pesado fora do catálogo, antigo ou sem modelo (`servico.estimar_por_equivalentes`, config `ESTIMAVEIS`):
+- Eletro pesado fora do catálogo, antigo ou sem modelo (`servico.estimate_from_equivalents`, config `ESTIMABLE`):
   tipo e tamanho (sempre, para comparar com modelos novos) e depois o número escrito no próprio aparelho
   (`formas`, enviado em `valor_etiqueta` + `campo_etiqueta`):
   etiqueta do Inmetro (kWh/ciclo da lavadora, kWh/mês da TV) ou **potência da plaqueta** (W) × horas, que vale
   para aparelho antigo (TV de tubo, ar de janela velho...). Ar e ventilador não pedem etiqueta: a do ar mudou de
   kWh/mês para kWh/ano em 2023 e a do ventilador é de 1 h/dia. Com potência, as horas são obrigatórias.
-  Sem número: tipo com nome conhecido (`NOMES_DOS_TIPOS`, ex.: "Automática que abre por cima") e tamanho em
+  Sem número: tipo com nome conhecido (`TYPE_NAMES`, ex.: "Automática que abre por cima") e tamanho em
   opções prontas (`tamanhos`) ou digitado -> "aparelho de referência" com a mediana (e os quartis) das colunas de
   consumo dos modelos com a mesma medida (±10%, ampliando até ±40% para ter 5) e o mesmo tipo onde o tipo é
   padronizado: o mesmo kWh/ciclo (ou W) entra no cálculo e no texto. Faixa = 1º a 3º quartil; com menos de 4
@@ -143,20 +143,20 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
 - Eletroportáteis: tabela `portateis` (carga de `datasets/processed/eletroportateis.csv`, com fonte por linha;
   potência e uso típicos são premissas do grupo). kWh = W/1000 × tempo/dia × dias. Sem sugestão de modelos (não têm
   etiqueta do Inmetro): o app mostra as dicas do Eco-Coach (`POST /eco-coach/aparelho`).
-- Tempo de uso no app em horas e minutos (`ControleTempo`/`CampoTempo`); o `metodo` da API também ("15 min/dia").
+- Tempo de uso no app em horas e minutos (`TimeControl`/`TimeField`); o `metodo` da API também ("15 min/dia").
 
 ## Idioma: português (nativo) e inglês
 
 Para apresentar a estrangeiros, o app inteiro troca para o inglês no menu (☰), seção "Idioma · Language".
 Sempre abre em português; a escolha não é gravada.
-- App: `lib/idioma.dart` (`idioma` = ValueNotifier, `tr('pt', 'en')`, `mudarIdioma`). Todo texto de tela é
-  `tr('...', '...')`, com as duas versões lado a lado. `mudarIdioma` marca todas as telas para reconstruir; o
-  menu também volta as abas para a 1ª tela (`recomecarAba`) e apaga perfil e plano (`casa.esquecerTextosDaApi`),
+- App: `lib/idioma.dart` (`idioma` = ValueNotifier, `tr('pt', 'en')`, `changeLanguage`). Todo texto de tela é
+  `tr('...', '...')`, com as duas versões lado a lado. `changeLanguage` marca todas as telas para reconstruir; o
+  menu também volta as abas para a 1ª tela (`restartTab`) e apaga perfil e plano (`casa.forgetApiTexts`),
   porque eles vieram da API no outro idioma. `MaterialApp.locale` + `GlobalMaterialLocalizations`: textos do
   Flutter ("Voltar"/"Back") seguem o idioma. Nos testes, `pageBack()` só acha "Back": no `IampApp` em português,
-  tocar em `find.byTooltip('Voltar')`. `reais`/`numero`/`lerNumero` seguem o idioma (inglês: "R$ 1,234.50"; quem
+  tocar em `find.byTooltip('Voltar')`. `reais`/`number`/`readNumber` seguem o idioma (inglês: "R$ 1,234.50"; quem
   digita "0,85" continua certo). O `setUp` dos testes volta o idioma para `Idioma.pt`.
-- API: `Accept-Language` (o app manda `pt-BR` ou `en`) -> middleware `IdiomaDaRequisicao` (main.py) guarda o
+- API: `Accept-Language` (o app manda `pt-BR` ou `en`) -> middleware `RequestLanguage` (main.py) guarda o
   idioma numa ContextVar (`src/idioma.py`). Texto montado com números: `tr(pt, en)` no lugar. Texto fixo
   (constantes, ESTIMAVEIS, NOMES_DOS_TIPOS, nomes dos eletroportáteis, rag_agent.NOMES): `t(texto)` com o
   dicionário `src/traducoes.py` (chave = texto em português). `tests/test_idioma.py` falha se faltar tradução ou
@@ -164,29 +164,29 @@ Sempre abre em português; a escolha não é gravada.
   perfil "Consciente", velocidade) não mudam: o app traduz o nome. `unidades()`/`medida()` trocam pol/cv/litros
   e os separadores ("7.500 BTU/h" -> "7,500 BTU/h").
 - Eco-Coach em inglês: a busca vetorial continua em português (documentos brasileiros); o prompt ganha
-  `IDIOMA_EN` (escrever em inglês, traduzir as dicas, manter [n]) e os números vão no formato americano.
+  `LANGUAGE_EN` (escrever em inglês, traduzir as dicas, manter [n]) e os números vão no formato americano.
   As fontes citadas continuam com o título em português (o app avisa).
 - O histórico (`consultas`) guarda `metodo` no idioma em que a pessoa viu.
 
 ## Gás de cozinha: removido
 
 O grupo decidiu focar só em energia elétrica: o cálculo de gás de cozinha (fogões do Inmetro, preço do
-GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `banco.ESQUEMA` ainda apaga
-`fogoes`, `precos_glp` e `consultas_gas` de bancos antigos, e `banco_carregado()` recarrega o banco se a
+GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `banco.SCHEMA` ainda apaga
+`fogoes`, `precos_glp` e `consultas_gas` de bancos antigos, e `database_loaded()` recarrega o banco se a
 tabela `fogoes` ainda existir.
 
-`banco_carregado()` compara as colunas de `aparelhos` com `COLUNAS_APARELHOS` (criar_banco.py): ao
+`database_loaded()` compara as colunas de `aparelhos` com `APPLIANCE_COLUMNS` (criar_banco.py): ao
 adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
 
 ## Sugestão de troca (`servico.sugerir_alternativas` e `servico.comparar`)
 
-- Equivalência em `EQUIVALENCIA` (calculadora_residencial.py): mesma categoria (fluorescente pode
+- Equivalência em `EQUIVALENCE` (calculadora_residencial.py): mesma categoria (fluorescente pode
   virar LED), medida parecida (`capacidade` ou `fluxo_lm`) dentro da tolerância e mesmo tipo só onde
   o tipo do Inmetro é padronizado (geladeira, ar, máquina de lavar). Mesmo uso e mesma tarifa do atual.
-- Filtros: só `origem_dado = 'informado'`; economia mínima 5% (`ECONOMIA_MINIMA`); consumo abaixo de
-  40% da mediana dos equivalentes é descartado como erro de dado (`FRACAO_SUSPEITA`; caso real:
+- Filtros: só `origem_dado = 'informado'`; economia mínima 5% (`MIN_SAVINGS`); consumo abaixo de
+  40% da mediana dos equivalentes é descartado como erro de dado (`SUSPECT_FRACTION`; caso real:
   HISENSE RS3P428NEDA1 com 2,8 kWh); variações do mesmo modelo (marca+detalhe+kWh) aparecem uma vez.
-- Sem sugestão (`SEM_SUGESTAO`, com o motivo para o app): chuveiro, micro-ondas, vapor de sódio.
+- Sem sugestão (`NO_SUGGESTION`, com o motivo para o app): chuveiro, micro-ondas, vapor de sódio.
 - Payback = preco_novo / economia_mes (Python, na API). O catálogo não tem preço: o usuário digita.
 
 ## Eco-Coach (RAG) — `src/rag.py`, `src/rag_agent.py`, `scripts/carregar_rag.py`
@@ -195,10 +195,15 @@ adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco re
   etiqueta ENCE, nova etiqueta de geladeira 2026, PBE) + cartilha da Cemig 2025 (páginas 2–17).
   O Procel Info saiu do ar e o Internet Archive não guardou as dicas, por isso a Cemig.
 - Limpeza da cartilha: só itens com marcador (•); o PDF tem anotações para o ilustrador sem marcador.
-  Seção por página (`SECAO_DA_PAGINA`) + títulos curtos com nome de aparelho (`SECOES`).
-- Embeddings LOCAIS com fastembed (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dim, sem torch);
-  cache em `models/fastembed/` (fora do git; a imagem Docker baixa no build). Tabela `trechos_rag`
-  (vector(384)) é criada pelo script, não pelo `criar_banco.py`; recarga apaga e recria os trechos.
+  Seção por página (`PAGE_SECTION`) + títulos curtos com nome de aparelho (`SECTIONS`).
+- Embeddings pela API do Gemini (`gemini-embedding-001`, `GEMINI_EMBEDDING_MODEL`, 768 dim; `rag.vectorize`
+  com `task` RETRIEVAL_DOCUMENT na carga e RETRIEVAL_QUERY na busca; `_question_vector` guarda as perguntas
+  repetidas). Antes eram locais (fastembed, 384 dim), mas o modelo ocupava ~550 MB e a API não cabia nos 512 MB
+  do Render grátis: hoje a API usa ~110 MB (pico 150 MB com a carga). Vão ao Google os trechos públicos e as
+  perguntas de busca (nomes de aparelhos), nada do usuário. Falha do Gemini vira `RuntimeError` -> 503.
+  Tabela `trechos_rag` (vector(768)) é recriada pelo `carregar_rag.py` (DROP + CREATE). Base vazia ao subir
+  (banco novo, ex.: Neon): a API roda o `carregar_rag.py` sozinha (`load_rag` em main.py; a imagem leva
+  `datasets/raw/rag/` e o script). Sem a chave, só avisa e o /eco-coach responde 503.
 - LLM: Gemini pela API gratuita do AI Studio (`GEMINI_API_KEY`; `GEMINI_MODELOS` = principal e reserva,
   hoje `gemini-3.5-flash,gemini-3.5-flash-lite`). `thinking_budget=0`: o raciocínio interno cortava o texto.
   Hugging Face foi descartado: a conta não tem crédito gratuito (402).
@@ -215,40 +220,40 @@ lugar visível (app, web, Android, iOS).
 
 - `tema.dart`: tudo o que é visual. `Cores` (paleta preto e amarelo `#FFD000`, verde = economia,
   vermelho = alerta; texto branco 100/90/80%, nada abaixo de 80% para manter contraste AA no preto),
-  `Espaco` (grade 4/8) e a extensão `Iamp` (ThemeExtension) com os estilos de texto (34/22/18/16, base 18,
+  `Spacing` (grade 4/8) e a extensão `Iamp` (ThemeExtension) com os estilos de texto (34/22/18/16, base 18,
   nada abaixo de 16), cores com significado, raios, ícones, alvo de toque (48dp) e as decorações
-  `cartaoDestaque`/`selo`. Nas telas: `final t = Iamp.de(context);` e nunca cor/tamanho solto.
-- Acessibilidade: o app respeita o tamanho de fonte do sistema; com 150% ou mais (`fonteGrande`) o que
-  ficaria lado a lado empilha (`LadoALado`, `CampoTempo`, `GradeDeTipos`). Nenhuma informação só por cor
+  `highlightCard`/`badge`. Nas telas: `final t = Iamp.de(context);` e nunca cor/tamanho solto.
+- Acessibilidade: o app respeita o tamanho de fonte do sistema; com 150% ou mais (`largeFont`) o que
+  ficaria lado a lado empilha (`SideBySide`, `TimeField`, `TypeGrid`). Nenhuma informação só por cor
   (payback tem frase "Se paga rápido/Demora/Não se paga"; perfil tem nome e ícone). Cartões clicáveis com
-  `MergeSemantics`, botões de ícone com tooltip que diz o aparelho, `ValorAnimado` lido só com o valor final.
+  `MergeSemantics`, botões de ícone com tooltip que diz o aparelho, `AnimatedValue` lido só com o valor final.
 - Navegação (`navegacao.dart` + `telas/inicio.dart`): barra inferior com 3 abas (Calcular, Minha casa,
   Economizar), ícone + texto; cada aba tem a própria pilha (`Navigator` + `ScaffoldMessenger`), então a
-  barra fica visível durante o cálculo. `irPara(Aba, recomecar:, fecharAtual:)` troca de aba.
+  barra fica visível durante o cálculo. `goTo(AppTab, restart:, closeCurrent:)` troca de aba.
 - Boas-vindas (`telas/boas_vindas.dart`): abre por cima das abas (`initialRoute: '/boas-vindas'` monta
-  '/' embaixo); só a `MarcaIamp(tamanho: 120, tamanhoNome: 56)` e o botão (sem texto, pedido do grupo);
+  '/' embaixo); só a `IampBrand(size: 120, nameSize: 56)` e o botão (sem texto, pedido do grupo);
   "Comece a economizar" fecha e vai para Calcular etapa 1; voltar do Android nela fecha o app.
-  `IampApp(boasVindas: false)` nos testes das abas.
-- Etapa 2 com tipo escolhido (`TelaModelo`): lista de todas as marcas do tipo (`_ListaDeMarcas`, GET /marcas)
+  `IampApp(showWelcome: false)` nos testes das abas.
+- Etapa 2 com tipo escolhido (`ModelScreen`): lista de todas as marcas do tipo (`_BrandList`, GET /marcas)
   filtrada pelo texto digitado; cada marca é um `ExpansionTile` que só busca os modelos ao abrir (GET /modelos).
   "Buscar" continua a busca por texto (o resultado substitui a lista). Sem tipo, não há lista de marcas.
 - Menu de acesso rápido (`telas/menu.dart`, `drawer` da casca): botão ☰ (tooltip "Menu") só na 1ª tela de
-  cada aba (`Pagina` usa `Scaffold.maybeOf` + `isFirst`); itens Início, Calcular, Estimar, Minha casa,
+  cada aba (`AppPage` usa `Scaffold.maybeOf` + `isFirst`); itens Início, Calcular, Estimar, Minha casa,
   Economizar. Itens são `ListTile` (texto quebra com fonte 2x; `NavigationDrawerDestination` estourava).
-- Marca (`MarcaIamp`, comum.dart): `assets/icone/icone.png` com contorno amarelo esmaecido e o nome ao lado.
+- Marca (`IampBrand`, comum.dart): `assets/icone/icone.png` com contorno amarelo esmaecido e o nome ao lado.
   Usa `cacheWidth` (nos testes a imagem vem como `ResizeImage`). O código dos colegas não passa pelo
   `dart format`: formatar só os arquivos que você mudou.
-- Uma decisão por tela. Cálculo do catálogo em 6 etapas ("Etapa n de 6", `etapaDoCalculo`): tipo
-  (`TelaBusca`, botões grandes) -> marca/modelo (`TelaModelo`) -> uso (`TelaUso`) -> estado (`TelaEstado`,
-  oferece a última tarifa) -> distribuidora (`TelaDistribuidora`; ou `TelaTarifaConta`) -> resultado.
+- Uma decisão por tela. Cálculo do catálogo em 6 etapas ("Etapa n de 6", `calculationStep`): tipo
+  (`SearchScreen`, botões grandes) -> marca/modelo (`ModelScreen`) -> uso (`UsageScreen`) -> estado (`StateScreen`,
+  oferece a última tarifa) -> distribuidora (`DistributorScreen`; ou `BillTariffScreen`) -> resultado.
   Estimativa (`estimar.dart`): uma pergunta por tela, com "Não sei"/"Não tenho" nas opcionais; voltar
   volta uma pergunta (`PopScope`).
 - R$ é a informação principal; kWh, tarifa e fórmula ficam como texto secundário ou em "Como calculamos".
-- Padrões (`telas/comum.dart`): `Pagina` (ação principal no `rodape`), `CabecalhoPergunta`, `CartaoOpcao`,
-  `CartaoDestaque`, `CartaoInfo`, `BarraParte` (barra + % escrito), `MensagemErro`, `Carregando`.
+- Padrões (`telas/comum.dart`): `AppPage` (ação principal no `footer`), `QuestionHeader`, `OptionCard`,
+  `HighlightCard`, `InfoCard`, `PartBar` (barra + % escrito), `ErrorMessage`, `Loading`.
 - Ícone: `assets/icone/*.png` -> `dart run flutter_launcher_icons` (config no pubspec.yaml).
 - `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
-  ChangeNotifier global `casa`; só em memória, sem persistência). Remover item tem "Desfazer" (`reinserir`).
+  ChangeNotifier global `casa`; só em memória, sem persistência). Remover item tem "Desfazer" (`reinsert`).
 - Minha casa: total por mês, cada item com R$, % da conta, quantidade (−/+) e botões visíveis ("Ver modelos
   que gastam menos", "Remover"); perfil K-Means mostrado em R$ por pessoa (tarifa média da casa).
 - Economizar (`eco_coach.dart`): só chama o /eco-coach quando a pessoa toca em "Montar meu plano"; o plano
@@ -257,10 +262,10 @@ lugar visível (app, web, Android, iOS).
   amarelo). Trocas com payback de `comparar.dart` entram em `casa.trocas` (máx. 5). Timeout: 90 s.
 - `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, "Não sei" = valor do Inmetro.
 - Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra).
-- Busca: resultados agrupados por tipo (`ResultadosPorTipo`, `tituloDaCategoria`); um tipo só já vem aberto;
-  acima de 30 por tipo (`limiteBuscaPorTipo`) avisa para digitar parte do modelo; só a resposta mais
-  recente vale (`_pedido`). Teste com API falsa: `http.runWithClient` + `MockClient`.
-- Aviso "foi para a sua casa": `avisarAdicionado` some em 5 s (`duracaoAviso`, `persist: false`).
+- Busca: resultados agrupados por tipo (`ResultsPerType`, `categoryTitle`); um tipo só já vem aberto;
+  acima de 30 por tipo (`searchLimitPerType`) avisa para digitar parte do modelo; só a resposta mais
+  recente vale (`_request`). Teste com API falsa: `http.runWithClient` + `MockClient`.
+- Aviso "foi para a sua casa": `notifyAdded` some em 5 s (`noticeDuration`, `persist: false`).
 - Testes em `test/widget_test.dart`: fluxo completo com API falsa, abas, estimativa pergunta a pergunta,
   fonte 2x sem estouro (tela de 360dp), guidelines de toque 48dp, rótulos e contraste
   (`meetsGuideline`), Eco-Coach, somas e formatação.
@@ -315,6 +320,41 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 - Segredos só no state/tfvars (no `.gitignore`), nunca nos metadados da VM. State local, API em HTTP.
 - Credenciais da Oracle: `~/.oci/config` (perfil `oci_perfil`). App: `--dart-define=API_URL=<api_url>`.
 
+## Modo claro, transições e cadastro (app)
+
+- Modo claro: `Palette.dark`/`Palette.light` (tema.dart) com os mesmos papéis de cor; `iampTheme(light:)` e
+  `Iamp.forPalette`. `lightMode` (ValueNotifier) é escutado pelo MaterialApp; menu, seção "Aparência"
+  (Escuro/Claro). Abre no escuro e não grava a escolha. No claro o amarelo `#FFD000` não tem contraste no branco:
+  fica só em preenchimento (`t.highlightFill` + `t.onFill` preto) e `t.highlight` vira âmbar `#7A5A00`. Nas telas,
+  preenchimento amarelo = `highlightFill`; ícone/texto de destaque = `highlight`. Nunca `AppColors.*` direto
+  (são as cores do escuro). Teste de contraste AA no claro em `widget_test.dart` (grupo "Modo claro").
+- Transições: `StepTransition` (tema.dart) no `pageTransitionsTheme` de todas as plataformas (280 ms, desliza
+  + apaga); barra de etapa com `TweenAnimationBuilder` na `AppPage`; perguntas da estimativa com
+  `AnimatedSwitcher` (`_forward` dá o lado). Tudo respeita `MediaQuery.disableAnimationsOf`.
+- Cadastro: `conta.dart` (`account` = ValueNotifier<Account?>, nome + e-mail) e `telas/cadastro.dart`
+  (`SignUpScreen`), aberto pelas boas-vindas e pelo menu. Opcional, só em memória, **sem chamada à API**
+  (há teste disso). O menu ficou mais comprido: nos testes, rolar com `scrollUntilVisible` até Aparência/Idioma.
+- Cadastro e LGPD: nome e e-mail são dados pessoais; a LGPD vale mesmo em projeto de curso gratuito (a exceção
+  acadêmica do art. 4º é parcial e não cobre um app distribuído a terceiros). Para ligar o cadastro ao banco
+  falta: consentimento registrado e aviso de privacidade, senha com hash (argon2/bcrypt), HTTPS (o Render dá),
+  rotas para ver/corrigir/apagar os dados, não mandar dado pessoal ao Gemini e, na tabela `consultas`, decidir
+  se o histórico fica ligado à pessoa. Enquanto isso não existir, o cadastro não sai do aparelho.
+
+## Nuvem: Render (API) + Neon (banco)
+
+- Escolhidos porque a Oracle (instituição) só libera o acesso em até 2 semanas e a apresentação é antes; os dois
+  são grátis, sem cartão, com login pelo GitHub. `infra/oracle/` continua pronto como alternativa.
+- `render.yaml` (Blueprint): serviço web Docker, plano free, região virginia (perto do Neon AWS us-east-1),
+  `healthCheckPath: /saude`, deploy a cada push na `main`. Segredos no painel: `DATABASE_URL` (Neon) e
+  `GEMINI_API_KEY`. `Dockerfile` usa `${PORT:-8000}`; `config.py` troca `postgresql://` por
+  `postgresql+psycopg2://` (o SQLAlchemy 2.1 usa o psycopg 3 nesse formato e o projeto usa o psycopg2).
+- Simulado em 11/11/2026 no Docker com banco vazio e `--memory=512m`: carga automática do catálogo e do RAG,
+  /saude, /calcular, /marcas, /eco-coach ok; pico de 150 MB.
+- Render grátis dorme depois de 15 min sem uso (~1 min para acordar): o app chama `Api.wakeUp()` no `main`,
+  `requestLimit` = 75 s (Eco-Coach 120 s) e `Loading` avisa depois de 8 s (`Loading.waitBeforeHint`).
+- Docker Desktop novo no Windows: `docker compose build` falha com "failed to execute bake" (pede
+  `--allow=fs.read=Dockerfile`); usar `BUILDX_BAKE_ENTITLEMENTS_FS=0` antes do comando.
+
 ## Versionamento e APK (passo a passo no README, seção 8)
 
 - Versão do app em `pubspec.yaml` (hoje `2.0.0+6`: nome + build; o build sobe a cada APK), da API em
@@ -328,7 +368,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
   API só acrescentam campos.
 - Assinatura (`android/app/build.gradle.kts`): com `android/key.properties` usa a chave do projeto;
   sem ele, a chave de teste do PC (aviso no build). Chave e senhas fora do git (`.gitignore` do android/).
-  Chave criada em 09/11/2026 (`C:\Users\mathe\chaves\iamp.jks`, alias `iamp`, `CN=iamp, O=Projeto TCS 2026`;
+  Chave criada em 09/11/2026 (`C:\Users\mathe\keys\iamp.jks`, alias `iamp`, `CN=iamp, O=Projeto TCS 2026`;
   senha aleatória só no `key.properties`, não abrir). Conferir: `apksigner verify --print-certs` e
   `aapt dump badging` (build-tools 36.0.0 do SDK). Quem instalou o 1º APK (chave de teste) desinstala uma vez.
 - Celular: o `API_URL` fica gravado no APK. Ele aponta para o IP do PC na rede (`ipconfig`/Wi-Fi), que
@@ -373,19 +413,26 @@ PENDENTE: o gás saiu do projeto; tirar a anotação de gás do BPMN e do `docs/
 - Payback simples (sem juros, sem revenda do antigo, sem reajuste de tarifa) e com preço digitado.
 - Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
   potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV
-  reescala por regra de três com 6,59 h/dia de ensaio (`HORAS_REFERENCIA_INMETRO`): número
+  reescala por regra de três com 6,59 h/dia de ensaio (`INMETRO_REFERENCE_HOURS`): número
   levantado pelo grupo, sem o documento oficial e sem saber se o kWh/mês inclui o stand-by.
 - Eco-Coach: no plano gratuito da API do Gemini o Google pode usar o conteúdo enviado para melhorar
   os produtos (confirmar nos termos atuais). Enviamos só números de consumo e trechos públicos, nada
   pessoal. O plano gratuito tem limite de uso e os modelos disponíveis mudam (o 2.5 já saiu do ar).
 - O texto do Eco-Coach é gerado por IA: pode errar mesmo com as regras; por isso cita as fontes.
+- A busca do Eco-Coach usa os embeddings do Gemini: os trechos dos documentos públicos e as perguntas de busca
+  (nomes de aparelhos) vão para o Google. Nada pessoal; antes os vetores eram gerados no próprio servidor.
 - Residências do ML são sintéticas: os perfis servem para demonstração.
 - O CTGAN ainda distorce a distribuição de moradores (ex.: 3 moradores 25% na seed -> ~37%).
 
 ## Convenções
 
-- Código, comentários e mensagens em português; colunas em snake_case (`config.salvar_processado`).
-- Nunca montar SQL com texto do usuário; usar `banco.consulta`/`banco.executar` com `?`.
+- Nomes no código (classes, métodos, funções, variáveis) em **inglês** (padronizado em 11/11/2026); textos para
+  o usuário, mensagens, comentários e docstrings em português. O que é contrato continua em português: chaves do
+  JSON da API (`JSON_NAMES` + `ApiModel` em main.py ligam o campo em inglês ao nome do JSON), parâmetros de URL
+  (`Query(alias="busca")`), colunas do banco/CSV e nomes de arquivo (`servico.py`, `telas/busca.dart`).
+  Repassar `**kwargs`: as chaves do dicionário são nomes de parâmetro (em inglês). Colunas em snake_case
+  (`config.save_processed`).
+- Nunca montar SQL com texto do usuário; usar `banco.query`/`banco.run` com `?`.
 - Toda fonte de dado precisa ser registrada (coluna de fonte ou tabela `cargas`).
 - Branches por pessoa/tarefa, merge na `main` por Pull Request.
 - Commits e PRs sem linha "Co-Authored-By" nem rodapé de atribuição ao Claude.

@@ -3,7 +3,6 @@ SQLAlchemy>=2.0
 psycopg2-binary>=2.9
 fastapi>=0.110
 uvicorn>=0.29
-# RAG Eco-Coach: embeddings locais (sem torch), API do Gemini e leitura do PDF da cartilha
-fastembed>=0.9
+# RAG Eco-Coach: API do Gemini (texto e embeddings) e leitura do PDF da cartilha
 google-genai>=3.0
 pypdf>=7.0

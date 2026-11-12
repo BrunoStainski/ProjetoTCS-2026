@@ -9,134 +9,134 @@ import 'distribuidora.dart';
 /// Etapa 3: pergunta como o aparelho e usado, so quando a API pede.
 /// Se o Inmetro ja informa o consumo mensal, pula direto para o estado.
 /// Ventilador: a velocidade e, depois, as horas por dia (o Inmetro mede 1 h por dia).
-class TelaUso extends StatefulWidget {
-  final Consulta consulta;
+class UsageScreen extends StatefulWidget {
+  final Query query;
 
-  const TelaUso({super.key, required this.consulta});
+  const UsageScreen({super.key, required this.query});
 
   @override
-  State<TelaUso> createState() => _TelaUsoState();
+  State<UsageScreen> createState() => _UsageScreenState();
 }
 
-class _TelaUsoState extends State<TelaUso> {
-  final _valor = TextEditingController();
-  final _tempo = ControleTempo();
-  PerguntaDeUso? _pergunta;
-  String? _velocidade;
-  bool _horasDoVentilador = false; // ja escolheu a velocidade, agora as horas
-  String? _erro;
+class _UsageScreenState extends State<UsageScreen> {
+  final _value = TextEditingController();
+  final _time = TimeControl();
+  UsageQuestion? _question;
+  String? _speed;
+  bool _fanHours = false; // ja escolheu a velocidade, agora as horas
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _carregar();
+    _load();
   }
 
   @override
   void dispose() {
-    _valor.dispose();
-    _tempo.dispose();
+    _value.dispose();
+    _time.dispose();
     super.dispose();
   }
 
-  Future<void> _carregar() async {
-    setState(() => _erro = null);
+  Future<void> _load() async {
+    setState(() => _error = null);
     try {
-      final p = await Api.perguntaDeUso(widget.consulta.aparelho.id);
+      final p = await Api.usageQuestion(widget.query.appliance.id);
       if (!mounted) return;
-      if (p.pergunta == null) {
-        _seguir(substituir: true);
+      if (p.question == null) {
+        _follow(substitute: true);
         return;
       }
       setState(() {
-        _pergunta = p;
-        if (p.pergunta == 'velocidade') {
-          _velocidade = p.padrao as String?;
-        } else if (p.pergunta == 'horas') {
-          _tempo.definir((p.padrao as num?)?.toDouble());
-        } else if (p.padrao != null) {
-          _valor.text = numero((p.padrao as num).toDouble(), casas: 0);
+        _question = p;
+        if (p.question == 'velocidade') {
+          _speed = p.defaults as String?;
+        } else if (p.question == 'horas') {
+          _time.define((p.defaults as num?)?.toDouble());
+        } else if (p.defaults != null) {
+          _value.text = number((p.defaults as num).toDouble(), homes: 0);
         }
       });
-    } on ApiErro catch (e) {
-      if (mounted) setState(() => _erro = e.mensagem);
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
     }
   }
 
-  void _seguir({bool substituir = false}) {
-    final rota = MaterialPageRoute(builder: (_) => TelaEstado(consulta: widget.consulta));
-    substituir ? Navigator.pushReplacement(context, rota) : Navigator.push(context, rota);
+  void _follow({bool substitute = false}) {
+    final route = MaterialPageRoute(builder: (_) => StateScreen(query: widget.query));
+    substitute ? Navigator.pushReplacement(context, route) : Navigator.push(context, route);
   }
 
-  void _escolherVelocidade(String velocidade) {
+  void _chooseSpeed(String speed) {
     setState(() {
-      _velocidade = velocidade;
-      _erro = null;
-      _horasDoVentilador = _pergunta!.perguntarHoras;
+      _speed = speed;
+      _error = null;
+      _fanHours = _question!.askHours;
     });
-    if (!_horasDoVentilador) _confirmar();
+    if (!_fanHours) _confirm();
   }
 
-  void _confirmar({bool pular = false}) {
-    final c = widget.consulta;
-    c.horasDia = c.ciclosMes = c.velocidade = null;
-    switch (_pergunta!.pergunta) {
+  void _confirm({bool skip = false}) {
+    final c = widget.query;
+    c.dailyHours = c.monthlyCycles = c.speed = null;
+    switch (_question!.question) {
       case 'velocidade':
-        c.velocidade = _velocidade;
-        if (_pergunta!.perguntarHoras) {
-          final horas = _tempo.horasDia;
-          if (horas == null) {
+        c.speed = _speed;
+        if (_question!.askHours) {
+          final hours = _time.dailyHours;
+          if (hours == null) {
             setState(
-              () => _erro = tr(
+              () => _error = tr(
                 'Informe quanto tempo por dia ele fica ligado. Ex.: 8 h e 0 min.',
                 'Enter how long it stays on per day. E.g.: 8 h and 0 min.',
               ),
             );
             return;
           }
-          c.horasDia = horas;
+          c.dailyHours = hours;
         }
       case 'horas':
-        if (pular) {
-          _tempo.limpar();
+        if (skip) {
+          _time.clear();
           break;
         }
-        if (_pergunta!.opcional && _tempo.vazio) break;
-        final horas = _tempo.horasDia;
-        if (horas == null) {
+        if (_question!.optional && _time.isEmpty) break;
+        final hours = _time.dailyHours;
+        if (hours == null) {
           setState(
-            () => _erro = tr(
+            () => _error = tr(
               'Informe quanto tempo por dia, em horas e minutos. Ex.: 0 h e 15 min.',
               'Enter how long per day, in hours and minutes. E.g.: 0 h and 15 min.',
             ),
           );
           return;
         }
-        c.horasDia = horas;
+        c.dailyHours = hours;
       case 'ciclos':
-        final ciclos = lerNumero(_valor.text);
-        if (ciclos == null || ciclos < 0) {
-          setState(() => _erro = tr('Informe quantas vezes por mês. Ex.: 12.', 'Enter how many times per month. E.g.: 12.'));
+        final cycles = readNumber(_value.text);
+        if (cycles == null || cycles < 0) {
+          setState(() => _error = tr('Informe quantas vezes por mês. Ex.: 12.', 'Enter how many times per month. E.g.: 12.'));
           return;
         }
-        c.ciclosMes = ciclos;
+        c.monthlyCycles = cycles;
     }
-    setState(() => _erro = null);
-    _seguir();
+    setState(() => _error = null);
+    _follow();
   }
 
-  Widget? _rodape(PerguntaDeUso? p) {
-    if (p == null || (p.pergunta == 'velocidade' && !_horasDoVentilador)) return null;
-    final continuar = FilledButton(onPressed: _confirmar, child: Text(tr('Continuar', 'Continue')));
-    if (!(p.pergunta == 'horas' && p.opcional)) return continuar;
+  Widget? _footer(UsageQuestion? p) {
+    if (p == null || (p.question == 'velocidade' && !_fanHours)) return null;
+    final proceed = FilledButton(onPressed: _confirm, child: Text(tr('Continuar', 'Continue')));
+    if (!(p.question == 'horas' && p.optional)) return proceed;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        continuar,
-        const SizedBox(height: Espaco.p),
+        proceed,
+        const SizedBox(height: Spacing.p),
         TextButton(
-          onPressed: () => _confirmar(pular: true),
+          onPressed: () => _confirm(skip: true),
           child: Text(tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value")),
         ),
       ],
@@ -146,30 +146,30 @@ class _TelaUsoState extends State<TelaUso> {
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final p = _pergunta;
-    final aparelho = widget.consulta.aparelho;
-    final pagina = Pagina(
-      titulo: tr('Como você usa', 'How you use it'),
-      etapa: etapaDoCalculo(widget.consulta, 3),
-      rodape: _rodape(p),
-      filho: ListView(
+    final p = _question;
+    final appliance = widget.query.appliance;
+    final page = AppPage(
+      title: tr('Como você usa', 'How you use it'),
+      step: calculationStep(widget.query, 3),
+      footer: _footer(p),
+      child: ListView(
         children: [
           MergeSemantics(
             child: Row(
               children: [
-                Icon(iconeDaCategoria(aparelho.categoria), size: t.iconeGrande),
-                const SizedBox(width: Espaco.pm),
+                Icon(categoryIcon(appliance.category), size: t.largeIcon),
+                const SizedBox(width: Spacing.pm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(aparelho.nome, style: t.forte),
+                      Text(appliance.name, style: t.strong),
                       Text(
                         [
-                          nomeDaCategoria(aparelho.categoria),
-                          if (aparelho.detalhe.isNotEmpty) aparelho.detalhe,
+                          categoryName(appliance.category),
+                          if (appliance.detail.isNotEmpty) appliance.detail,
                         ].join(' · '),
-                        style: t.secundario,
+                        style: t.secondary,
                       ),
                     ],
                   ),
@@ -177,44 +177,44 @@ class _TelaUsoState extends State<TelaUso> {
               ],
             ),
           ),
-          const SizedBox(height: Espaco.g),
-          if (p == null && _erro == null) const Carregando(),
-          if (p?.pergunta == 'velocidade' && !_horasDoVentilador) ...[
-            CabecalhoPergunta(
+          const SizedBox(height: Spacing.g),
+          if (p == null && _error == null) const Loading(),
+          if (p?.question == 'velocidade' && !_fanHours) ...[
+            QuestionHeader(
               tr('Em qual velocidade você costuma usar?', 'Which speed do you usually use?'),
-              ajuda: tr('Toque na opção.', 'Tap an option.'),
+              help: tr('Toque na opção.', 'Tap an option.'),
             ),
-            for (final o in p!.opcoes)
-              CartaoOpcao(
-                titulo: nomeDaVelocidade(o),
-                selecionada: o == _velocidade,
-                onTap: () => _escolherVelocidade(o),
+            for (final o in p!.options)
+              OptionCard(
+                title: speedName(o),
+                selected: o == _speed,
+                onTap: () => _chooseSpeed(o),
               ),
           ],
-          if (_horasDoVentilador) ...[
-            CabecalhoPergunta(
+          if (_fanHours) ...[
+            QuestionHeader(
               tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
-              ajuda: tr(
+              help: tr(
                 'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
                 'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
               ),
             ),
-            CampoTempo(controle: _tempo, aoConfirmar: _confirmar),
+            TimeField(control: _time, onConfirm: _confirm),
           ],
-          if (p?.pergunta == 'horas') ...[
-            CabecalhoPergunta(
+          if (p?.question == 'horas') ...[
+            QuestionHeader(
               tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
-              ajuda: p!.opcional
+              help: p!.optional
                   ? tr(
                       'Se não souber, toque em "Não sei" embaixo: usamos o consumo medido pelo Inmetro.',
                       'If you are not sure, tap "I don\'t know" below: we use the consumption measured by Inmetro.',
                     )
-                  : p.padrao != null
+                  : p.defaults != null
                   ? tr(
                       'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
                       'We filled in a typical value. Change it to your own use if it is different.',
                     )
-                  : aparelho.categoria == 'chuveiro'
+                  : appliance.category == 'chuveiro'
                   ? tr(
                       'Some o tempo de todos os usos do dia. Ex.: dois banhos de 10 min = 0 h e 20 min.',
                       'Add up every use in the day. E.g.: two 10-minute showers = 0 h and 20 min.',
@@ -224,43 +224,43 @@ class _TelaUsoState extends State<TelaUso> {
                       'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
                     ),
             ),
-            CampoTempo(controle: _tempo, aoConfirmar: _confirmar),
+            TimeField(control: _time, onConfirm: _confirm),
           ],
-          if (p?.pergunta == 'ciclos') ...[
-            CabecalhoPergunta(
+          if (p?.question == 'ciclos') ...[
+            QuestionHeader(
               tr('Quantas vezes por mês você lava roupa?', 'How many loads of laundry do you do per month?'),
-              ajuda: tr(
+              help: tr(
                 'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
                 'We filled in a typical value. Change it to your own use if it is different.',
               ),
             ),
             TextField(
-              controller: _valor,
+              controller: _value,
               keyboardType: TextInputType.number,
-              onSubmitted: (_) => _confirmar(),
+              onSubmitted: (_) => _confirm(),
               decoration: InputDecoration(
                 labelText: tr('Lavagens por mês', 'Loads per month'),
                 suffixText: tr('vezes', 'times'),
               ),
             ),
           ],
-          const SizedBox(height: Espaco.m),
-          if (_erro != null) MensagemErro(_erro!, tentarDeNovo: p == null ? _carregar : null),
+          const SizedBox(height: Spacing.m),
+          if (_error != null) ErrorMessage(_error!, tryAgain: p == null ? _load : null),
         ],
       ),
     );
     // voltar nas horas do ventilador volta para a velocidade
     return PopScope(
-      canPop: !_horasDoVentilador,
-      onPopInvokedWithResult: (saiu, _) {
-        if (!saiu) {
+      canPop: !_fanHours,
+      onPopInvokedWithResult: (left, _) {
+        if (!left) {
           setState(() {
-            _horasDoVentilador = false;
-            _erro = null;
+            _fanHours = false;
+            _error = null;
           });
         }
       },
-      child: pagina,
+      child: page,
     );
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: regra-negocio-eco-coach
-description: Regras de negócio do Eco-Coach do iamp, o plano de economia gerado por RAG (pgvector + fastembed) e Gemini a partir de documentos oficiais do Inmetro e da Cemig. Use ao alterar rag.py, rag_agent.py, scripts/carregar_rag.py, os prompts, as fontes ou as rotas /eco-coach.
+description: Regras de negócio do Eco-Coach do iamp, o plano de economia gerado por RAG (pgvector + embeddings do Gemini) e Gemini a partir de documentos oficiais do Inmetro e da Cemig. Use ao alterar rag.py, rag_agent.py, scripts/carregar_rag.py, os prompts, as fontes ou as rotas /eco-coach.
 ---
 
 # Regra de negócio: Eco-Coach (RAG + LLM)
@@ -18,10 +18,10 @@ Use esta skill ao implementar, alterar ou revisar o Eco-Coach: `POST /eco-coach`
 - Documentos em `datasets/raw/rag/`, cada um com uma linha em `fontes.csv` (arquivo, título, órgão, tipo de fonte, URL, data de publicação, data de acesso, observação). Hoje: 4 páginas do Inmetro/gov.br e a cartilha da Cemig 2025 (páginas 2 a 17).
 - Só fontes **públicas e oficiais** (órgão regulador, programa governamental, distribuidora). Fonte nova exige: arquivo em `raw/rag`, linha em `fontes.csv`, regra de limpeza em `carregar_rag.py` se o formato for novo, e rodar `python scripts/carregar_rag.py` (apaga e recria `trechos_rag`).
 - Limpeza documentada no script: na cartilha só itens com marcador (•), seção por página; nas páginas HTML só o corpo da notícia. Trechos de ~800 caracteres por seção.
-- Embeddings **locais** com fastembed (`paraphrase-multilingual-MiniLM-L12-v2`, 384 dimensões, sem torch), cache em `models/fastembed/` (fora do git, baixado no build da imagem). Tabela `trechos_rag` com `vector(384)`, criada pelo script e não pelo `criar_banco.py`.
-- Busca (`rag.buscar_trechos`): até 2 trechos por aparelho que mais pesa (`TRECHOS_POR_APARELHO`), máximo 7 no plano (`MAX_TRECHOS`) e 6 nas dicas (`TRECHOS_DICAS`).
+- Embeddings pela API do Gemini (`gemini-embedding-001`, 768 dimensões; RETRIEVAL_DOCUMENT na carga, RETRIEVAL_QUERY na busca). Eram locais (fastembed, 384), mas o modelo não cabia nos 512 MB do Render grátis. Tabela `trechos_rag` com `vector(768)`, recriada pelo `carregar_rag.py`; com a base vazia a API carrega sozinha ao subir.
+- Busca (`rag.search_chunks`): até 2 trechos por aparelho que mais pesa (`CHUNKS_PER_APPLIANCE`), máximo 7 no plano (`MAX_CHUNKS`) e 6 nas dicas (`TIP_CHUNKS`).
 
-## Regras do prompt (`INSTRUCOES`, `INSTRUCOES_DICAS`)
+## Regras do prompt (`INSTRUCTIONS`, `TIP_INSTRUCTIONS`)
 
 1. Usar somente os números da seção de dados; percentuais das fontes podem ser citados "segundo a fonte".
 2. Toda dica termina com citação `[n]`; sem fonte para um aparelho, não inventar dica (no plano) ou usar só dicas gerais dizendo que são gerais (nas dicas por aparelho).
@@ -35,7 +35,7 @@ Mudança no prompt é mudança de regra: registrar em `prompts/registros_vibecod
 ## Resposta e pós-processamento
 
 - `fontes` na resposta traz só as citações `[n]` que realmente existem nos trechos usados; citação inventada (ex.: `[99]`) é descartada. Links das fontes vão para o app.
-- `AVISO_ECO` / `AVISO_DICAS` sempre presentes: texto gerado por IA, valores calculados pelo iamp, conferir as fontes.
+- `ECO_NOTICE` / `TIP_NOTICE` sempre presentes: texto gerado por IA, valores calculados pelo iamp, conferir as fontes.
 - Erros: `422` entrada inválida; `503` base vetorial vazia, chave ausente ou LLM indisponível (tenta o modelo principal e o reserva de `GEMINI_MODELOS`).
 
 ## LLM e configuração
@@ -43,7 +43,7 @@ Mudança no prompt é mudança de regra: registrar em `prompts/registros_vibecod
 - Gemini pela API do Google AI Studio (`google-genai`), chave em `GEMINI_API_KEY` no `.env` e no `terraform.tfvars` (idêntica, numa linha só). `GEMINI_MODELOS` = principal e reserva (hoje `gemini-3.5-flash,gemini-3.5-flash-lite`); os modelos gratuitos mudam, então a lista fica em configuração.
 - `thinking_budget=0`: o raciocínio interno cortava o texto final.
 - Nunca imprimir a chave em logs ou erros; mascarar antes de exibir saída do Terraform.
-- Testes substituem `rag_agent.chamar_llm` por resposta fixa e não chamam o Gemini; a busca vetorial usa o banco de verdade e é pulada se `trechos_rag` estiver vazia.
+- Testes substituem `rag_agent.call_llm` por resposta fixa e não chamam o Gemini; a busca vetorial usa o banco de verdade e é pulada se `trechos_rag` estiver vazia.
 
 ## Ética e privacidade (usar no documento de processo)
 

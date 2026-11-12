@@ -1,45 +1,45 @@
 
 from pathlib import Path
 import pandas as pd
-from config import ler_csv_inmetro, salvar_processado
+from config import read_csv_inmetro, save_processed
 import numpy as np
 
-df = ler_csv_inmetro("ventiladores-de-teto.csv")
+df = read_csv_inmetro("ventiladores-de-teto.csv")
 
 print("Dados originais:", df.shape)
 
 # Remover colunas administrativas
-colunas_remover = [
+remove_columns = [
     "Código de Barras",
     "Status do Modelo",
     "Status do Registro",
     "Número do Registro"
 ]
 
-df = df.drop(columns=colunas_remover, errors="ignore")
+df = df.drop(columns=remove_columns, errors="ignore")
 
 # Remover duplicatas exatas
 df = df.drop_duplicates()
 
 # Colunas de consumo
-colunas_consumo = [
+consumption_columns = [
     "Consumo de energia mensal na vel. alta (kWh/mês)",
     "Consumo de energia mensal na vel. média (kWh/mês)",
     "Consumo de energia mensal na vel. baixa (kWh/mês)"
 ]
 
 # Converter consumos para números
-for coluna in colunas_consumo:
-    df[coluna] = pd.to_numeric(
-        df[coluna], errors="coerce"
+for column in consumption_columns:
+    df[column] = pd.to_numeric(
+        df[column], errors="coerce"
     )
 
 # Valores negativos são inválidos
-for coluna in colunas_consumo:
-    df.loc[df[coluna] < 0, coluna] = np.nan
+for column in consumption_columns:
+    df.loc[df[column] < 0, column] = np.nan
 
 # Remover linhas sem nenhum consumo informado
-df = df.dropna(subset=colunas_consumo, how="all")
+df = df.dropna(subset=consumption_columns, how="all")
 
 # Manter o registro mais completo por marca e modelo
 df["_completude"] = df.notna().sum(axis=1)
@@ -50,7 +50,7 @@ df = (
     .drop(columns=["_completude"])
 )
 
-salvar_processado(df, "ventiladores_teto_limpo.csv")
+save_processed(df, "ventiladores_teto_limpo.csv")
 
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)

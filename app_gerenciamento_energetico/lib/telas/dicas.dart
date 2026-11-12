@@ -8,47 +8,47 @@ import 'eco_coach.dart';
 import 'texto_plano.dart';
 
 /// Dicas do Eco-Coach para um aparelho so (eletroportateis, que nao tem modelos para comparar).
-class TelaDicas extends StatefulWidget {
-  final Resultado resultado;
-  final Future<Dicas> Function(Resultado) buscarDicas;
+class TipScreen extends StatefulWidget {
+  final Result result;
+  final Future<Tips> Function(Result) searchTips;
 
-  const TelaDicas({super.key, required this.resultado, this.buscarDicas = Api.dicas});
+  const TipScreen({super.key, required this.result, this.searchTips = Api.tips});
 
   @override
-  State<TelaDicas> createState() => _TelaDicasState();
+  State<TipScreen> createState() => _TipScreenState();
 }
 
-class _TelaDicasState extends State<TelaDicas> {
-  late Future<Dicas> _dicas;
+class _TipScreenState extends State<TipScreen> {
+  late Future<Tips> _tips;
 
   @override
   void initState() {
     super.initState();
-    _dicas = widget.buscarDicas(widget.resultado);
+    _tips = widget.searchTips(widget.result);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final r = widget.resultado;
-    return Pagina(
-      titulo: tr('Como gastar menos', 'How to spend less'),
-      filho: FutureBuilder<Dicas>(
-        future: _dicas,
+    final r = widget.result;
+    return AppPage(
+      title: tr('Como gastar menos', 'How to spend less'),
+      child: FutureBuilder<Tips>(
+        future: _tips,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return Carregando(
-              texto: tr(
+            return Loading(
+              text: tr(
                 'O Eco-Coach está preparando dicas para o seu aparelho...',
                 'The Eco-Coach is preparing tips for your appliance...',
               ),
             );
           }
           if (snap.hasError) {
-            return MensagemErro(
+            return ErrorMessage(
               snap.error.toString(),
-              tentarDeNovo: () => setState(() {
-                _dicas = widget.buscarDicas(r);
+              tryAgain: () => setState(() {
+                _tips = widget.searchTips(r);
               }),
             );
           }
@@ -58,27 +58,27 @@ class _TelaDicasState extends State<TelaDicas> {
               MergeSemantics(
                 child: Card(
                   child: ListTile(
-                    leading: Icon(iconeDaCategoria(r.categoria)),
-                    title: Text(r.nome),
+                    leading: Icon(categoryIcon(r.category)),
+                    title: Text(r.name),
                     subtitle: Text(
                       tr(
-                        '${reais(r.custoMes)} por mês · ${numero(r.kwhMes)} kWh',
-                        '${reais(r.custoMes)} per month · ${numero(r.kwhMes)} kWh',
+                        '${reais(r.monthlyCost)} por mês · ${number(r.monthlyKwh)} kWh',
+                        '${reais(r.monthlyCost)} per month · ${number(r.monthlyKwh)} kWh',
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: Espaco.m),
-              TextoPlano(d.texto),
-              if (d.fontes.isNotEmpty) ...[
-                Titulo(tr('Fontes', 'Sources')),
-                if (emIngles) Text('The sources are Brazilian documents in Portuguese.', style: t.secundario),
-                for (final f in d.fontes) CartaoFonte(f),
+              const SizedBox(height: Spacing.m),
+              PlanText(d.text),
+              if (d.sources.isNotEmpty) ...[
+                SectionTitle(tr('Fontes', 'Sources')),
+                if (inEnglish) Text('The sources are Brazilian documents in Portuguese.', style: t.secondary),
+                for (final f in d.sources) SourceCard(f),
               ],
-              const SizedBox(height: Espaco.m),
-              ListaAvisos([d.aviso]),
-              SizedBox(height: t.alvoToque),
+              const SizedBox(height: Spacing.m),
+              NoticeList([d.notice]),
+              SizedBox(height: t.touchTarget),
             ],
           );
         },

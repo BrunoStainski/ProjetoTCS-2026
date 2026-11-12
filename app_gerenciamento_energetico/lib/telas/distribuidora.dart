@@ -1,7 +1,7 @@
 // Tarifa de energia, uma decisao por tela:
-// etapa 4 (TelaEstado): o estado, ou usar a mesma tarifa de antes;
-// etapa 5 (TelaDistribuidora): a distribuidora do estado;
-// opcional (TelaTarifaConta): digitar a tarifa que esta na conta de luz.
+// etapa 4 (StateScreen): o estado, ou usar a mesma tarifa de antes;
+// etapa 5 (DistributorScreen): a distribuidora do estado;
+// opcional (BillTariffScreen): digitar a tarifa que esta na conta de luz.
 
 import 'package:flutter/material.dart';
 
@@ -12,7 +12,7 @@ import '../tema.dart';
 import 'comum.dart';
 import 'resultado.dart';
 
-const nomesDosEstados = {
+const stateNames = {
   'AC': 'Acre',
   'AL': 'Alagoas',
   'AM': 'Amazonas',
@@ -43,23 +43,23 @@ const nomesDosEstados = {
 };
 
 /// Calcula com a tarifa escolhida e abre o resultado.
-void calcularCom(BuildContext context, Consulta consulta, EscolhaTarifa tarifa) {
-  consulta.tarifa = tarifa;
-  casa.lembrarTarifa(tarifa);
-  Navigator.push(context, MaterialPageRoute(builder: (_) => TelaResultado(consulta: consulta)));
+void calculateWith(BuildContext context, Query query, TariffChoice tariff) {
+  query.tariff = tariff;
+  home.rememberTariff(tariff);
+  Navigator.push(context, MaterialPageRoute(builder: (_) => ResultScreen(query: query)));
 }
 
 /// Etapa 4: em qual estado a pessoa mora (ou a mesma tarifa da ultima vez).
-class TelaEstado extends StatefulWidget {
-  final Consulta consulta;
+class StateScreen extends StatefulWidget {
+  final Query query;
 
-  const TelaEstado({super.key, required this.consulta});
+  const StateScreen({super.key, required this.query});
 
   @override
-  State<TelaEstado> createState() => _TelaEstadoState();
+  State<StateScreen> createState() => _StateScreenState();
 }
 
-class _TelaEstadoState extends State<TelaEstado> {
+class _StateScreenState extends State<StateScreen> {
   late Future<List<String>> _ufs;
 
   @override
@@ -68,41 +68,41 @@ class _TelaEstadoState extends State<TelaEstado> {
     _ufs = Api.ufs();
   }
 
-  void _escolher(String uf) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDistribuidora(consulta: widget.consulta, uf: uf)));
+  void _choose(String uf) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => DistributorScreen(query: widget.query, uf: uf)));
   }
 
-  void _digitarTarifa() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaTarifaConta(consulta: widget.consulta)));
+  void _typeTariff() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => BillTariffScreen(query: widget.query)));
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final ultima = casa.ultimaTarifa;
-    return Pagina(
-      titulo: tr('Sua energia', 'Your electricity'),
-      etapa: etapaDoCalculo(widget.consulta, 4),
-      filho: ListView(
+    final last = home.lastTariff;
+    return AppPage(
+      title: tr('Sua energia', 'Your electricity'),
+      step: calculationStep(widget.query, 4),
+      child: ListView(
         children: [
-          if (ultima != null) ...[
-            CabecalhoPergunta(tr('Usar a mesma conta de luz de antes?', 'Use the same electricity bill as before?')),
-            CartaoOpcao(
-              icone: Icons.bolt,
-              titulo: tr('Sim, usar ${ultima.descricao}', 'Yes, use ${ultima.descricao}'),
-              subtitulo: tr(
-                'Tarifa de ${reais(ultima.tarifaKwh, casas: 4)} por kWh',
-                'Rate of ${reais(ultima.tarifaKwh, casas: 4)} per kWh',
+          if (last != null) ...[
+            QuestionHeader(tr('Usar a mesma conta de luz de antes?', 'Use the same electricity bill as before?')),
+            OptionCard(
+              icon: Icons.bolt,
+              title: tr('Sim, usar ${last.description}', 'Yes, use ${last.description}'),
+              subtitle: tr(
+                'Tarifa de ${reais(last.tariffKwh, homes: 4)} por kWh',
+                'Rate of ${reais(last.tariffKwh, homes: 4)} per kWh',
               ),
-              onTap: () => calcularCom(context, widget.consulta, ultima),
+              onTap: () => calculateWith(context, widget.query, last),
             ),
-            const SizedBox(height: Espaco.m),
-            Text(tr('Ou escolha outro estado:', 'Or pick another state:'), style: t.forte),
-            const SizedBox(height: Espaco.p),
+            const SizedBox(height: Spacing.m),
+            Text(tr('Ou escolha outro estado:', 'Or pick another state:'), style: t.strong),
+            const SizedBox(height: Spacing.p),
           ] else
-            CabecalhoPergunta(
+            QuestionHeader(
               tr('Em qual estado você mora?', 'Which Brazilian state do you live in?'),
-              ajuda: tr(
+              help: tr(
                 'Assim achamos a sua distribuidora de energia e o preço do kWh.',
                 'This is how we find your power company and the price of a kWh.',
               ),
@@ -111,31 +111,31 @@ class _TelaEstadoState extends State<TelaEstado> {
             future: _ufs,
             builder: (context, snap) {
               if (snap.connectionState != ConnectionState.done) {
-                return Carregando(texto: tr('Carregando os estados...', 'Loading states...'));
+                return Loading(text: tr('Carregando os estados...', 'Loading states...'));
               }
               if (snap.hasError) {
-                return MensagemErro(
+                return ErrorMessage(
                   snap.error.toString(),
-                  tentarDeNovo: () => setState(() {
+                  tryAgain: () => setState(() {
                     _ufs = Api.ufs();
                   }),
                 );
               }
-              final ufs = [...snap.data!]..sort((a, b) => (nomesDosEstados[a] ?? a).compareTo(nomesDosEstados[b] ?? b));
+              final ufs = [...snap.data!]..sort((a, b) => (stateNames[a] ?? a).compareTo(stateNames[b] ?? b));
               return Column(
                 children: [
                   for (final uf in ufs)
-                    CartaoOpcao(titulo: nomesDosEstados[uf] ?? uf, subtitulo: uf, onTap: () => _escolher(uf)),
+                    OptionCard(title: stateNames[uf] ?? uf, subtitle: uf, onTap: () => _choose(uf)),
                 ],
               );
             },
           ),
-          const SizedBox(height: Espaco.m),
-          CartaoOpcao(
-            icone: Icons.receipt_long,
-            titulo: tr('Prefiro digitar a tarifa da minha conta', "I'd rather type the rate from my bill"),
-            subtitulo: tr('Se você tem a conta de luz em mãos.', 'If you have your electricity bill at hand.'),
-            onTap: _digitarTarifa,
+          const SizedBox(height: Spacing.m),
+          OptionCard(
+            icon: Icons.receipt_long,
+            title: tr('Prefiro digitar a tarifa da minha conta', "I'd rather type the rate from my bill"),
+            subtitle: tr('Se você tem a conta de luz em mãos.', 'If you have your electricity bill at hand.'),
+            onTap: _typeTariff,
           ),
         ],
       ),
@@ -144,88 +144,88 @@ class _TelaEstadoState extends State<TelaEstado> {
 }
 
 /// Etapa 5: qual distribuidora atende a casa (aparece na conta de luz).
-class TelaDistribuidora extends StatefulWidget {
-  final Consulta consulta;
+class DistributorScreen extends StatefulWidget {
+  final Query query;
   final String uf;
 
-  const TelaDistribuidora({super.key, required this.consulta, required this.uf});
+  const DistributorScreen({super.key, required this.query, required this.uf});
 
   @override
-  State<TelaDistribuidora> createState() => _TelaDistribuidoraState();
+  State<DistributorScreen> createState() => _DistributorScreenState();
 }
 
-class _TelaDistribuidoraState extends State<TelaDistribuidora> {
-  final _filtro = TextEditingController();
-  late Future<List<Distribuidora>> _distribuidoras;
+class _DistributorScreenState extends State<DistributorScreen> {
+  final _filter = TextEditingController();
+  late Future<List<Distributor>> _distributors;
 
   @override
   void initState() {
     super.initState();
-    _distribuidoras = Api.distribuidoras(uf: widget.uf);
+    _distributors = Api.distributors(uf: widget.uf);
   }
 
   @override
   void dispose() {
-    _filtro.dispose();
+    _filter.dispose();
     super.dispose();
   }
 
-  List<Distribuidora> _filtradas(List<Distribuidora> lista) {
-    final alvo = _filtro.text.trim().toLowerCase();
-    return alvo.isEmpty ? lista : lista.where((d) => d.nome.toLowerCase().contains(alvo)).toList();
+  List<Distributor> _filtered(List<Distributor> itemList) {
+    final target = _filter.text.trim().toLowerCase();
+    return target.isEmpty ? itemList : itemList.where((d) => d.name.toLowerCase().contains(target)).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    return Pagina(
-      titulo: nomesDosEstados[widget.uf] ?? widget.uf,
-      etapa: etapaDoCalculo(widget.consulta, 5),
-      filho: FutureBuilder<List<Distribuidora>>(
-        future: _distribuidoras,
+    return AppPage(
+      title: stateNames[widget.uf] ?? widget.uf,
+      step: calculationStep(widget.query, 5),
+      child: FutureBuilder<List<Distributor>>(
+        future: _distributors,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
-            return Carregando(texto: tr('Carregando as distribuidoras...', 'Loading power companies...'));
+            return Loading(text: tr('Carregando as distribuidoras...', 'Loading power companies...'));
           }
           if (snap.hasError) {
-            return MensagemErro(
+            return ErrorMessage(
               snap.error.toString(),
-              tentarDeNovo: () => setState(() {
-                _distribuidoras = Api.distribuidoras(uf: widget.uf);
+              tryAgain: () => setState(() {
+                _distributors = Api.distributors(uf: widget.uf);
               }),
             );
           }
-          final todas = snap.data!;
-          final lista = _filtradas(todas);
+          final all = snap.data!;
+          final itemList = _filtered(all);
           return ListView(
             children: [
-              CabecalhoPergunta(
+              QuestionHeader(
                 tr('Qual é a sua distribuidora de energia?', 'Which is your power company?'),
-                ajuda: tr(
+                help: tr(
                   'É a empresa que manda a conta de luz. O nome aparece no alto da conta.',
                   'It is the company that sends your electricity bill. Its name is at the top of the bill.',
                 ),
               ),
-              if (todas.length > 5) ...[
+              if (all.length > 5) ...[
                 TextField(
-                  controller: _filtro,
+                  controller: _filter,
                   onChanged: (_) => setState(() {}),
                   decoration: InputDecoration(
                     labelText: tr('Procurar pelo nome', 'Search by name'),
                     prefixIcon: const Icon(Icons.search),
                   ),
                 ),
-                const SizedBox(height: Espaco.p),
+                const SizedBox(height: Spacing.p),
               ],
-              if (lista.isEmpty) Text(tr('Nenhuma distribuidora com esse nome.', 'No power company with that name.'), style: t.corpo),
-              for (final d in lista)
-                CartaoOpcao(
-                  titulo: d.nome,
-                  subtitulo: tr(
-                    'Tarifa de ${reais(d.tarifaKwh, casas: 4)} por kWh',
-                    'Rate of ${reais(d.tarifaKwh, casas: 4)} per kWh',
+              if (itemList.isEmpty) Text(tr('Nenhuma distribuidora com esse nome.', 'No power company with that name.'), style: t.body),
+              for (final d in itemList)
+                OptionCard(
+                  title: d.name,
+                  subtitle: tr(
+                    'Tarifa de ${reais(d.tariffKwh, homes: 4)} por kWh',
+                    'Rate of ${reais(d.tariffKwh, homes: 4)} per kWh',
                   ),
-                  onTap: () => calcularCom(context, widget.consulta, EscolhaTarifa.daDistribuidora(d)),
+                  onTap: () => calculateWith(context, widget.query, TariffChoice.fromDistributor(d)),
                 ),
             ],
           );
@@ -236,46 +236,46 @@ class _TelaDistribuidoraState extends State<TelaDistribuidora> {
 }
 
 /// Tarifa digitada a partir da conta de luz.
-class TelaTarifaConta extends StatefulWidget {
-  final Consulta consulta;
+class BillTariffScreen extends StatefulWidget {
+  final Query query;
 
-  const TelaTarifaConta({super.key, required this.consulta});
+  const BillTariffScreen({super.key, required this.query});
 
   @override
-  State<TelaTarifaConta> createState() => _TelaTarifaContaState();
+  State<BillTariffScreen> createState() => _BillTariffScreenState();
 }
 
-class _TelaTarifaContaState extends State<TelaTarifaConta> {
-  final _tarifa = TextEditingController();
-  String? _erro;
+class _BillTariffScreenState extends State<BillTariffScreen> {
+  final _tariff = TextEditingController();
+  String? _error;
 
   @override
   void dispose() {
-    _tarifa.dispose();
+    _tariff.dispose();
     super.dispose();
   }
 
-  void _calcular() {
-    final tarifa = lerNumero(_tarifa.text);
-    if (tarifa == null || tarifa <= 0 || tarifa > 10) {
-      setState(() => _erro = tr('Informe o valor em reais por kWh. Ex.: 0,85.', 'Enter the price in reais per kWh. E.g.: 0.85.'));
+  void _calculate() {
+    final tariff = readNumber(_tariff.text);
+    if (tariff == null || tariff <= 0 || tariff > 10) {
+      setState(() => _error = tr('Informe o valor em reais por kWh. Ex.: 0,85.', 'Enter the price in reais per kWh. E.g.: 0.85.'));
       return;
     }
-    setState(() => _erro = null);
-    calcularCom(context, widget.consulta, EscolhaTarifa.manual(tarifa));
+    setState(() => _error = null);
+    calculateWith(context, widget.query, TariffChoice.manual(tariff));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Pagina(
-      titulo: tr('Tarifa da conta', 'Rate from your bill'),
-      etapa: etapaDoCalculo(widget.consulta, 5),
-      rodape: FilledButton(onPressed: _calcular, child: Text(tr('Calcular', 'Calculate'))),
-      filho: ListView(
+    return AppPage(
+      title: tr('Tarifa da conta', 'Rate from your bill'),
+      step: calculationStep(widget.query, 5),
+      footer: FilledButton(onPressed: _calculate, child: Text(tr('Calcular', 'Calculate'))),
+      child: ListView(
         children: [
-          CabecalhoPergunta(
+          QuestionHeader(
             tr('Quanto custa o kWh na sua conta?', 'How much does a kWh cost on your bill?'),
-            ajuda: tr(
+            help: tr(
               'Divida o valor total da conta pelo consumo do mês em kWh. '
                   'Ex.: R\$ 170,00 ÷ 200 kWh = 0,85.',
               "Divide the bill's total by the month's consumption in kWh. "
@@ -283,15 +283,15 @@ class _TelaTarifaContaState extends State<TelaTarifaConta> {
             ),
           ),
           TextField(
-            controller: _tarifa,
+            controller: _tariff,
             autofocus: true,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onSubmitted: (_) => _calcular(),
+            onSubmitted: (_) => _calculate(),
             decoration: InputDecoration(
               labelText: tr('Reais por kWh', 'Reais (R\$) per kWh'),
               hintText: tr('Ex.: 0,85', 'E.g.: 0.85'),
               prefixText: 'R\$ ',
-              errorText: _erro,
+              errorText: _error,
             ),
           ),
         ],

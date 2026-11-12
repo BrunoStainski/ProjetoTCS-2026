@@ -13,123 +13,123 @@ import banco
 import servico
 
 
-def brl(valor, casas=2):
+def brl(value, homes=2):
     """1234.5 -> 'R$ 1.234,50'"""
-    texto = f"{valor:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"R$ {texto}"
+    text = f"{value:,.{homes}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {text}"
 
 
-def num(valor, casas=2):
-    return f"{valor:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def num(value, homes=2):
+    return f"{value:,.{homes}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-def perguntar(texto):
+def ask(text):
     try:
-        return input(texto).strip()
+        return input(text).strip()
     except (EOFError, KeyboardInterrupt):
         print("\nAte mais!")
         sys.exit(0)
 
 
-def escolher(itens, rotulo):
+def choose(items, label):
     """Mostra uma lista numerada. Devolve o item escolhido, ou None para buscar de novo."""
-    for i, item in enumerate(itens, start=1):
-        print(f"  {i:>2}. {rotulo(item)}")
+    for i, item in enumerate(items, start=1):
+        print(f"  {i:>2}. {label(item)}")
     while True:
-        resp = perguntar("Numero da opcao (Enter para buscar de novo): ")
+        resp = ask("Numero da opcao (Enter para buscar de novo): ")
         if not resp:
             return None
-        if resp.isdigit() and 1 <= int(resp) <= len(itens):
-            return itens[int(resp) - 1]
+        if resp.isdigit() and 1 <= int(resp) <= len(items):
+            return items[int(resp) - 1]
         print("  Opcao invalida.")
 
 
-def numero_ou_padrao(texto, padrao):
+def number_or_default(text, default_value):
     while True:
-        resp = perguntar(texto).replace(",", ".")
+        resp = ask(text).replace(",", ".")
         if not resp:
             return None  # usa a estimativa do grupo
         try:
-            valor = float(resp)
-            if valor > 0:
-                return valor
+            value = float(resp)
+            if value > 0:
+                return value
         except ValueError:
             pass
         print("  Digite um numero maior que zero, ou Enter para usar o padrao.")
 
 
-def passo_aparelho(con):
+def appliance_step(con):
     print("\n1) Qual e o aparelho?")
     while True:
-        texto = perguntar("   Digite a marca e/ou o modelo (ex.: brastemp brm44): ")
-        modelos = servico.buscar_modelos(con, texto, limite=5)  # 5 por tipo: a lista fica curta
-        if not modelos:
+        text = ask("   Digite a marca e/ou o modelo (ex.: brastemp brm44): ")
+        models = servico.search_models(con, text, limit=5)  # 5 por tipo: a lista fica curta
+        if not models:
             print("   Nenhum modelo encontrado. Tente so a marca ou parte do modelo.")
             continue
-        if len(modelos) == 1:
-            m = modelos[0]
+        if len(models) == 1:
+            m = models[0]
             print(f"   Encontrado: {m['marca']} {m['modelo']} ({m['categoria']})")
             return m
-        escolha = escolher(modelos, lambda m: f"{m['marca']} {m['modelo']} - {m['categoria']}"
+        choice = choose(models, lambda m: f"{m['marca']} {m['modelo']} - {m['categoria']}"
                                               + (f" ({m['detalhe']})" if m["detalhe"] else ""))
-        if escolha:
-            return escolha
+        if choice:
+            return choice
 
 
-def passo_uso(con, aparelho):
-    uso = servico.dados_de_uso(con, aparelho["id"])
-    horas = ciclos = velocidade = None
-    if uso["pergunta"] == "horas":
-        padrao, opcional = uso["padrao"], uso.get("opcional", False)
-        if opcional:
-            dica = "Enter = usar o consumo do Inmetro"
+def usage_step(con, appliance):
+    usage = servico.usage_data(con, appliance["id"])
+    hours = cycles = speed = None
+    if usage["pergunta"] == "horas":
+        default_value, optional = usage["padrao"], usage.get("opcional", False)
+        if optional:
+            tip = "Enter = usar o consumo do Inmetro"
         else:
-            dica = f"Enter = {num(padrao, 1)} h, estimativa" if padrao else "obrigatorio"
+            tip = f"Enter = {num(default_value, 1)} h, estimativa" if default_value else "obrigatorio"
         while True:
-            horas = numero_ou_padrao(f"   Quantas horas por dia voce usa? [{dica}]: ", padrao)
-            if horas is not None or padrao or opcional:
+            hours = number_or_default(f"   Quantas horas por dia voce usa? [{tip}]: ", default_value)
+            if hours is not None or default_value or optional:
                 break
             print("   Para este aparelho preciso das horas de uso.")
-    elif uso["pergunta"] == "ciclos":
-        ciclos = numero_ou_padrao(f"   Quantas lavagens por mes? [Enter = {num(uso['padrao'], 0)}, estimativa]: ",
-                                  uso["padrao"])
-    elif uso["pergunta"] == "velocidade":
-        opcoes = "/".join(uso["opcoes"])
-        resp = perguntar(f"   Em qual velocidade voce usa ({opcoes})? [Enter = {uso['padrao']}]: ").lower()
-        velocidade = resp if resp in uso["opcoes"] else uso["padrao"]
-    return horas, ciclos, velocidade
+    elif usage["pergunta"] == "ciclos":
+        cycles = number_or_default(f"   Quantas lavagens por mes? [Enter = {num(usage['padrao'], 0)}, estimativa]: ",
+                                  usage["padrao"])
+    elif usage["pergunta"] == "velocidade":
+        options = "/".join(usage["opcoes"])
+        resp = ask(f"   Em qual velocidade voce usa ({options})? [Enter = {usage['padrao']}]: ").lower()
+        speed = resp if resp in usage["opcoes"] else usage["padrao"]
+    return hours, cycles, speed
 
 
-def passo_distribuidora(con):
+def distributor_step(con):
     print("\n2) Qual e a sua distribuidora de energia? (aparece na conta de luz)")
     while True:
-        resp = perguntar("   Digite a sigla do estado (ex.: PR), o nome (ex.: copel)\n"
+        resp = ask("   Digite a sigla do estado (ex.: PR), o nome (ex.: copel)\n"
                          "   ou 'conta' para digitar a tarifa da sua conta de luz: ")
         if resp.lower() == "conta":
-            tarifa = numero_ou_padrao("   Tarifa em R$/kWh (ex.: 0,85): ", None)
-            if tarifa:
-                return None, tarifa
+            tariff = number_or_default("   Tarifa em R$/kWh (ex.: 0,85): ", None)
+            if tariff:
+                return None, tariff
             continue
         if len(resp) == 2 and resp.isalpha():
-            lista = servico.listar_distribuidoras(con, uf=resp)
+            item_list = servico.list_distributors(con, uf=resp)
         else:
-            lista = servico.listar_distribuidoras(con, busca=resp)
-        if not lista:
+            item_list = servico.list_distributors(con, search_text=resp)
+        if not item_list:
             print("   Nada encontrado com tarifa cadastrada. Tente o estado ou outra parte do nome.")
             continue
-        if len(lista) == 1:
-            d = lista[0]
+        if len(item_list) == 1:
+            d = item_list[0]
             print(f"   Distribuidora: {d['nome']} ({d['uf'] or 'UF nao informada'})")
             return d, None
-        escolha = escolher(lista, lambda d: f"{d['nome']} ({d['uf'] or '?'}) - {brl(d['tarifa_kwh'], 4)}/kWh")
-        if escolha:
-            return escolha, None
+        choice = choose(item_list, lambda d: f"{d['nome']} ({d['uf'] or '?'}) - {brl(d['tarifa_kwh'], 4)}/kWh")
+        if choice:
+            return choice, None
 
 
-def mostrar(r):
+def display(r):
     print("\n" + "=" * 52)
-    detalhe = f" ({r['detalhe']})" if r["detalhe"] else ""
-    print(f" {r['marca']} {r['modelo']}{detalhe}")
+    detail = f" ({r['detalhe']})" if r["detalhe"] else ""
+    print(f" {r['marca']} {r['modelo']}{detail}")
     if r["distribuidora"] != "-":
         print(f" Distribuidora: {r['distribuidora']} - {r['uf']}")
     print("-" * 52)
@@ -140,35 +140,35 @@ def mostrar(r):
     print("-" * 52)
     print(f" Como calculamos: {r['metodo']}")
     print(f" Fonte da tarifa: {r['origem_tarifa']}")
-    for aviso in r["avisos"]:
-        print(f" * {aviso}")
+    for notice in r["avisos"]:
+        print(f" * {notice}")
     print("=" * 52)
 
 
 def main():
     try:
-        con = banco.conectar()
-    except ConnectionError as erro:
-        print(f"Erro: {erro}")
+        con = banco.connect()
+    except ConnectionError as error:
+        print(f"Erro: {error}")
         sys.exit(1)
 
     print("iamp - quanto o seu aparelho pesa na conta de luz")
     try:
         while True:
-            aparelho = passo_aparelho(con)
-            horas, ciclos, velocidade = passo_uso(con, aparelho)
-            distribuidora, tarifa_manual = passo_distribuidora(con)
+            appliance = appliance_step(con)
+            hours, cycles, speed = usage_step(con, appliance)
+            distributor, manual_tariff = distributor_step(con)
             try:
-                r = servico.calcular(
-                    con, aparelho["id"],
-                    distribuidora_id=distribuidora["id"] if distribuidora else None,
-                    tarifa_manual=tarifa_manual,
-                    horas_dia=horas, ciclos_mes=ciclos, velocidade=velocidade,
+                r = servico.calculate(
+                    con, appliance["id"],
+                    distributor_id=distributor["id"] if distributor else None,
+                    manual_tariff=manual_tariff,
+                    daily_hours=hours, monthly_cycles=cycles, speed=speed,
                 )
-                mostrar(r)
-            except ValueError as erro:
-                print(f"Erro: {erro}")
-            if perguntar("\nCalcular outro aparelho? (s/n): ").lower() not in ("s", "sim"):
+                display(r)
+            except ValueError as error:
+                print(f"Erro: {error}")
+            if ask("\nCalcular outro aparelho? (s/n): ").lower() not in ("s", "sim"):
                 print("Ate mais!")
                 break
     finally:

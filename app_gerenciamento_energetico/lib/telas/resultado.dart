@@ -11,96 +11,96 @@ import 'sugestoes.dart';
 
 /// Etapa 6: chama POST /calcular e mostra quanto o aparelho custa em reais.
 /// Daqui a pessoa adiciona o aparelho na casa ou procura um modelo mais economico.
-class TelaResultado extends StatefulWidget {
-  final Consulta consulta;
+class ResultScreen extends StatefulWidget {
+  final Query query;
 
-  const TelaResultado({super.key, required this.consulta});
+  const ResultScreen({super.key, required this.query});
 
   @override
-  State<TelaResultado> createState() => _TelaResultadoState();
+  State<ResultScreen> createState() => _ResultScreenState();
 }
 
-class _TelaResultadoState extends State<TelaResultado> {
-  late Future<Resultado> _resultado;
-  bool _adicionado = false;
+class _ResultScreenState extends State<ResultScreen> {
+  late Future<Result> _result;
+  bool _added = false;
 
   @override
   void initState() {
     super.initState();
-    _resultado = _calcular();
+    _result = _calculate();
   }
 
-  Future<Resultado> _calcular() {
-    final c = widget.consulta;
-    return c.estimado
-        ? Api.estimar(c.estimativa!.rota, c.corpoDaEstimativa())
-        : Api.calcular(c.aparelho.id, c.paraApi());
+  Future<Result> _calculate() {
+    final c = widget.query;
+    return c.estimated
+        ? Api.estimate(c.estimation!.route, c.estimateBody())
+        : Api.calculate(c.appliance.id, c.toApi());
   }
 
-  void _adicionar(Resultado r) {
-    casa.adicionar(widget.consulta, r);
-    setState(() => _adicionado = true);
-    avisarAdicionado(ScaffoldMessenger.of(context), tr('${r.nome} foi para a sua casa.', '${r.nome} was added to your home.'));
+  void _add(Result r) {
+    home.add(widget.query, r);
+    setState(() => _added = true);
+    notifyAdded(ScaffoldMessenger.of(context), tr('${r.name} foi para a sua casa.', '${r.name} was added to your home.'));
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Resultado>(
-      future: _resultado,
+    return FutureBuilder<Result>(
+      future: _result,
       builder: (context, snap) {
         final r = snap.connectionState == ConnectionState.done && !snap.hasError ? snap.data : null;
-        return Pagina(
-          titulo: tr('Quanto custa', 'How much it costs'),
-          etapa: etapaDoCalculo(widget.consulta, 6),
-          rodape: r == null
+        return AppPage(
+          title: tr('Quanto custa', 'How much it costs'),
+          step: calculationStep(widget.query, 6),
+          footer: r == null
               ? null
-              : BotaoComConfirmacao(
-                  feito: _adicionado,
-                  textoAcao: tr('Adicionar à minha casa', 'Add to my home'),
-                  iconeAcao: Icons.add_home_outlined,
-                  onAcao: () => _adicionar(r),
-                  textoFeito: tr('Está na sua casa: ver o total', 'It is in your home: see the total'),
-                  onFeito: () => irPara(Aba.casa, fecharAtual: true),
+              : ConfirmButton(
+                  done: _added,
+                  actionText: tr('Adicionar à minha casa', 'Add to my home'),
+                  actionIcon: Icons.add_home_outlined,
+                  onAction: () => _add(r),
+                  doneText: tr('Está na sua casa: ver o total', 'It is in your home: see the total'),
+                  onDone: () => goTo(AppTab.home, closeCurrent: true),
                 ),
-          filho: _corpo(snap),
+          child: _body(snap),
         );
       },
     );
   }
 
-  Widget _corpo(AsyncSnapshot<Resultado> snap) {
-    if (snap.connectionState != ConnectionState.done) return Carregando(texto: tr('Calculando...', 'Calculating...'));
+  Widget _body(AsyncSnapshot<Result> snap) {
+    if (snap.connectionState != ConnectionState.done) return Loading(text: tr('Calculando...', 'Calculating...'));
     if (snap.hasError) {
-      return MensagemErro(
+      return ErrorMessage(
         snap.error.toString(),
-        tentarDeNovo: () => setState(() {
-          _resultado = _calcular();
+        tryAgain: () => setState(() {
+          _result = _calculate();
         }),
       );
     }
     final r = snap.data!;
     return ListView(
       children: [
-        DetalhesDoResultado(r),
-        const SizedBox(height: Espaco.g),
-        if (!widget.consulta.portatil)
+        ResultDetails(r),
+        const SizedBox(height: Spacing.g),
+        if (!widget.query.smallAppliance)
           OutlinedButton.icon(
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => TelaSugestoes(consulta: widget.consulta, atual: r)),
+              MaterialPageRoute(builder: (_) => SuggestionScreen(query: widget.query, current: r)),
             ),
             icon: const Icon(Icons.trending_down),
             label: Text(tr('Ver modelos que gastam menos', 'See models that use less')),
           ),
-        if (widget.consulta.portatil)
+        if (widget.query.smallAppliance)
           OutlinedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TelaDicas(resultado: r))),
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TipScreen(result: r))),
             icon: const Icon(Icons.tips_and_updates_outlined),
             label: Text(tr('Como gastar menos com ele', 'How to spend less on it')),
           ),
-        const SizedBox(height: Espaco.p),
+        const SizedBox(height: Spacing.p),
         TextButton.icon(
-          onPressed: () => Navigator.popUntil(context, (rota) => rota.isFirst),
+          onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
           icon: const Icon(Icons.restart_alt),
           label: Text(tr('Calcular outro aparelho', 'Calculate another appliance')),
         ),
@@ -109,10 +109,10 @@ class _TelaResultadoState extends State<TelaResultado> {
   }
 }
 
-class DetalhesDoResultado extends StatelessWidget {
-  final Resultado r;
+class ResultDetails extends StatelessWidget {
+  final Result r;
 
-  const DetalhesDoResultado(this.r, {super.key});
+  const ResultDetails(this.r, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -123,19 +123,19 @@ class DetalhesDoResultado extends StatelessWidget {
         MergeSemantics(
           child: Row(
             children: [
-              Icon(iconeDaCategoria(r.categoria), size: t.iconeGrande),
-              const SizedBox(width: Espaco.pm),
+              Icon(categoryIcon(r.category), size: t.largeIcon),
+              const SizedBox(width: Spacing.pm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(r.nome, style: t.forte),
+                    Text(r.name, style: t.strong),
                     Text(
                       [
-                        if (r.detalhe.isNotEmpty) r.detalhe,
-                        if (r.distribuidora != '-') '${r.distribuidora} (${r.uf})',
+                        if (r.detail.isNotEmpty) r.detail,
+                        if (r.distributor != '-') '${r.distributor} (${r.uf})',
                       ].join(' · '),
-                      style: t.secundario,
+                      style: t.secondary,
                     ),
                   ],
                 ),
@@ -143,46 +143,46 @@ class DetalhesDoResultado extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: Espaco.m),
-        CartaoDestaque(
-          titulo: r.aproximado
+        const SizedBox(height: Spacing.m),
+        HighlightCard(
+          title: r.approximate
               ? tr('Gasto aproximado por mês', 'Approximate cost per month')
               : tr('Gasto por mês', 'Cost per month'),
-          valor: r.custoMes,
-          formatar: reais,
-          rodape: [
-            if (r.temFaixa)
+          value: r.monthlyCost,
+          format: reais,
+          footer: [
+            if (r.hasRange)
               tr(
-                'Entre ${reais(r.custoMinMes!)} e ${reais(r.custoMaxMes!)}',
-                'Between ${reais(r.custoMinMes!)} and ${reais(r.custoMaxMes!)}',
+                'Entre ${reais(r.monthlyMinCost!)} e ${reais(r.monthlyMaxCost!)}',
+                'Between ${reais(r.monthlyMinCost!)} and ${reais(r.monthlyMaxCost!)}',
               ),
-            tr('${reais(r.custoAno)} por ano', '${reais(r.custoAno)} per year'),
+            tr('${reais(r.yearlyCost)} por ano', '${reais(r.yearlyCost)} per year'),
           ].join(' · '),
         ),
-        const SizedBox(height: Espaco.p),
+        const SizedBox(height: Spacing.p),
         Text(
           tr(
-            'Consumo de ${numero(r.kwhMes)} kWh por mês, com a energia a ${reais(r.tarifaKwh, casas: 4)} o kWh.',
-            'Uses ${numero(r.kwhMes)} kWh per month, with electricity at ${reais(r.tarifaKwh, casas: 4)} per kWh.',
+            'Consumo de ${number(r.monthlyKwh)} kWh por mês, com a energia a ${reais(r.tariffKwh, homes: 4)} o kWh.',
+            'Uses ${number(r.monthlyKwh)} kWh per month, with electricity at ${reais(r.tariffKwh, homes: 4)} per kWh.',
           ),
-          style: t.secundario,
+          style: t.secondary,
           textAlign: TextAlign.center,
         ),
-        const SizedBox(height: Espaco.m),
-        ListaAvisos(r.avisos),
+        const SizedBox(height: Spacing.m),
+        NoticeList(r.notices),
         Card(
           clipBehavior: Clip.antiAlias,
           child: ExpansionTile(
             leading: const Icon(Icons.info_outline),
-            title: Text(tr('Como calculamos', 'How we calculated'), style: t.forte),
-            subtitle: Text(tr('Fórmula e fonte da tarifa', 'Formula and rate source'), style: t.secundario),
-            childrenPadding: const EdgeInsets.fromLTRB(Espaco.m, 0, Espaco.m, Espaco.m),
+            title: Text(tr('Como calculamos', 'How we calculated'), style: t.strong),
+            subtitle: Text(tr('Fórmula e fonte da tarifa', 'Formula and rate source'), style: t.secondary),
+            childrenPadding: const EdgeInsets.fromLTRB(Spacing.m, 0, Spacing.m, Spacing.m),
             expandedCrossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(r.metodo, style: t.corpo),
-              const SizedBox(height: Espaco.pm),
-              Text(tr('Fonte da tarifa', 'Rate source'), style: t.rotulo),
-              Text(r.origemTarifa, style: t.corpo),
+              Text(r.method, style: t.body),
+              const SizedBox(height: Spacing.pm),
+              Text(tr('Fonte da tarifa', 'Rate source'), style: t.label),
+              Text(r.tariffOrigin, style: t.body),
             ],
           ),
         ),

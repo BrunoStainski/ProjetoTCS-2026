@@ -2,6 +2,7 @@
 // aba ou arrastando da borda esquerda. Topo: a marca (icone com contorno amarelo e o nome).
 // Itens feitos com ListTile (e nao NavigationDrawerDestination) porque o texto precisa quebrar a
 // linha com a fonte do sistema grande (o app aceita ate 2x).
+// Depois vem o cadastro (opcional) e a aparencia (modo escuro ou claro; o app abre no escuro).
 // No fim, o idioma: o app sempre abre em portugues e aqui troca para o ingles (apresentacao para
 // estrangeiros). O titulo da secao e os nomes dos idiomas aparecem nas duas linguas, para quem nao
 // entende o idioma atual tambem achar a opcao.
@@ -9,120 +10,138 @@
 import 'package:flutter/material.dart';
 
 import '../casa.dart';
+import '../conta.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'boas_vindas.dart';
+import 'cadastro.dart';
 import 'comum.dart';
 import 'estimar.dart';
 
-enum _Item { inicio, calcular, estimar, casa, economizar }
+enum _Item { start, calculate, estimate, home, save, account }
 
 class MenuIamp extends StatelessWidget {
   const MenuIamp({super.key});
 
-  static const _itemDaAba = {Aba.calcular: _Item.calcular, Aba.casa: _Item.casa, Aba.economizar: _Item.economizar};
+  static const _tabItem = {AppTab.calculate: _Item.calculate, AppTab.home: _Item.home, AppTab.save: _Item.save};
 
-  void _escolher(BuildContext context, _Item item) {
-    final navegador = Navigator.of(context); // o navegador de fora das abas
+  void _choose(BuildContext context, _Item item) {
+    final navigator = Navigator.of(context); // o navegador de fora das abas
     Scaffold.of(context).closeDrawer();
     // como na barra de baixo: tocar na aba que ja esta aberta volta para a primeira tela dela
-    void abrir(Aba aba) => irPara(aba, recomecar: aba == abaAtual.value);
+    void open(AppTab tab) => goTo(tab, restart: tab == currentTab.value);
     switch (item) {
-      case _Item.inicio:
-        navegador.push(
+      case _Item.start:
+        navigator.push(
           PageRouteBuilder(
-            pageBuilder: (_, _, _) => const TelaBoasVindas(),
-            transitionsBuilder: (_, animacao, _, filho) => FadeTransition(opacity: animacao, child: filho),
+            pageBuilder: (_, _, _) => const WelcomeScreen(),
+            transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
           ),
         );
-      case _Item.calcular:
-        abrir(Aba.calcular);
-      case _Item.estimar:
-        irPara(Aba.calcular, recomecar: true);
-        chavesDasAbas[Aba.calcular]!.currentState?.push(MaterialPageRoute(builder: (_) => const TelaEstimar()));
-      case _Item.casa:
-        abrir(Aba.casa);
-      case _Item.economizar:
-        abrir(Aba.economizar);
+      case _Item.calculate:
+        open(AppTab.calculate);
+      case _Item.estimate:
+        goTo(AppTab.calculate, restart: true);
+        tabKeys[AppTab.calculate]!.currentState?.push(MaterialPageRoute(builder: (_) => const EstimateScreen()));
+      case _Item.home:
+        open(AppTab.home);
+      case _Item.save:
+        open(AppTab.save);
+      case _Item.account:
+        navigator.push(MaterialPageRoute(builder: (_) => const SignUpScreen()));
     }
   }
 
-  void _trocarIdioma(BuildContext context, Idioma novo) {
+  void _setLightMode(BuildContext context, bool light) {
     Scaffold.of(context).closeDrawer();
-    if (novo == idioma.value) return;
+    lightMode.value = light; // o MaterialApp troca o tema; as telas abertas continuam onde estavam
+  }
+
+  void _swapLanguage(BuildContext context, Language rewritten) {
+    Scaffold.of(context).closeDrawer();
+    if (rewritten == language.value) return;
     // telas abertas guardam respostas da API no idioma anterior (resultado, sugestoes...):
     // cada aba volta para a primeira tela e o perfil e o plano sao pedidos de novo. A casa continua.
-    for (final aba in Aba.values) {
-      recomecarAba(aba);
+    for (final tab in AppTab.values) {
+      restartTab(tab);
     }
-    casa.esquecerTextosDaApi();
-    mudarIdioma(novo);
+    home.forgetApiTexts();
+    changeLanguage(rewritten);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Drawer(
-      backgroundColor: t.superficie,
+      backgroundColor: t.surface,
       surfaceTintColor: Colors.transparent,
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([abaAtual, casa]),
+          listenable: Listenable.merge([currentTab, home, account, lightMode]),
           builder: (context, _) {
-            final aberto = _itemDaAba[abaAtual.value];
-            Widget item(_Item i, IconData icone, IconData iconeAberto, String texto, {Widget Function(Widget)? marca}) {
-              final selecionado = i == aberto;
-              final simbolo = Icon(selecionado ? iconeAberto : icone);
+            final openItem = _tabItem[currentTab.value];
+            Widget item(_Item i, IconData icon, IconData openIcon, String text, {Widget Function(Widget)? brand}) {
+              final selected = i == openItem;
+              final symbol = Icon(selected ? openIcon : icon);
               return _ItemMenu(
-                icone: marca == null ? simbolo : marca(simbolo),
-                texto: texto,
-                selecionado: selecionado,
-                aoTocar: () => _escolher(context, i),
+                icon: brand == null ? symbol : brand(symbol),
+                text: text,
+                selected: selected,
+                onTap: () => _choose(context, i),
               );
             }
 
             return ListView(
-              padding: const EdgeInsets.symmetric(horizontal: Espaco.pm),
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.pm),
               children: [
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(Espaco.m, Espaco.g, Espaco.m, Espaco.m),
-                  child: Align(alignment: Alignment.centerLeft, child: MarcaIamp()),
+                  padding: EdgeInsets.fromLTRB(Spacing.m, Spacing.g, Spacing.m, Spacing.m),
+                  child: Align(alignment: Alignment.centerLeft, child: IampBrand()),
                 ),
-                const Divider(indent: Espaco.m, endIndent: Espaco.m),
-                const SizedBox(height: Espaco.p),
-                item(_Item.inicio, Icons.bolt_outlined, Icons.bolt, tr('Início', 'Start')),
-                item(_Item.calcular, Icons.calculate_outlined, Icons.calculate, tr('Calcular um aparelho', 'Calculate an appliance')),
-                item(_Item.estimar, Icons.tune_outlined, Icons.tune, tr('Estimar um aparelho', 'Estimate an appliance')),
+                const Divider(indent: Spacing.m, endIndent: Spacing.m),
+                const SizedBox(height: Spacing.p),
+                item(_Item.start, Icons.bolt_outlined, Icons.bolt, tr('Início', 'Start')),
+                item(_Item.calculate, Icons.calculate_outlined, Icons.calculate, tr('Calcular um aparelho', 'Calculate an appliance')),
+                item(_Item.estimate, Icons.tune_outlined, Icons.tune, tr('Estimar um aparelho', 'Estimate an appliance')),
                 item(
-                  _Item.casa,
+                  _Item.home,
                   Icons.home_outlined,
                   Icons.home,
                   tr('Minha casa', 'My home'),
-                  marca: (simbolo) => Badge(
-                    isLabelVisible: !casa.vazia,
-                    label: Text('${casa.totalAparelhos}'),
-                    child: simbolo,
+                  brand: (symbol) => Badge(
+                    isLabelVisible: !home.isEmpty,
+                    label: Text('${home.totalAppliances}'),
+                    child: symbol,
                   ),
                 ),
-                item(_Item.economizar, Icons.savings_outlined, Icons.savings, tr('Economizar', 'Save energy')),
-                const SizedBox(height: Espaco.p),
-                const Divider(indent: Espaco.m, endIndent: Espaco.m),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, Espaco.pp),
-                  child: Semantics(
-                    header: true,
-                    child: Row(
-                      children: [
-                        Icon(Icons.language, color: t.destaque),
-                        const SizedBox(width: Espaco.pm),
-                        Expanded(child: Text('Idioma · Language', style: t.rotulo)),
-                      ],
-                    ),
-                  ),
+                item(_Item.save, Icons.savings_outlined, Icons.savings, tr('Economizar', 'Save energy')),
+                item(
+                  _Item.account,
+                  Icons.person_outline,
+                  Icons.person,
+                  account.value == null
+                      ? tr('Criar cadastro', 'Sign up')
+                      : tr('Meu cadastro (${account.value!.firstName})', 'My account (${account.value!.firstName})'),
                 ),
-                for (final i in Idioma.values)
-                  _ItemIdioma(i, escolhido: i == idioma.value, aoTocar: () => _trocarIdioma(context, i)),
+                const SizedBox(height: Spacing.p),
+                const Divider(indent: Spacing.m, endIndent: Spacing.m),
+                _SectionHeader(Icons.contrast, tr('Aparência', 'Appearance')),
+                _ItemChoice(
+                  tr('Escuro', 'Dark'),
+                  chosen: !lightMode.value,
+                  onTap: () => _setLightMode(context, false),
+                ),
+                _ItemChoice(
+                  tr('Claro', 'Light'),
+                  chosen: lightMode.value,
+                  onTap: () => _setLightMode(context, true),
+                ),
+                const SizedBox(height: Spacing.p),
+                const Divider(indent: Spacing.m, endIndent: Spacing.m),
+                const _SectionHeader(Icons.language, 'Idioma · Language'),
+                for (final i in Language.values)
+                  _ItemChoice(i.name, chosen: i == language.value, onTap: () => _swapLanguage(context, i)),
               ],
             );
           },
@@ -134,60 +153,86 @@ class MenuIamp extends StatelessWidget {
 
 /// Item do menu: faixa amarela com texto e icone pretos quando e a aba aberta; senao, icone amarelo.
 class _ItemMenu extends StatelessWidget {
-  final Widget icone;
-  final String texto;
-  final bool selecionado;
-  final VoidCallback aoTocar;
+  final Widget icon;
+  final String text;
+  final bool selected;
+  final VoidCallback onTap;
 
-  const _ItemMenu({required this.icone, required this.texto, required this.selecionado, required this.aoTocar});
+  const _ItemMenu({required this.icon, required this.text, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Espaco.pp),
+      padding: const EdgeInsets.symmetric(vertical: Spacing.pp),
       child: ListTile(
-        leading: icone,
-        title: Text(texto, style: selecionado ? t.forte.copyWith(color: Cores.preto) : t.corpo),
-        selected: selecionado,
-        selectedTileColor: t.destaque,
-        selectedColor: Cores.preto,
-        iconColor: t.destaque,
+        leading: icon,
+        title: Text(text, style: selected ? t.strong.copyWith(color: t.onFill) : t.body),
+        selected: selected,
+        selectedTileColor: t.highlightFill,
+        selectedColor: t.onFill,
+        iconColor: t.highlight,
         minTileHeight: 56,
         shape: const StadiumBorder(),
-        onTap: aoTocar,
+        onTap: onTap,
       ),
     );
   }
 }
 
-/// Idioma no menu: escolha entre opcoes (como um botao de radio). O escolhido tem o sinal de "certo"
-/// e o nome em negrito; a faixa amarela fica so para a aba aberta.
-class _ItemIdioma extends StatelessWidget {
-  final Idioma opcao;
-  final bool escolhido;
-  final VoidCallback aoTocar;
+/// Titulo de uma secao de escolha no menu (Aparencia, Idioma).
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String text;
 
-  const _ItemIdioma(this.opcao, {required this.escolhido, required this.aoTocar});
+  const _SectionHeader(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.pp),
+      child: Semantics(
+        header: true,
+        child: Row(
+          children: [
+            Icon(icon, color: t.highlight),
+            const SizedBox(width: Spacing.pm),
+            Expanded(child: Text(text, style: t.label)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Escolha entre opcoes no menu (idioma, aparencia), como um botao de radio. O escolhido tem o sinal
+/// de "certo" e o nome em negrito; a faixa amarela fica so para a aba aberta.
+class _ItemChoice extends StatelessWidget {
+  final String option;
+  final bool chosen;
+  final VoidCallback onTap;
+
+  const _ItemChoice(this.option, {required this.chosen, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     // o leitor de tela anuncia "selecionado" e que e uma escolha entre opcoes (como um botao de radio)
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Espaco.pp),
+      padding: const EdgeInsets.symmetric(vertical: Spacing.pp),
       child: MergeSemantics(
         child: Semantics(
           inMutuallyExclusiveGroup: true,
           child: ListTile(
-            leading: Icon(escolhido ? Icons.check_circle : Icons.circle_outlined),
-            title: Text(opcao.nome, style: escolhido ? t.forte : t.corpo),
-            selected: escolhido,
-            iconColor: t.destaque,
-            selectedColor: t.destaque,
+            leading: Icon(chosen ? Icons.check_circle : Icons.circle_outlined),
+            title: Text(option, style: chosen ? t.strong : t.body),
+            selected: chosen,
+            iconColor: t.highlight,
+            selectedColor: t.highlight,
             minTileHeight: 56,
             shape: const StadiumBorder(),
-            onTap: aoTocar,
+            onTap: onTap,
           ),
         ),
       ),

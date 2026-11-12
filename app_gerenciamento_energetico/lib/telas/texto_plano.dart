@@ -7,115 +7,121 @@ import 'package:flutter/material.dart';
 
 import '../tema.dart';
 
-final _citacao = RegExp(r'\[(\d+(?:\s*,\s*\d+)*)\]');
-final _negrito = RegExp(r'\*\*(.+?)\*\*');
-final _numerada = RegExp(r'^(\d+)[.)]\s+');
-final _marcador = RegExp(r'^[-*•]\s+');
+final _citation = RegExp(r'\[(\d+(?:\s*,\s*\d+)*)\]');
+final _bold = RegExp(r'\*\*(.+?)\*\*');
+final _numbered = RegExp(r'^(\d+)[.)]\s+');
+final _marker = RegExp(r'^[-*•]\s+');
 
 /// Texto de uma linha -> pedacos com estilo (negrito e citacoes destacadas).
-List<TextSpan> pedacosDoTexto(String texto, TextStyle base) {
-  final pedacos = <TextSpan>[];
+/// strong/citation: cores do negrito e das citacoes (mudam com o modo claro/escuro; padrao = escuro).
+List<TextSpan> textPieces(
+  String text,
+  TextStyle base, {
+  Color strong = AppColors.white,
+  Color citation = AppColors.yellow,
+}) {
+  final pieces = <TextSpan>[];
   // primeiro separa o negrito, depois as citacoes dentro de cada parte
-  var inicio = 0;
-  for (final m in _negrito.allMatches(texto)) {
-    if (m.start > inicio) pedacos.addAll(_comCitacoes(texto.substring(inicio, m.start), base));
-    pedacos.addAll(_comCitacoes(m.group(1)!, base.copyWith(fontWeight: FontWeight.bold, color: Cores.branco)));
-    inicio = m.end;
+  var start = 0;
+  for (final m in _bold.allMatches(text)) {
+    if (m.start > start) pieces.addAll(_withCitations(text.substring(start, m.start), base, citation));
+    pieces.addAll(_withCitations(m.group(1)!, base.copyWith(fontWeight: FontWeight.bold, color: strong), citation));
+    start = m.end;
   }
-  if (inicio < texto.length) pedacos.addAll(_comCitacoes(texto.substring(inicio), base));
-  return pedacos;
+  if (start < text.length) pieces.addAll(_withCitations(text.substring(start), base, citation));
+  return pieces;
 }
 
-List<TextSpan> _comCitacoes(String texto, TextStyle estilo) {
-  final pedacos = <TextSpan>[];
-  var inicio = 0;
-  for (final m in _citacao.allMatches(texto)) {
-    if (m.start > inicio) pedacos.add(TextSpan(text: _semAsteriscos(texto.substring(inicio, m.start)), style: estilo));
-    final numeros = m.group(1)!.split(',').map((n) => n.trim()).join(', ');
-    pedacos.add(
+List<TextSpan> _withCitations(String text, TextStyle style, Color citation) {
+  final pieces = <TextSpan>[];
+  var start = 0;
+  for (final m in _citation.allMatches(text)) {
+    if (m.start > start) pieces.add(TextSpan(text: _withoutAsterisks(text.substring(start, m.start)), style: style));
+    final numbers = m.group(1)!.split(',').map((n) => n.trim()).join(', ');
+    pieces.add(
       TextSpan(
-        text: '[$numeros]',
-        style: estilo.copyWith(color: Cores.amarelo, fontWeight: FontWeight.bold),
+        text: '[$numbers]',
+        style: style.copyWith(color: citation, fontWeight: FontWeight.bold),
       ),
     );
-    inicio = m.end;
+    start = m.end;
   }
-  if (inicio < texto.length) pedacos.add(TextSpan(text: _semAsteriscos(texto.substring(inicio)), style: estilo));
-  return pedacos;
+  if (start < text.length) pieces.add(TextSpan(text: _withoutAsterisks(text.substring(start)), style: style));
+  return pieces;
 }
 
 // *italico* e _italico_ viram texto normal (o app usa so 2 pesos e nenhum italico)
-String _semAsteriscos(String s) => s.replaceAll(RegExp(r'(?<!\w)[*_](?!\s)|(?<!\s)[*_](?!\w)'), '');
+String _withoutAsterisks(String s) => s.replaceAll(RegExp(r'(?<!\w)[*_](?!\s)|(?<!\s)[*_](?!\w)'), '');
 
-class TextoPlano extends StatelessWidget {
+class PlanText extends StatelessWidget {
   final String markdown;
 
-  const TextoPlano(this.markdown, {super.key});
+  const PlanText(this.markdown, {super.key});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final blocos = <Widget>[];
-    for (final linhaCrua in markdown.split('\n')) {
-      final recuo = linhaCrua.length - linhaCrua.trimLeft().length;
-      final linha = linhaCrua.trim();
-      if (linha.isEmpty || linha == '---') {
-        if (blocos.isNotEmpty) blocos.add(const SizedBox(height: Espaco.p));
+    final blocks = <Widget>[];
+    for (final rawLine in markdown.split('\n')) {
+      final indent = rawLine.length - rawLine.trimLeft().length;
+      final line = rawLine.trim();
+      if (line.isEmpty || line == '---') {
+        if (blocks.isNotEmpty) blocks.add(const SizedBox(height: Spacing.p));
         continue;
       }
-      final titulo = linha.startsWith('#')
-          ? linha.replaceFirst(RegExp(r'^#+\s*'), '')
-          : (linha.startsWith('**') && linha.endsWith('**') && _negrito.allMatches(linha).length == 1)
-          ? linha.substring(2, linha.length - 2)
+      final title = line.startsWith('#')
+          ? line.replaceFirst(RegExp(r'^#+\s*'), '')
+          : (line.startsWith('**') && line.endsWith('**') && _bold.allMatches(line).length == 1)
+          ? line.substring(2, line.length - 2)
           : null;
-      if (titulo != null) {
-        blocos.add(
+      if (title != null) {
+        blocks.add(
           Padding(
-            padding: const EdgeInsets.only(top: Espaco.p, bottom: Espaco.pp),
+            padding: const EdgeInsets.only(top: Spacing.p, bottom: Spacing.pp),
             child: Semantics(
               header: true,
               child: Text(
-                titulo.replaceAll('*', '').replaceAll(RegExp(r':$'), ''),
-                style: t.forte.copyWith(color: t.destaque),
+                title.replaceAll('*', '').replaceAll(RegExp(r':$'), ''),
+                style: t.strong.copyWith(color: t.highlight),
               ),
             ),
           ),
         );
         continue;
       }
-      final numerada = _numerada.firstMatch(linha);
-      final marcador = _marcador.firstMatch(linha);
-      if (numerada != null || marcador != null) {
-        final texto = linha.substring((numerada ?? marcador)!.end);
-        blocos.add(
+      final numbered = _numbered.firstMatch(line);
+      final marker = _marker.firstMatch(line);
+      if (numbered != null || marker != null) {
+        final text = line.substring((numbered ?? marker)!.end);
+        blocks.add(
           Padding(
-            padding: EdgeInsets.only(left: recuo > 1 ? Espaco.g : 0, bottom: Espaco.p),
+            padding: EdgeInsets.only(left: indent > 1 ? Spacing.g : 0, bottom: Spacing.p),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(right: Espaco.p),
-                  child: numerada != null
-                      ? Text('${numerada.group(1)}.', style: t.forte.copyWith(color: t.destaque))
+                  padding: const EdgeInsets.only(right: Spacing.p),
+                  child: numbered != null
+                      ? Text('${numbered.group(1)}.', style: t.strong.copyWith(color: t.highlight))
                       : Padding(
                           padding: const EdgeInsets.only(top: 2),
-                          child: Icon(Icons.bolt, size: t.icone - 4, color: t.destaque),
+                          child: Icon(Icons.bolt, size: t.icon - 4, color: t.highlight),
                         ),
                 ),
-                Expanded(child: Text.rich(TextSpan(children: pedacosDoTexto(texto, t.corpo)))),
+                Expanded(child: Text.rich(TextSpan(children: textPieces(text, t.body, strong: t.strongText, citation: t.highlight)))),
               ],
             ),
           ),
         );
         continue;
       }
-      blocos.add(
+      blocks.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: Espaco.p),
-          child: Text.rich(TextSpan(children: pedacosDoTexto(linha, t.corpo))),
+          padding: const EdgeInsets.only(bottom: Spacing.p),
+          child: Text.rich(TextSpan(children: textPieces(line, t.body, strong: t.strongText, citation: t.highlight))),
         ),
       );
     }
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: blocos);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: blocks);
   }
 }

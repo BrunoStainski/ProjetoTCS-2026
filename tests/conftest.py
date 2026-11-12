@@ -18,26 +18,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import banco  # noqa: E402
 
 
-def aparelho(categoria, **valores):
+def appliance(category, **values):
     """Aparelho de teste com todas as colunas do catalogo (NaN no que nao foi informado)."""
-    colunas = ["kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
+    columns = ["kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
                "kwh_ciclo", "potencia_w", "standby_kwh_mes"]
-    base = {c: math.nan for c in colunas}
-    base.update({"categoria": categoria, "marca": "TESTE", "modelo": "M1",
+    base = {c: math.nan for c in columns}
+    base.update({"categoria": category, "marca": "TESTE", "modelo": "M1",
                  "detalhe": "", "origem_dado": "informado"})
-    base.update(valores)
+    base.update(values)
     return base
 
 
 @pytest.fixture(scope="session")
-def banco_disponivel():
+def database_available():
     """True se o PostgreSQL responde e ja tem os dados carregados."""
     try:
-        con = banco.conectar()
+        con = banco.connect()
     except ConnectionError:
         return False
     try:
-        return banco.executar(con, "SELECT COUNT(*) FROM aparelhos").scalar_one() > 0
+        return banco.run(con, "SELECT COUNT(*) FROM aparelhos").scalar_one() > 0
     except Exception:
         return False
     finally:
@@ -45,12 +45,12 @@ def banco_disponivel():
 
 
 @pytest.fixture
-def con(banco_disponivel):
-    if not banco_disponivel:
+def con(database_available):
+    if not database_available:
         pytest.skip("PostgreSQL fora do ar ou vazio (rode: docker compose up -d)")
-    conexao = banco.conectar()
-    yield conexao
-    conexao.close()
+    connection = banco.connect()
+    yield connection
+    connection.close()
 
 
 @pytest.fixture(scope="session")
@@ -63,8 +63,8 @@ def client():
 
 
 @pytest.fixture
-def api(client, banco_disponivel):
+def api(client, database_available):
     """Cliente da API para rotas que leem o banco."""
-    if not banco_disponivel:
+    if not database_available:
         pytest.skip("PostgreSQL fora do ar ou vazio (rode: docker compose up -d)")
     return client

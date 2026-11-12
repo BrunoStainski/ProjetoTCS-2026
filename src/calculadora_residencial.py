@@ -12,17 +12,17 @@ import pandas as pd
 
 import config
 import estimativa
-from estimativa import tempo_por_dia
-from idioma import t, tr, unidades
+from estimativa import time_per_day
+from idioma import t, tr, units
 
-DIAS_MES = 30
-LIMITE_BUSCA = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
-LIMITE_MODELOS_MARCA = 50  # modelos de uma marca na lista de marcas do app (o resto: digitar o modelo)
+DAYS_PER_MONTH = 30
+SEARCH_LIMIT = 15  # modelos por tipo de aparelho na busca (uma marca pode ter varios tipos)
+BRAND_MODEL_LIMIT = 50  # modelos de uma marca na lista de marcas do app (o resto: digitar o modelo)
 
 # Padroes de uso para aparelhos em que o Inmetro so informa potencia ou consumo por ciclo.
 # ATENCAO: valores escolhidos pelo grupo, ainda sem fonte. O app mostra como "estimativa"
 # e deixa o usuario trocar. Aparelho sem padrao aqui (ex.: chuveiro) obriga o usuario a informar.
-PREMISSAS = {
+ASSUMPTIONS = {
     "lampada_led": {"horas_dia": 5.0},
     "lampada_fluorescente": {"horas_dia": 5.0},
     "lampada_vapor_sodio": {"horas_dia": 12.0},
@@ -41,12 +41,12 @@ PREMISSAS = {
 #    o kWh/mes do Inmetro inclui o stand-by; por isso o consumo inteiro e reescalado.
 #  - ventiladores: o kWh/mes do Inmetro e de 1 h por dia (potencia x 30 h, conferido nos CSVs brutos).
 #    Sem as horas, o ventilador sairia como se ficasse ligado 1 h por dia, entao a resposta e obrigatoria.
-HORAS_REFERENCIA_INMETRO = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
-HORAS_OPCIONAIS = {"ar_condicionado", "televisor"}
-NOMES_VELOCIDADES = {"baixa": "baixa", "media": "média", "alta": "alta"}
-NOMES_VELOCIDADES_EN = {"baixa": "low", "media": "medium", "alta": "high"}
+INMETRO_REFERENCE_HOURS = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
+OPTIONAL_HOURS = {"ar_condicionado", "televisor"}
+SPEED_NAMES = {"baixa": "baixa", "media": "média", "alta": "alta"}
+SPEED_NAMES_EN = {"baixa": "low", "media": "medium", "alta": "high"}
 
-COLUNAS_NUM = [
+NUM_COLUMNS = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta",
     "kwh_ciclo", "potencia_w", "standby_kwh_mes", "fluxo_lm",
 ]
@@ -56,7 +56,7 @@ COLUNAS_NUM = [
 #  - medida: coluna que precisa ser parecida (capacidade = litros, polegadas, BTU/h, kg, cm ou cv)
 #  - tolerancia: diferenca maxima da medida (0.15 = 15% para mais ou para menos)
 #  - mesmo_tipo: exige o mesmo tipo (so onde o tipo vem padronizado no Inmetro)
-EQUIVALENCIA = {
+EQUIVALENCE = {
     "refrigerador": {"categorias": ["refrigerador"], "medida": "capacidade", "tolerancia": 0.15,
                      "mesmo_tipo": True, "texto": "mesmo tipo e volume parecido (até 15% de diferença)"},
     "televisor": {"categorias": ["televisor"], "medida": "capacidade", "tolerancia": 0.05,
@@ -79,18 +79,18 @@ EQUIVALENCIA = {
 }
 
 
-def _etiqueta(campo, unidade, onde, exemplo, maximo):
-    return {"campo": campo, "nome": "Etiqueta amarela do Inmetro", "rotulo": "Consumo de energia",
-            "unidade": unidade, "onde": onde, "dica": None, "exemplo": exemplo, "maximo": maximo}
+def _label(field, unit, where, example, maximum):
+    return {"campo": field, "nome": "Etiqueta amarela do Inmetro", "rotulo": "Consumo de energia",
+            "unidade": unit, "onde": where, "dica": None, "exemplo": example, "maximo": maximum}
 
 
-def _plaqueta(onde, exemplo, maximo, dica=None):
+def _nameplate(where, example, maximum, tip=None):
     return {"campo": "potencia_w", "nome": "Potência escrita no aparelho", "rotulo": "Potência",
-            "unidade": "W", "onde": onde, "dica": dica, "exemplo": exemplo, "maximo": maximo}
+            "unidade": "W", "onde": where, "dica": tip, "exemplo": example, "maximo": maximum}
 
 
-def _tamanhos(unidade, *valores):
-    return [{"valor": v, "nome": f"{v:,} {unidade}".replace(",", ".")} for v in valores]
+def _sizes(unit, *values):
+    return [{"valor": v, "nome": f"{v:,} {unit}".replace(",", ".")} for v in values]
 
 
 # Aparelho fora do catalogo (antigo ou sem modelo). O usuario informa o numero do proprio aparelho
@@ -100,57 +100,57 @@ def _tamanhos(unidade, *valores):
 #    ventilador e de 1 h por dia; a potencia da plaqueta x horas evita essa confusao.
 #  - ventilador de teto: sem tamanho (o diametro do catalogo tem erros e ninguem sabe o seu de cabeca).
 #  - obrigatorio: sem catalogo para comparar, o usuario precisa informar a potencia.
-ESTIMAVEIS = {
+ESTIMABLE = {
     "refrigerador": {"nome": "Geladeira ou freezer", "especial": True},
     "maquina_de_lavar": {
-        "nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)", "tamanhos": _tamanhos("kg", 6, 8, 10, 12, 15),
-        "formas": [_etiqueta("kwh_ciclo", "kWh/ciclo", "Adesivo amarelo colado na máquina, na linha \"Consumo de energia\".",
+        "nome": "Máquina de lavar", "medida": "Capacidade de lavagem (kg)", "tamanhos": _sizes("kg", 6, 8, 10, 12, 15),
+        "formas": [_label("kwh_ciclo", "kWh/ciclo", "Adesivo amarelo colado na máquina, na linha \"Consumo de energia\".",
                              "Ex.: 0,25", 5)]},
     "ar_condicionado": {
         "nome": "Ar-condicionado", "medida": "Capacidade (BTU/h)",
-        "tamanhos": _tamanhos("BTU/h", 7500, 9000, 12000, 18000, 24000),
-        "formas": [_plaqueta("Etiqueta branca com o modelo, na lateral do aparelho (no split, na parte de dentro).",
+        "tamanhos": _sizes("BTU/h", 7500, 9000, 12000, 18000, 24000),
+        "formas": [_nameplate("Etiqueta branca com o modelo, na lateral do aparelho (no split, na parte de dentro).",
                              "Ex.: 1100", 10000,
-                             dica="Use a potência elétrica (consumida). Não use a capacidade de refrigeração, "
+                             tip="Use a potência elétrica (consumida). Não use a capacidade de refrigeração, "
                                   "que é um número bem maior.")]},
     "televisor": {
         "nome": "Televisor", "medida": "Tamanho da tela (polegadas)",
-        "tamanhos": _tamanhos("polegadas", 24, 32, 43, 50, 55, 65),
-        "formas": [_plaqueta("Etiqueta atrás da TV, com o modelo e a voltagem. Toda TV tem, até as antigas.",
+        "tamanhos": _sizes("polegadas", 24, 32, 43, 50, 55, 65),
+        "formas": [_nameplate("Etiqueta atrás da TV, com o modelo e a voltagem. Toda TV tem, até as antigas.",
                              "Ex.: 120", 1500),
-                   _etiqueta("kwh_mes", "kWh/mês", "Adesivo amarelo, só nas TVs mais novas.", "Ex.: 9,9", 300)]},
+                   _label("kwh_mes", "kWh/mês", "Adesivo amarelo, só nas TVs mais novas.", "Ex.: 9,9", 300)]},
     "ventilador_de_mesa": {
         "nome": "Ventilador de mesa, coluna ou parede", "medida": "Diâmetro da hélice (cm)",
-        "tamanhos": _tamanhos("cm", 30, 40, 50),
-        "formas": [_plaqueta("Etiqueta embaixo da base ou atrás do motor, com a voltagem e a potência.",
+        "tamanhos": _sizes("cm", 30, 40, 50),
+        "formas": [_nameplate("Etiqueta embaixo da base ou atrás do motor, com a voltagem e a potência.",
                              "Ex.: 120", 500)]},
     "ventilador_de_teto": {
         "nome": "Ventilador de teto",
-        "formas": [_plaqueta("Etiqueta em cima do motor ou na caixa, com a voltagem e a potência.", "Ex.: 130", 500)]},
+        "formas": [_nameplate("Etiqueta em cima do motor ou na caixa, com a voltagem e a potência.", "Ex.: 130", 500)]},
     "microondas": {
-        "nome": "Micro-ondas", "medida": "Capacidade (litros)", "tamanhos": _tamanhos("litros", 20, 25, 30, 35),
-        "formas": [_plaqueta("Etiqueta atrás do aparelho ou na parte de dentro da porta.", "Ex.: 1300", 5000,
-                             dica="Use a potência consumida (de entrada), que é a maior. A potência de saída, "
+        "nome": "Micro-ondas", "medida": "Capacidade (litros)", "tamanhos": _sizes("litros", 20, 25, 30, 35),
+        "formas": [_nameplate("Etiqueta atrás do aparelho ou na parte de dentro da porta.", "Ex.: 1300", 5000,
+                             tip="Use a potência consumida (de entrada), que é a maior. A potência de saída, "
                                   "de cozimento, é menor.")]},
     "bomba": {
         "nome": "Bomba d'água", "medida": "Potência do motor (cv)",
         "tamanhos": [{"valor": v, "nome": n} for v, n in
                      ((0.25, "1/4 cv"), (0.33, "1/3 cv"), (0.5, "1/2 cv"), (0.75, "3/4 cv"), (1, "1 cv"), (1.5, "1,5 cv"))],
-        "formas": [_plaqueta("Placa de metal presa no motor.", "Ex.: 750", 20000,
-                             dica="Se estiver em kW, multiplique por 1.000 (0,75 kW = 750 W).")]},
+        "formas": [_nameplate("Placa de metal presa no motor.", "Ex.: 750", 20000,
+                             tip="Se estiver em kW, multiplique por 1.000 (0,75 kW = 750 W).")]},
     "chuveiro": {
         "nome": "Chuveiro elétrico", "obrigatorio": True,
-        "formas": [_plaqueta("Na embalagem ou gravada no próprio chuveiro.", "Ex.: 5500", 12000,
-                             dica="Use a potência da posição que você mais usa. A de inverno é a maior.")]},
+        "formas": [_nameplate("Na embalagem ou gravada no próprio chuveiro.", "Ex.: 5500", 12000,
+                             tip="Use a potência da posição que você mais usa. A de inverno é a maior.")]},
     "lampada_led": {"nome": "Lâmpada LED", "obrigatorio": True,
-                    "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 9", 1000)]},
+                    "formas": [_nameplate("Escrita na própria lâmpada ou na caixa.", "Ex.: 9", 1000)]},
     "lampada_fluorescente": {"nome": "Lâmpada fluorescente", "obrigatorio": True,
-                             "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 20", 1000)]},
+                             "formas": [_nameplate("Escrita na própria lâmpada ou na caixa.", "Ex.: 20", 1000)]},
     "lampada_vapor_sodio": {"nome": "Lâmpada de vapor de sódio", "obrigatorio": True,
-                            "formas": [_plaqueta("Escrita na própria lâmpada ou na caixa.", "Ex.: 70", 1000)]},
+                            "formas": [_nameplate("Escrita na própria lâmpada ou na caixa.", "Ex.: 70", 1000)]},
 }
 # Nomes do Inmetro trocados por uma descricao que o usuario reconhece olhando o aparelho (na ordem da tela).
-NOMES_DOS_TIPOS = {
+TYPE_NAMES = {
     "Top Load (automatica)": ("Automática que abre por cima", "Tampa em cima. Lava, enxágua e centrifuga sozinha."),
     "Semiautomaticas": ("Tanquinho ou semiautomática", "Lava, mas você tira a água ou muda a roupa de lugar."),
     "Front Load (automatica)": ("Automática que abre na frente", "Porta redonda na frente."),
@@ -160,15 +160,15 @@ NOMES_DOS_TIPOS = {
     "Split Piso-teto": ("Split de piso-teto", "Aparelho grande preso no teto ou embaixo, na parede."),
     "Split Cassete": ("Split cassete", "Embutido no forro do teto, solta ar para os quatro lados."),
 }
-TOLERANCIA_ESTIMATIVA = 0.10
-AMPLIACOES_ESTIMATIVA = (1, 2, 4)
-MINIMO_EQUIVALENTES = 5
-MINIMO_QUARTIS = 4
-AVISO_EQUIVALENTES = ("Gasto aproximado pelos modelos atuais parecidos do catálogo do Inmetro. Aparelhos antigos "
+ESTIMATE_TOLERANCE = 0.10
+ESTIMATE_EXPANSIONS = (1, 2, 4)
+MIN_EQUIVALENTS = 5
+MIN_QUARTILES = 4
+EQUIVALENT_NOTICE = ("Gasto aproximado pelos modelos atuais parecidos do catálogo do Inmetro. Aparelhos antigos "
                       "costumam gastar mais que os atuais; com o valor da etiqueta o cálculo fica exato.")
 
 # Onde nao sugerimos troca, e o motivo (aparece no app).
-SEM_SUGESTAO = {
+NO_SUGGESTION = {
     "chuveiro": ("Chuveiros elétricos têm eficiência parecida: um modelo de menor potência só esquenta "
                  "menos a água. Para economizar, reduza o tempo de banho ou use a posição verão."),
     "microondas": ("O Inmetro informa só a potência do micro-ondas. Um modelo de menor potência demora mais "
@@ -177,19 +177,19 @@ SEM_SUGESTAO = {
                             "para achar uma lâmpada equivalente."),
 }
 # Uma sugestao precisa gastar pelo menos 5% menos que o aparelho atual.
-ECONOMIA_MINIMA = 0.05
+MIN_SAVINGS = 0.05
 # Consumo abaixo de 40% da mediana dos modelos equivalentes e tratado como erro de digitacao no
 # Inmetro e nao e sugerido (ex.: HISENSE RS3P428NEDA = 28,0 kWh e a versao 127 V = 2,8 kWh).
-FRACAO_SUSPEITA = 0.4
+SUSPECT_FRACTION = 0.4
 
-ORIGEM_CONVERTIDA = "convertido da metodologia antiga do Inmetro"
-AVISO_CONVERTIDO = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
+CONVERTED_ORIGIN = "convertido da metodologia antiga do Inmetro"
+CONVERTED_NOTICE = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
                     "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.")
 
-AVISO_PADRAO = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifária e iluminação "
+DEFAULT_NOTICE = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifária e iluminação "
                 "pública. O uso real muda o resultado.")
 # Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
-AVISO_TARIFA_USUARIO = ("Calculado com a tarifa que voce informou. O uso real muda o resultado.")
+USER_TARIFF_NOTICE = ("Calculado com a tarifa que voce informou. O uso real muda o resultado.")
 
 # Cada spec diz quais colunas do CSV limpo viram cada campo do catalogo.
 # "capacidade": (coluna, unidade) aparece na tela, ex.: "490 L".
@@ -271,29 +271,29 @@ SPECS = [
     },
 ]
 
-ARQUIVOS_FORA_DO_ESCOPO = {
+OUT_OF_SCOPE_FILES = {
     "aquecedores-de-agua-e-gas_limpo.csv": "consome gas, nao energia eletrica",
     "fornos-eletricos-comerciais_limpo.csv": "uso comercial e unidade do consumo nao confirmada",
     "sistemas-acoplados-equipamentos-solar-de-agua_limpo.csv": "gera economia de energia, nao consome",
 }
 
 
-def normalizar(texto):
+def normalize(text):
     """Minusculo, sem acento, so letras, numeros e espaco."""
-    texto = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().lower()
-    return re.sub(r"[^a-z0-9]+", " ", texto).strip()
+    text = unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower()
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
 
-def _num(df, colunas):
+def _num(df, columns):
     """Primeira coluna numerica preenchida da lista (fallback na ordem)."""
-    serie = pd.Series(float("nan"), index=df.index)
-    for coluna in colunas:
-        if coluna in df.columns:
-            serie = serie.fillna(pd.to_numeric(df[coluna], errors="coerce"))
-    return serie
+    series = pd.Series(float("nan"), index=df.index)
+    for column in columns:
+        if column in df.columns:
+            series = series.fillna(pd.to_numeric(df[column], errors="coerce"))
+    return series
 
 
-def _construir(df, spec):
+def _build(df, spec):
     out = pd.DataFrame(index=df.index)
     out["categoria"] = spec["categoria"]
     out["marca"] = df["marca"].astype(str).str.strip()
@@ -301,201 +301,201 @@ def _construir(df, spec):
     out["tipo"] = df[spec["tipo"]].fillna("").astype(str).str.strip() if spec.get("tipo") else ""
 
     if spec.get("capacidade"):
-        coluna, unidade = spec["capacidade"]
-        out["capacidade"] = _num(df, [coluna])
-        out["unidade"] = unidade
-        out["detalhe"] = out["capacidade"].map(lambda v: "" if pd.isna(v) else f"{v:g} {unidade}")
+        column, unit = spec["capacidade"]
+        out["capacidade"] = _num(df, [column])
+        out["unidade"] = unit
+        out["detalhe"] = out["capacidade"].map(lambda v: "" if pd.isna(v) else f"{v:g} {unit}")
     else:
         out["capacidade"], out["unidade"], out["detalhe"] = float("nan"), None, ""
 
-    for coluna in COLUNAS_NUM:
-        out[coluna] = float("nan")
+    for column in NUM_COLUMNS:
+        out[column] = float("nan")
     if "kwh_mes" in spec:
         out["kwh_mes"] = _num(df, spec["kwh_mes"]) / spec.get("kwh_mes_div", 1)
     if "velocidades" in spec:
-        for nome, coluna in spec["velocidades"].items():
-            out[f"kwh_mes_{nome}"] = _num(df, [coluna])
+        for name, column in spec["velocidades"].items():
+            out[f"kwh_mes_{name}"] = _num(df, [column])
         out["kwh_mes"] = out["kwh_mes_media"].fillna(out["kwh_mes_alta"]).fillna(out["kwh_mes_baixa"])
     if "kwh_ciclo" in spec:
         out["kwh_ciclo"] = _num(df, spec["kwh_ciclo"])
     if "potencia_w" in spec:
         out["potencia_w"] = _num(df, spec["potencia_w"])
     if "standby_dia" in spec:
-        out["standby_kwh_mes"] = _num(df, [spec["standby_dia"]]) * DIAS_MES
+        out["standby_kwh_mes"] = _num(df, [spec["standby_dia"]]) * DAYS_PER_MONTH
     if "fluxo_lm" in spec:  # lumens: usado para achar lampada equivalente
         out["fluxo_lm"] = _num(df, [spec["fluxo_lm"]])
         out.loc[out["fluxo_lm"] <= 0, "fluxo_lm"] = float("nan")
-        com_lm = out["fluxo_lm"].notna()
-        out.loc[com_lm, "detalhe"] = out.loc[com_lm, "detalhe"] + ", " + out.loc[com_lm, "fluxo_lm"].map("{:g} lm".format)
+        with_lm = out["fluxo_lm"].notna()
+        out.loc[with_lm, "detalhe"] = out.loc[with_lm, "detalhe"] + ", " + out.loc[with_lm, "fluxo_lm"].map("{:g} lm".format)
 
     out["origem_dado"] = "informado"
     if "kwh_mes_metodologia_antiga" in spec:
-        _converter_metodologia_antiga(df, out, spec["kwh_mes_metodologia_antiga"])
+        _convert_old_methodology(df, out, spec["kwh_mes_metodologia_antiga"])
     if spec.get("derivado"):
         out.loc[spec["derivado"](df), "origem_dado"] = "derivado ou estimado na limpeza"
     if "consumo_imputado" in df.columns:  # marcado pelos scripts de limpeza
-        imputado = df["consumo_imputado"].astype(str).str.lower().isin(["true", "1"])
-        out.loc[imputado, "origem_dado"] = "derivado ou estimado na limpeza"
+        imputed = df["consumo_imputado"].astype(str).str.lower().isin(["true", "1"])
+        out.loc[imputed, "origem_dado"] = "derivado ou estimado na limpeza"
     out["arquivo"] = spec["arquivo"]
 
     # descarta linhas sem nenhum dado de consumo e valores impossiveis
-    for coluna in COLUNAS_NUM:
-        out.loc[out[coluna] <= 0, coluna] = float("nan")
-    tem_dado = out[["kwh_mes", "kwh_ciclo", "potencia_w"]].notna().any(axis=1)
-    return out[tem_dado & (out["marca"] != "") & (out["modelo"] != "")]
+    for column in NUM_COLUMNS:
+        out.loc[out[column] <= 0, column] = float("nan")
+    has_data = out[["kwh_mes", "kwh_ciclo", "potencia_w"]].notna().any(axis=1)
+    return out[has_data & (out["marca"] != "") & (out["modelo"] != "")]
 
 
-def _converter_metodologia_antiga(df, out, regra):
-    antigo = _num(df, [regra["coluna"]])
-    falta = out["kwh_mes"].isna() & antigo.notna()
-    if not falta.any():
+def _convert_old_methodology(df, out, rule):
+    old = _num(df, [rule["coluna"]])
+    missing = out["kwh_mes"].isna() & old.notna()
+    if not missing.any():
         return
-    frost_free = df[regra["degelo"]].fillna("").astype(str).str.contains("Frost")
+    frost_free = df[rule["degelo"]].fillna("").astype(str).str.contains("Frost")
     try:
-        modelo = estimativa.carregar_modelo()
-    except FileNotFoundError as erro:
-        print(f"[aviso] {erro}; consumo da metodologia antiga usado sem conversao")
-        out.loc[falta, "kwh_mes"] = antigo[falta]
+        model = estimativa.load_model()
+    except FileNotFoundError as error:
+        print(f"[aviso] {error}; consumo da metodologia antiga usado sem conversao")
+        out.loc[missing, "kwh_mes"] = old[missing]
         return
-    fator = pd.Series([estimativa.fator_metodologia(t, f, modelo) for t, f in zip(out["tipo"], frost_free)],
+    factor = pd.Series([estimativa.methodology_factor(t, f, model) for t, f in zip(out["tipo"], frost_free)],
                       index=out.index)
-    out.loc[falta, "kwh_mes"] = antigo[falta] * fator[falta]
-    out.loc[falta, "origem_dado"] = ORIGEM_CONVERTIDA
+    out.loc[missing, "kwh_mes"] = old[missing] * factor[missing]
+    out.loc[missing, "origem_dado"] = CONVERTED_ORIGIN
 
 
-def carregar_catalogo(pasta=None):
+def load_catalog(folder=None):
     """Junta todos os CSVs limpos num catalogo unico de aparelhos."""
-    pasta = pasta or config.DADOS
-    partes = []
+    folder = folder or config.DATA
+    parts = []
     for spec in SPECS:
-        caminho = pasta / spec["arquivo"]
-        if not caminho.exists():
+        path = folder / spec["arquivo"]
+        if not path.exists():
             print(f"[aviso] {spec['arquivo']} nao encontrado, categoria {spec['categoria']} fica de fora")
             continue
-        df = pd.read_csv(caminho, encoding="utf-8-sig")
+        df = pd.read_csv(path, encoding="utf-8-sig")
         try:
-            partes.append(_construir(df, spec))
-        except KeyError as erro:
-            print(f"[aviso] {spec['arquivo']}: coluna {erro} nao existe, arquivo ignorado")
-    if not partes:
-        raise FileNotFoundError(f"nenhum dataset carregado em {pasta}")
-    catalogo = pd.concat(partes, ignore_index=True)
-    catalogo = catalogo.drop_duplicates(subset=["categoria", "marca", "modelo"], keep="first")
-    catalogo["busca"] = (catalogo["marca"] + " " + catalogo["modelo"]).map(normalizar)
-    return catalogo.reset_index(drop=True)
+            parts.append(_build(df, spec))
+        except KeyError as error:
+            print(f"[aviso] {spec['arquivo']}: coluna {error} nao existe, arquivo ignorado")
+    if not parts:
+        raise FileNotFoundError(f"nenhum dataset carregado em {folder}")
+    catalog = pd.concat(parts, ignore_index=True)
+    catalog = catalog.drop_duplicates(subset=["categoria", "marca", "modelo"], keep="first")
+    catalog["busca"] = (catalog["marca"] + " " + catalog["modelo"]).map(normalize)
+    return catalog.reset_index(drop=True)
 
 
-def consumo_mensal_kwh(aparelho, horas_dia=None, ciclos_mes=None, velocidade=None, dias=DIAS_MES):
+def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, speed=None, days=DAYS_PER_MONTH):
     """Consumo em kWh/mes e como foi calculado. Ordem: tabela > ciclos > potencia x horas."""
-    premissa = PREMISSAS.get(aparelho["categoria"], {})
-    referencia = HORAS_REFERENCIA_INMETRO.get(aparelho["categoria"])
-    if horas_dia is not None and not 0 <= horas_dia <= 24:
+    assumption = ASSUMPTIONS.get(appliance["categoria"], {})
+    reference = INMETRO_REFERENCE_HOURS.get(appliance["categoria"])
+    if daily_hours is not None and not 0 <= daily_hours <= 24:
         raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
-    informado = tr("informado", "entered")
-    ajuste = tr("informe as horas de uso para ajustar", "enter the hours of use to adjust")
+    given = tr("informado", "entered")
+    adjustment = tr("informe as horas de uso para ajustar", "enter the hours of use to adjust")
 
-    if velocidade and pd.notna(aparelho.get(f"kwh_mes_{velocidade}")):
-        kwh = float(aparelho[f"kwh_mes_{velocidade}"])
-        nome = tr(NOMES_VELOCIDADES.get(velocidade, velocidade), NOMES_VELOCIDADES_EN.get(velocidade, velocidade))
-        if horas_dia is not None and referencia:
-            return {"kwh_mes": kwh * horas_dia / referencia,
-                    "metodo": tr(f"consumo do Inmetro na velocidade {nome} ({kwh:g} kWh/mês para "
-                                 f"{tempo_por_dia(referencia)}) ajustado para {tempo_por_dia(horas_dia)} (informado)",
-                                 f"Inmetro consumption at {nome} speed ({kwh:g} kWh/month for "
-                                 f"{tempo_por_dia(referencia)}) adjusted to {tempo_por_dia(horas_dia)} (entered)"),
+    if speed and pd.notna(appliance.get(f"kwh_mes_{speed}")):
+        kwh = float(appliance[f"kwh_mes_{speed}"])
+        name = tr(SPEED_NAMES.get(speed, speed), SPEED_NAMES_EN.get(speed, speed))
+        if daily_hours is not None and reference:
+            return {"kwh_mes": kwh * daily_hours / reference,
+                    "metodo": tr(f"consumo do Inmetro na velocidade {name} ({kwh:g} kWh/mês para "
+                                 f"{time_per_day(reference)}) ajustado para {time_per_day(daily_hours)} (informado)",
+                                 f"Inmetro consumption at {name} speed ({kwh:g} kWh/month for "
+                                 f"{time_per_day(reference)}) adjusted to {time_per_day(daily_hours)} (entered)"),
                     "premissa": False}
-        metodo = tr(f"consumo mensal do Inmetro, velocidade {nome}", f"Inmetro monthly consumption, {nome} speed")
-        if referencia:
-            metodo += tr(f" ({tempo_por_dia(referencia)} no ensaio; {ajuste})",
-                         f" ({tempo_por_dia(referencia)} in the test; {ajuste})")
-        return {"kwh_mes": kwh, "metodo": metodo, "premissa": False}
+        method = tr(f"consumo mensal do Inmetro, velocidade {name}", f"Inmetro monthly consumption, {name} speed")
+        if reference:
+            method += tr(f" ({time_per_day(reference)} no ensaio; {adjustment})",
+                         f" ({time_per_day(reference)} in the test; {adjustment})")
+        return {"kwh_mes": kwh, "metodo": method, "premissa": False}
 
-    if horas_dia is not None and (aparelho["categoria"] in HORAS_OPCIONAIS or referencia):
-        if aparelho["categoria"] == "ar_condicionado" and pd.notna(aparelho["potencia_w"]):
-            return {"kwh_mes": float(aparelho["potencia_w"]) * horas_dia * dias / 1000,
-                    "metodo": tr(f"{aparelho['potencia_w']:g} W (potência em carga total) x "
-                                 f"{tempo_por_dia(horas_dia)} x {dias} dias (informado); valor máximo, "
+    if daily_hours is not None and (appliance["categoria"] in OPTIONAL_HOURS or reference):
+        if appliance["categoria"] == "ar_condicionado" and pd.notna(appliance["potencia_w"]):
+            return {"kwh_mes": float(appliance["potencia_w"]) * daily_hours * days / 1000,
+                    "metodo": tr(f"{appliance['potencia_w']:g} W (potência em carga total) x "
+                                 f"{time_per_day(daily_hours)} x {days} dias (informado); valor máximo, "
                                  "o compressor não fica ligado o tempo todo",
-                                 f"{aparelho['potencia_w']:g} W (power at full load) x "
-                                 f"{tempo_por_dia(horas_dia)} x {dias} days (entered); maximum value, "
+                                 f"{appliance['potencia_w']:g} W (power at full load) x "
+                                 f"{time_per_day(daily_hours)} x {days} days (entered); maximum value, "
                                  "the compressor is not on all the time"),
                     "premissa": False}
-        if referencia and pd.notna(aparelho["kwh_mes"]):
-            return {"kwh_mes": float(aparelho["kwh_mes"]) * horas_dia / referencia,
-                    "metodo": tr(f"consumo mensal do Inmetro ({aparelho['kwh_mes']:g} kWh para {referencia:g} h/dia) "
-                                 f"ajustado para {tempo_por_dia(horas_dia)} (informado)",
-                                 f"Inmetro monthly consumption ({aparelho['kwh_mes']:g} kWh for {referencia:g} h/day) "
-                                 f"adjusted to {tempo_por_dia(horas_dia)} (entered)"),
+        if reference and pd.notna(appliance["kwh_mes"]):
+            return {"kwh_mes": float(appliance["kwh_mes"]) * daily_hours / reference,
+                    "metodo": tr(f"consumo mensal do Inmetro ({appliance['kwh_mes']:g} kWh para {reference:g} h/dia) "
+                                 f"ajustado para {time_per_day(daily_hours)} (informado)",
+                                 f"Inmetro monthly consumption ({appliance['kwh_mes']:g} kWh for {reference:g} h/day) "
+                                 f"adjusted to {time_per_day(daily_hours)} (entered)"),
                     "premissa": False}
 
-    if pd.notna(aparelho["kwh_mes"]):
-        metodo = tr("consumo mensal do Inmetro", "Inmetro monthly consumption")
-        if referencia:
-            metodo += tr(f" ({tempo_por_dia(referencia)} no ensaio; {ajuste})",
-                         f" ({tempo_por_dia(referencia)} in the test; {ajuste})")
-        elif aparelho["categoria"] in HORAS_OPCIONAIS:
-            metodo += tr(f" (uso padrão do ensaio; {ajuste})", f" (standard test use; {ajuste})")
-        return {"kwh_mes": float(aparelho["kwh_mes"]), "metodo": metodo, "premissa": False}
+    if pd.notna(appliance["kwh_mes"]):
+        method = tr("consumo mensal do Inmetro", "Inmetro monthly consumption")
+        if reference:
+            method += tr(f" ({time_per_day(reference)} no ensaio; {adjustment})",
+                         f" ({time_per_day(reference)} in the test; {adjustment})")
+        elif appliance["categoria"] in OPTIONAL_HOURS:
+            method += tr(f" (uso padrão do ensaio; {adjustment})", f" (standard test use; {adjustment})")
+        return {"kwh_mes": float(appliance["kwh_mes"]), "metodo": method, "premissa": False}
 
-    if pd.notna(aparelho["kwh_ciclo"]):
-        ciclos = ciclos_mes if ciclos_mes is not None else premissa.get("ciclos_mes")
-        if ciclos is None:
+    if pd.notna(appliance["kwh_ciclo"]):
+        cycles = monthly_cycles if monthly_cycles is not None else assumption.get("ciclos_mes")
+        if cycles is None:
             raise ValueError(tr("informe quantos ciclos por mes", "enter how many cycles per month"))
-        if ciclos < 0:
+        if cycles < 0:
             raise ValueError(tr("ciclos por mes nao pode ser negativo", "cycles per month cannot be negative"))
-        origem = informado if ciclos_mes is not None else tr("estimativa do grupo", "group estimate")
-        return {"kwh_mes": float(aparelho["kwh_ciclo"]) * ciclos,
-                "metodo": tr(f"{aparelho['kwh_ciclo']:g} kWh por ciclo x {ciclos:g} ciclos por mês ({origem})",
-                             f"{aparelho['kwh_ciclo']:g} kWh per cycle x {ciclos:g} cycles per month ({origem})"),
-                "premissa": ciclos_mes is None}
+        origin = given if monthly_cycles is not None else tr("estimativa do grupo", "group estimate")
+        return {"kwh_mes": float(appliance["kwh_ciclo"]) * cycles,
+                "metodo": tr(f"{appliance['kwh_ciclo']:g} kWh por ciclo x {cycles:g} ciclos por mês ({origin})",
+                             f"{appliance['kwh_ciclo']:g} kWh per cycle x {cycles:g} cycles per month ({origin})"),
+                "premissa": monthly_cycles is None}
 
-    if pd.notna(aparelho["potencia_w"]):
-        horas = horas_dia if horas_dia is not None else premissa.get("horas_dia")
-        if horas is None:
+    if pd.notna(appliance["potencia_w"]):
+        hours = daily_hours if daily_hours is not None else assumption.get("horas_dia")
+        if hours is None:
             raise ValueError(tr("informe quantas horas por dia o aparelho fica ligado",
                                 "enter how many hours per day the appliance is on"))
-        if not 0 <= horas <= 24:
+        if not 0 <= hours <= 24:
             raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
-        standby = aparelho.get("standby_kwh_mes")
+        standby = appliance.get("standby_kwh_mes")
         standby = 0.0 if pd.isna(standby) else float(standby)
-        origem = informado if horas_dia is not None else tr("estimativa do grupo", "group estimate")
-        metodo = tr(f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} dias ({origem})",
-                    f"{aparelho['potencia_w']:g} W x {tempo_por_dia(horas)} x {dias} days ({origem})")
+        origin = given if daily_hours is not None else tr("estimativa do grupo", "group estimate")
+        method = tr(f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days} dias ({origin})",
+                    f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days} days ({origin})")
         if standby:
-            metodo += tr(f" + {standby:.2f} kWh de stand-by", f" + {standby:.2f} kWh of standby")
-        return {"kwh_mes": float(aparelho["potencia_w"]) * horas * dias / 1000 + standby,
-                "metodo": metodo, "premissa": horas_dia is None}
+            method += tr(f" + {standby:.2f} kWh de stand-by", f" + {standby:.2f} kWh of standby")
+        return {"kwh_mes": float(appliance["potencia_w"]) * hours * days / 1000 + standby,
+                "metodo": method, "premissa": daily_hours is None}
 
     raise ValueError(tr("aparelho sem dados de consumo", "appliance without consumption data"))
 
 
-def montar_resultado(aparelho, consumo, tarifa_kwh, distribuidora, origem_tarifa, uf, horas_dia=None,
-                     tarifa_do_usuario=False):
+def build_result(appliance, consumption, tariff_kwh, distributor, tariff_origin, uf, daily_hours=None,
+                     user_tariff=False):
     """Dicionario final que a tela mostra e que vai para a tabela consultas."""
-    custo_mes = consumo["kwh_mes"] * tarifa_kwh
-    avisos = [t(AVISO_TARIFA_USUARIO if tarifa_do_usuario else AVISO_PADRAO)]
-    if consumo.get("premissa"):
-        avisos.append(tr("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.",
+    monthly_cost = consumption["kwh_mes"] * tariff_kwh
+    notices = [t(USER_TARIFF_NOTICE if user_tariff else DEFAULT_NOTICE)]
+    if consumption.get("premissa"):
+        notices.append(tr("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.",
                          "The time of use is an estimate made by our team. Enter yours for a more accurate value."))
-    if aparelho.get("origem_dado") == ORIGEM_CONVERTIDA:
-        avisos.append(t(AVISO_CONVERTIDO))
-    elif aparelho.get("origem_dado") not in (None, "informado"):
-        avisos.append(tr("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).",
+    if appliance.get("origem_dado") == CONVERTED_ORIGIN:
+        notices.append(t(CONVERTED_NOTICE))
+    elif appliance.get("origem_dado") not in (None, "informado"):
+        notices.append(tr("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).",
                          "This model's consumption was filled in during data cleaning (it did not come from Inmetro)."))
-    detalhe = aparelho.get("detalhe")
+    detail = appliance.get("detalhe")
     return {
-        "categoria": aparelho["categoria"],
-        "marca": aparelho["marca"],
-        "modelo": aparelho["modelo"],
-        "detalhe": "" if detalhe is None or pd.isna(detalhe) else unidades(detalhe),
-        "distribuidora": distribuidora or "-",
+        "categoria": appliance["categoria"],
+        "marca": appliance["marca"],
+        "modelo": appliance["modelo"],
+        "detalhe": "" if detail is None or pd.isna(detail) else units(detail),
+        "distribuidora": distributor or "-",
         "uf": uf if isinstance(uf, str) and uf else "-",
-        "horas_dia": horas_dia,
-        "kwh_mes": round(consumo["kwh_mes"], 2),
-        "metodo": consumo["metodo"],
-        "tarifa_kwh": round(float(tarifa_kwh), 5),
-        "origem_tarifa": origem_tarifa,
-        "custo_mes": round(custo_mes, 2),
-        "custo_ano": round(custo_mes * 12, 2),
-        "avisos": avisos,
+        "horas_dia": daily_hours,
+        "kwh_mes": round(consumption["kwh_mes"], 2),
+        "metodo": consumption["metodo"],
+        "tarifa_kwh": round(float(tariff_kwh), 5),
+        "origem_tarifa": tariff_origin,
+        "custo_mes": round(monthly_cost, 2),
+        "custo_ano": round(monthly_cost * 12, 2),
+        "avisos": notices,
     }

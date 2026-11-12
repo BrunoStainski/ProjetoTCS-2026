@@ -1,9 +1,9 @@
 
 from pathlib import Path
 import pandas as pd
-from config import ler_csv_inmetro, salvar_processado
+from config import read_csv_inmetro, save_processed
 
-df = ler_csv_inmetro("lampadas-de-vapor-de-sodio-de-alta-pressao.csv")
+df = read_csv_inmetro("lampadas-de-vapor-de-sodio-de-alta-pressao.csv")
 
 print("Dados originais:", df.shape)
 
@@ -33,7 +33,7 @@ df = df[
 # Remover duplicatas
 df = df.drop_duplicates(subset=["Marca", "Modelo"])
 
-salvar_processado(df, "lampadas_vapor_sodio_limpo.csv")
+save_processed(df, "lampadas_vapor_sodio_limpo.csv")
 
 print("\nLimpeza concluída!")
 print("Dados finais:", df.shape)

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Pecas usadas por varias telas: estrutura da pagina, cartoes de opcao, valores em destaque,
 // avisos e erros. Cores, textos e tamanhos vem do tema (Iamp.de(context)).
 
@@ -8,15 +10,15 @@ import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 
-export '../casa.dart' show Consulta, EscolhaTarifa;
+export '../casa.dart' show Query, TariffChoice;
 
 /// Fonte do sistema muito aumentada (150% ou mais): as telas empilham o que ficaria lado a lado.
-bool fonteGrande(BuildContext context) => MediaQuery.textScalerOf(context).scale(10) >= 15;
+bool largeFont(BuildContext context) => MediaQuery.textScalerOf(context).scale(10) >= 15;
 
-IconData iconeDaCategoria(String categoria) {
-  if (categoria.startsWith('lampada')) return Icons.lightbulb_outline;
-  if (categoria.startsWith('ventilador')) return Icons.wind_power;
-  return switch (categoria) {
+IconData categoryIcon(String category) {
+  if (category.startsWith('lampada')) return Icons.lightbulb_outline;
+  if (category.startsWith('ventilador')) return Icons.wind_power;
+  return switch (category) {
     'refrigerador' => Icons.kitchen,
     'televisor' => Icons.tv,
     'ar_condicionado' => Icons.ac_unit,
@@ -38,10 +40,10 @@ IconData iconeDaCategoria(String categoria) {
   };
 }
 
-String _primeiraMaiuscula(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).replaceAll('_', ' ');
+String _capitalizeFirst(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1).replaceAll('_', ' ');
 
 /// Nome de um aparelho do tipo (ex.: botoes da escolha do tipo, linha do item na casa).
-String nomeDaCategoria(String categoria) => switch (categoria) {
+String categoryName(String category) => switch (category) {
   'refrigerador' => tr('Geladeira ou freezer', 'Fridge or freezer'),
   'televisor' => tr('Televisão', 'TV'),
   'ar_condicionado' => tr('Ar-condicionado', 'Air conditioner'),
@@ -65,11 +67,11 @@ String nomeDaCategoria(String categoria) => switch (categoria) {
   'forno_eletrico' => tr('Forno elétrico de bancada', 'Countertop electric oven'),
   'aspirador_po' => tr('Aspirador de pó', 'Vacuum cleaner'),
   'torradeira' => tr('Torradeira', 'Toaster'),
-  _ => _primeiraMaiuscula(categoria),
+  _ => _capitalizeFirst(category),
 };
 
 /// Nome do tipo de aparelho para titulos (ex.: secoes da busca).
-String tituloDaCategoria(String categoria) => switch (categoria) {
+String categoryTitle(String category) => switch (category) {
   'refrigerador' => tr('Geladeiras', 'Fridges'),
   'televisor' => tr('Televisores', 'TVs'),
   'ar_condicionado' => tr('Ar-condicionado', 'Air conditioners'),
@@ -82,103 +84,103 @@ String tituloDaCategoria(String categoria) => switch (categoria) {
   'microondas' => tr('Micro-ondas', 'Microwaves'),
   'maquina_de_lavar' => tr('Máquinas de lavar', 'Washing machines'),
   'bomba' => tr("Bombas d'água", 'Water pumps'),
-  _ => _primeiraMaiuscula(categoria),
+  _ => _capitalizeFirst(category),
 };
 
 /// Velocidade do ventilador como a API manda ("media") para a tela ("Média").
-String nomeDaVelocidade(String velocidade) => switch (velocidade) {
+String speedName(String speed) => switch (speed) {
   'baixa' => tr('Baixa', 'Low'),
   'media' => tr('Média', 'Medium'),
   'alta' => tr('Alta', 'High'),
-  _ => _primeiraMaiuscula(velocidade),
+  _ => _capitalizeFirst(speed),
 };
 
 /// Perfil do K-Means como a API manda ("Consciente", a chave do perfil) para a tela.
-String nomeDoPerfil(String perfil) => switch (perfil) {
+String profileName(String profile) => switch (profile) {
   'Consciente' => tr('Consciente', 'Efficient'),
   'Moderado' => tr('Moderado', 'Moderate'),
   'Ineficiente' => tr('Ineficiente', 'Inefficient'),
-  _ => perfil,
+  _ => profile,
 };
 
-class ControleTempo {
-  final horas = TextEditingController();
-  final minutos = TextEditingController();
+class TimeControl {
+  final hours = TextEditingController();
+  final minutes = TextEditingController();
 
-  bool get vazio => horas.text.trim().isEmpty && minutos.text.trim().isEmpty;
+  bool get isEmpty => hours.text.trim().isEmpty && minutes.text.trim().isEmpty;
 
-  int? _parte(TextEditingController c) => c.text.trim().isEmpty ? 0 : int.tryParse(c.text.trim());
+  int? _part(TextEditingController c) => c.text.trim().isEmpty ? 0 : int.tryParse(c.text.trim());
 
-  bool get valido {
-    if (vazio) return true;
-    final h = _parte(horas);
-    final m = _parte(minutos);
+  bool get valid {
+    if (isEmpty) return true;
+    final h = _part(hours);
+    final m = _part(minutes);
     return h != null && m != null && h >= 0 && m >= 0 && m < 60 && h * 60 + m <= 24 * 60;
   }
 
-  double? get horasDia => vazio || !valido ? null : (_parte(horas)! * 60 + _parte(minutos)!) / 60;
+  double? get dailyHours => isEmpty || !valid ? null : (_part(hours)! * 60 + _part(minutes)!) / 60;
 
-  void definir(double? horasDia) {
-    if (horasDia == null) {
-      horas.clear();
-      minutos.clear();
+  void define(double? dailyHours) {
+    if (dailyHours == null) {
+      hours.clear();
+      minutes.clear();
       return;
     }
-    final total = (horasDia * 60).round();
-    horas.text = '${total ~/ 60}';
-    minutos.text = '${total % 60}';
+    final total = (dailyHours * 60).round();
+    hours.text = '${total ~/ 60}';
+    minutes.text = '${total % 60}';
   }
 
-  void limpar() => definir(null);
+  void clear() => define(null);
 
   void dispose() {
-    horas.dispose();
-    minutos.dispose();
+    hours.dispose();
+    minutes.dispose();
   }
 }
 
 /// Tempo de uso em dois campos (horas e minutos). Com fonte grande, um embaixo do outro.
-class CampoTempo extends StatelessWidget {
-  final ControleTempo controle;
-  final String? rotulo;
-  final String? ajuda;
-  final VoidCallback? aoConfirmar;
+class TimeField extends StatelessWidget {
+  final TimeControl control;
+  final String? label;
+  final String? help;
+  final VoidCallback? onConfirm;
 
-  const CampoTempo({super.key, required this.controle, this.rotulo, this.ajuda, this.aoConfirmar});
+  const TimeField({super.key, required this.control, this.label, this.help, this.onConfirm});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    Widget parte(TextEditingController c, String nome, String sufixo) => TextField(
+    Widget piece(TextEditingController c, String name, String suffix) => TextField(
       controller: c,
       keyboardType: TextInputType.number,
-      onSubmitted: (_) => aoConfirmar?.call(),
-      decoration: InputDecoration(labelText: nome, suffixText: sufixo),
+      onSubmitted: (_) => onConfirm?.call(),
+      decoration: InputDecoration(labelText: name, suffixText: suffix),
     );
-    final horas = parte(controle.horas, tr('Horas', 'Hours'), 'h');
-    final minutos = parte(controle.minutos, tr('Minutos', 'Minutes'), 'min');
+    final hours = piece(control.hours, tr('Horas', 'Hours'), 'h');
+    final minutes = piece(control.minutes, tr('Minutos', 'Minutes'), 'min');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (rotulo != null) ...[
-          Text(rotulo!, style: t.forte),
-          const SizedBox(height: Espaco.p),
+        if (label != null) ...[
+          Text(label!, style: t.strong),
+          const SizedBox(height: Spacing.p),
         ],
-        if (fonteGrande(context)) ...[
-          horas,
-          const SizedBox(height: Espaco.pm),
-          minutos,
+        if (largeFont(context)) ...[
+          hours,
+          const SizedBox(height: Spacing.pm),
+          minutes,
         ] else
           Row(
             children: [
-              Expanded(child: horas),
-              const SizedBox(width: Espaco.p),
-              Expanded(child: minutos),
+              Expanded(child: hours),
+              const SizedBox(width: Spacing.p),
+              Expanded(child: minutes),
             ],
           ),
-        if (ajuda != null) ...[
-          const SizedBox(height: Espaco.p),
-          Text(ajuda!, style: t.secundario),
+        if (help != null) ...[
+          const SizedBox(height: Spacing.p),
+          Text(help!, style: t.secondary),
         ],
       ],
     );
@@ -186,21 +188,21 @@ class CampoTempo extends StatelessWidget {
 }
 
 /// Tempo que o aviso "foi para a sua casa" fica na tela antes de sumir sozinho.
-const duracaoAviso = Duration(seconds: 5);
+const noticeDuration = Duration(seconds: 5);
 
 /// Aviso de aparelho adicionado, com o botao "Ver" (abre a aba Minha casa).
 /// Desde o Flutter 3.29 um SnackBar com botao fica na tela ate alguem tocar (persist);
-/// aqui ele some sozinho depois de [duracaoAviso].
+/// aqui ele some sozinho depois de [noticeDuration].
 /// Recebe o messenger guardado antes: o aviso pode continuar depois de sair da tela.
-void avisarAdicionado(ScaffoldMessengerState avisos, String texto) {
-  avisos
+void notifyAdded(ScaffoldMessengerState notices, String text) {
+  notices
     ..hideCurrentSnackBar() // adicionar varios seguidos nao enfileira avisos
     ..showSnackBar(
       SnackBar(
-        content: Text(texto),
-        duration: duracaoAviso,
+        content: Text(text),
+        duration: noticeDuration,
         persist: false,
-        action: SnackBarAction(label: tr('Ver', 'View'), onPressed: () => irPara(Aba.casa, fecharAtual: true)),
+        action: SnackBarAction(label: tr('Ver', 'View'), onPressed: () => goTo(AppTab.home, closeCurrent: true)),
       ),
     );
 }
@@ -218,8 +220,8 @@ class LogoIamp extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt, color: t.destaque, size: t.iconeGrande),
-          Text('Iamp', style: t.titulo.copyWith(letterSpacing: 1)),
+          Icon(Icons.bolt, color: t.highlight, size: t.largeIcon),
+          Text('Iamp', style: t.title.copyWith(letterSpacing: 1)),
         ],
       ),
     );
@@ -228,47 +230,47 @@ class LogoIamp extends StatelessWidget {
 
 /// Marca do app no menu e nas boas-vindas: o icone (quadrado preto com o raio) com contorno
 /// amarelo esmaecido e brilho suave, e o nome ao lado.
-class MarcaIamp extends StatelessWidget {
-  final double tamanho; // lado do quadrado do icone
-  final double? tamanhoNome; // padrao: o titulo do app (22)
+class IampBrand extends StatelessWidget {
+  final double size; // lado do quadrado do icone
+  final double? nameSize; // padrao: o titulo do app (22)
 
-  const MarcaIamp({super.key, this.tamanho = 48, this.tamanhoNome});
+  const IampBrand({super.key, this.size = 48, this.nameSize});
 
-  static const imagem = 'assets/icone/icone.png';
+  static const image = 'assets/icone/icone.png';
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final raio = BorderRadius.circular(tamanho * 0.22);
-    final icone = Container(
-      width: tamanho,
-      height: tamanho,
+    final radius = BorderRadius.circular(size * 0.22);
+    final icon = Container(
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        color: Cores.preto,
-        borderRadius: raio,
-        border: Border.all(color: t.destaque.withValues(alpha: 0.35), width: tamanho >= 72 ? 2 : 1.5),
-        boxShadow: [BoxShadow(color: t.destaque.withValues(alpha: 0.18), blurRadius: tamanho * 0.4)],
+        color: AppColors.black,
+        borderRadius: radius,
+        border: Border.all(color: t.highlight.withValues(alpha: 0.35), width: size >= 72 ? 2 : 1.5),
+        boxShadow: [BoxShadow(color: t.highlight.withValues(alpha: 0.18), blurRadius: size * 0.4)],
       ),
       child: ClipRRect(
-        borderRadius: raio,
+        borderRadius: radius,
         child: Image.asset(
-          imagem,
+          image,
           fit: BoxFit.cover,
-          cacheWidth: (tamanho * MediaQuery.devicePixelRatioOf(context)).round(),
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
         ),
       ),
     );
-    final nome = Text('Iamp', style: t.titulo.copyWith(fontSize: tamanhoNome, letterSpacing: 1));
+    final name = Text('Iamp', style: t.title.copyWith(fontSize: nameSize, letterSpacing: 1));
     return Semantics(
       label: 'Iamp',
       excludeSemantics: true,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          icone,
-          SizedBox(width: tamanho * 0.25),
+          icon,
+          SizedBox(width: size * 0.25),
           // com a fonte do sistema muito grande o nome encolhe em vez de passar da tela
-          Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: nome)),
+          Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: name)),
         ],
       ),
     );
@@ -276,87 +278,93 @@ class MarcaIamp extends StatelessWidget {
 }
 
 /// Em qual etapa do fluxo a pessoa esta (ex.: 2 de 6). Aparece em texto e na barra.
-class Etapa {
-  final int atual;
+class FlowStep {
+  final int current;
   final int total;
 
-  const Etapa(this.atual, this.total);
+  const FlowStep(this.current, this.total);
 }
 
 /// Calculo de um aparelho do catalogo: tipo, modelo, uso, estado, distribuidora e resultado.
-const totalEtapas = 6;
+const totalSteps = 6;
 
 /// Etapa do calculo do catalogo. A estimativa (aparelho fora do catalogo) tem as proprias perguntas
 /// e nao mostra essa contagem.
-Etapa? etapaDoCalculo(Consulta consulta, int atual) => consulta.estimado ? null : Etapa(atual, totalEtapas);
+FlowStep? calculationStep(Query query, int current) => query.estimated ? null : FlowStep(current, totalSteps);
 
 /// Estrutura de toda tela: barra com o titulo, largura maxima, etapa do fluxo (opcional)
 /// e o botao principal fixo embaixo (zona do polegar no celular).
-class Pagina extends StatelessWidget {
-  final String titulo;
-  final Widget filho;
-  final Etapa? etapa;
-  final Widget? tituloWidget; // substitui o texto do titulo (ex.: logo na tela inicial)
-  final Widget? rodape; // acao principal, fixa embaixo
+class AppPage extends StatelessWidget {
+  final String title;
+  final Widget child;
+  final FlowStep? step;
+  final Widget? widgetTitle; // substitui o texto do titulo (ex.: logo na tela inicial)
+  final Widget? footer; // acao principal, fixa embaixo
 
-  const Pagina({super.key, required this.titulo, required this.filho, this.etapa, this.tituloWidget, this.rodape});
+  const AppPage({super.key, required this.title, required this.child, this.step, this.widgetTitle, this.footer});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     // com fonte grande a barra de cima cresce junto (ate 1,75x) para o titulo nao cortar
-    final alturaBarra = MediaQuery.textScalerOf(context).scale(kToolbarHeight).clamp(kToolbarHeight, kToolbarHeight * 1.75);
-    final e = etapa;
+    final barHeight = MediaQuery.textScalerOf(context).scale(kToolbarHeight).clamp(kToolbarHeight, kToolbarHeight * 1.75);
+    final e = step;
     // botao do menu de acesso rapido na primeira tela de cada aba (nas outras fica a seta de voltar).
     // O menu mora na casca das abas (inicio.dart); fora dela (testes de uma tela so) nao aparece.
-    final casca = Scaffold.maybeOf(context);
-    final comMenu = (casca?.hasDrawer ?? false) && (ModalRoute.of(context)?.isFirst ?? false);
+    final shell = Scaffold.maybeOf(context);
+    final withMenu = (shell?.hasDrawer ?? false) && (ModalRoute.of(context)?.isFirst ?? false);
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: alturaBarra,
-        leading: comMenu ? IconButton(icon: const Icon(Icons.menu), tooltip: 'Menu', onPressed: casca!.openDrawer) : null,
-        title: tituloWidget ?? Text(titulo, maxLines: 2, overflow: TextOverflow.ellipsis),
+        toolbarHeight: barHeight,
+        leading: withMenu ? IconButton(icon: const Icon(Icons.menu), tooltip: 'Menu', onPressed: shell!.openDrawer) : null,
+        title: widgetTitle ?? Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
       ),
       body: SafeArea(
-        bottom: rodape == null,
-        child: _Largura(
+        bottom: footer == null,
+        child: _Width(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (e != null) ...[
-                LinearProgressIndicator(
-                  value: e.atual / e.total,
-                  minHeight: t.barraProgresso / 2,
-                  semanticsLabel: tr('Etapa ${e.atual} de ${e.total}', 'Step ${e.atual} of ${e.total}'),
+                // a barra avanca da etapa anterior ate a atual (junto com a transicao da tela)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: (e.current - 1) / e.total, end: e.current / e.total),
+                  duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => LinearProgressIndicator(
+                    value: value,
+                    minHeight: t.progressBar / 2,
+                    semanticsLabel: tr('Etapa ${e.current} de ${e.total}', 'Step ${e.current} of ${e.total}'),
+                  ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, 0),
+                  padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, 0),
                   child: ExcludeSemantics(
-                    child: Text(tr('Etapa ${e.atual} de ${e.total}', 'Step ${e.atual} of ${e.total}'), style: t.rotulo),
+                    child: Text(tr('Etapa ${e.current} de ${e.total}', 'Step ${e.current} of ${e.total}'), style: t.label),
                   ),
                 ),
               ],
               Expanded(
-                child: Padding(padding: const EdgeInsets.all(Espaco.m), child: filho),
+                child: Padding(padding: const EdgeInsets.all(Spacing.m), child: child),
               ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: rodape == null
+      bottomNavigationBar: footer == null
           ? null
           : DecoratedBox(
               decoration: BoxDecoration(
                 color: Theme.of(context).scaffoldBackgroundColor,
-                border: Border(top: BorderSide(color: t.borda)),
+                border: Border(top: BorderSide(color: t.border)),
               ),
               child: SafeArea(
                 top: false,
-                child: _Largura(
-                  encolher: true,
+                child: _Width(
+                  shrink: true,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(Espaco.m, Espaco.pm, Espaco.m, Espaco.m),
-                    child: rodape,
+                    padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.m),
+                    child: footer,
                   ),
                 ),
               ),
@@ -367,42 +375,42 @@ class Pagina extends StatelessWidget {
 
 /// Em tela larga (navegador, tablet) o conteudo fica centralizado com largura maxima.
 /// encolher: ocupa so a altura do conteudo (no rodape; sem isso o Align toma a tela inteira).
-class _Largura extends StatelessWidget {
+class _Width extends StatelessWidget {
   final Widget child;
-  final bool encolher;
+  final bool shrink;
 
-  const _Largura({required this.child, this.encolher = false});
+  const _Width({required this.child, this.shrink = false});
 
   @override
   Widget build(BuildContext context) => Align(
     alignment: Alignment.topCenter,
-    heightFactor: encolher ? 1 : null,
+    heightFactor: shrink ? 1 : null,
     child: ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: Iamp.de(context).larguraMaxima),
+      constraints: BoxConstraints(maxWidth: Iamp.de(context).maxWidth),
       child: child,
     ),
   );
 }
 
 /// A pergunta da etapa, grande, com uma explicacao curta embaixo.
-class CabecalhoPergunta extends StatelessWidget {
-  final String pergunta;
-  final String? ajuda;
+class QuestionHeader extends StatelessWidget {
+  final String question;
+  final String? help;
 
-  const CabecalhoPergunta(this.pergunta, {super.key, this.ajuda});
+  const QuestionHeader(this.question, {super.key, this.help});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: Espaco.m),
+      padding: const EdgeInsets.only(bottom: Spacing.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Semantics(header: true, child: Text(pergunta, style: t.pergunta)),
-          if (ajuda != null) ...[
-            const SizedBox(height: Espaco.p),
-            Text(ajuda!, style: t.secundario),
+          Semantics(header: true, child: Text(question, style: t.question)),
+          if (help != null) ...[
+            const SizedBox(height: Spacing.p),
+            Text(help!, style: t.secondary),
           ],
         ],
       ),
@@ -412,19 +420,19 @@ class CabecalhoPergunta extends StatelessWidget {
 
 /// Opcao grande para tocar (uma decisao por tela). Mostra um sinal de "escolhido"
 /// alem da cor, e o leitor de tela anuncia o titulo, a explicacao e se esta selecionada.
-class CartaoOpcao extends StatelessWidget {
-  final IconData? icone;
-  final String titulo;
-  final String? subtitulo;
-  final bool selecionada;
+class OptionCard extends StatelessWidget {
+  final IconData? icon;
+  final String title;
+  final String? subtitle;
+  final bool selected;
   final VoidCallback onTap;
 
-  const CartaoOpcao({
+  const OptionCard({
     super.key,
-    this.icone,
-    required this.titulo,
-    this.subtitulo,
-    this.selecionada = false,
+    this.icon,
+    required this.title,
+    this.subtitle,
+    this.selected = false,
     required this.onTap,
   });
 
@@ -433,19 +441,19 @@ class CartaoOpcao extends StatelessWidget {
     final t = Iamp.de(context);
     return Card(
       clipBehavior: Clip.antiAlias,
-      color: selecionada ? t.fundoDestaque : null,
+      color: selected ? t.highlightBackground : null,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(t.raio),
-        side: BorderSide(color: selecionada ? t.destaque : t.borda, width: selecionada ? 2 : 1),
+        borderRadius: BorderRadius.circular(t.radius),
+        side: BorderSide(color: selected ? t.highlight : t.border, width: selected ? 2 : 1),
       ),
       child: Semantics(
-        selected: selecionada,
+        selected: selected,
         button: true,
         child: ListTile(
-          leading: icone == null ? null : Icon(icone, size: t.iconeGrande),
-          title: Text(titulo),
-          subtitle: subtitulo == null ? null : Text(subtitulo!),
-          trailing: Icon(selecionada ? Icons.check_circle : Icons.chevron_right, color: t.destaque),
+          leading: icon == null ? null : Icon(icon, size: t.largeIcon),
+          title: Text(title),
+          subtitle: subtitle == null ? null : Text(subtitle!),
+          trailing: Icon(selected ? Icons.check_circle : Icons.chevron_right, color: t.highlight),
           onTap: onTap,
         ),
       ),
@@ -455,23 +463,23 @@ class CartaoOpcao extends StatelessWidget {
 
 /// Numero que "conta" ate o valor quando aparece e quando muda (ex.: total da casa).
 /// O leitor de tela ouve so o valor final, nao os numeros intermediarios.
-class ValorAnimado extends StatelessWidget {
-  final double valor;
-  final String Function(double) formatar;
-  final TextStyle estilo;
+class AnimatedValue extends StatelessWidget {
+  final double value;
+  final String Function(double) format;
+  final TextStyle style;
 
-  const ValorAnimado(this.valor, {super.key, required this.formatar, required this.estilo});
+  const AnimatedValue(this.value, {super.key, required this.format, required this.style});
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: formatar(valor),
+      label: format(value),
       excludeSemantics: true,
       child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: valor),
+        tween: Tween(begin: 0, end: value),
         duration: const Duration(milliseconds: 700),
         curve: Curves.easeOutCubic,
-        builder: (_, v, _) => Text(formatar(v), style: estilo, textAlign: TextAlign.center),
+        builder: (_, v, _) => Text(format(v), style: style, textAlign: TextAlign.center),
       ),
     );
   }
@@ -479,40 +487,40 @@ class ValorAnimado extends StatelessWidget {
 
 /// Valor principal da tela: fundo escuro, borda e brilho suave na cor do destaque.
 /// Amarelo para gasto, verde para economia.
-class CartaoDestaque extends StatelessWidget {
-  final String titulo;
-  final double valor;
-  final String Function(double) formatar;
-  final String? rodape;
+class HighlightCard extends StatelessWidget {
+  final String title;
+  final double value;
+  final String Function(double) format;
+  final String? footer;
   final Color? cor;
 
-  const CartaoDestaque({
+  const HighlightCard({
     super.key,
-    required this.titulo,
-    required this.valor,
-    required this.formatar,
-    this.rodape,
+    required this.title,
+    required this.value,
+    required this.format,
+    this.footer,
     this.cor,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
-    final c = cor ?? t.destaque;
+    final c = cor ?? t.highlight;
     return MergeSemantics(
       child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.symmetric(vertical: Espaco.pp),
-        padding: const EdgeInsets.all(Espaco.g),
-        decoration: t.cartaoDestaque(c),
+        margin: const EdgeInsets.symmetric(vertical: Spacing.pp),
+        padding: const EdgeInsets.all(Spacing.g),
+        decoration: t.highlightCard(c),
         child: Column(
           children: [
-            Text(titulo, style: t.rotulo, textAlign: TextAlign.center),
-            const SizedBox(height: Espaco.pp),
-            ValorAnimado(valor, formatar: formatar, estilo: t.valor.copyWith(color: c)),
-            if (rodape != null) ...[
-              const SizedBox(height: Espaco.pp),
-              Text(rodape!, style: t.secundario, textAlign: TextAlign.center),
+            Text(title, style: t.label, textAlign: TextAlign.center),
+            const SizedBox(height: Spacing.pp),
+            AnimatedValue(value, format: format, style: t.value.copyWith(color: c)),
+            if (footer != null) ...[
+              const SizedBox(height: Spacing.pp),
+              Text(footer!, style: t.secondary, textAlign: TextAlign.center),
             ],
           ],
         ),
@@ -522,12 +530,12 @@ class CartaoDestaque extends StatelessWidget {
 }
 
 /// Cartao pequeno: rotulo discreto em cima, valor em destaque embaixo.
-class CartaoInfo extends StatelessWidget {
-  final String titulo;
-  final String valor;
-  final String? detalhe;
+class InfoCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String? detail;
 
-  const CartaoInfo(this.titulo, this.valor, {super.key, this.detalhe});
+  const InfoCard(this.title, this.value, {super.key, this.detail});
 
   @override
   Widget build(BuildContext context) {
@@ -535,13 +543,13 @@ class CartaoInfo extends StatelessWidget {
     return MergeSemantics(
       child: Card(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Espaco.pm, vertical: Espaco.m),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.pm, vertical: Spacing.m),
           child: Column(
             children: [
-              Text(titulo, style: t.secundario, textAlign: TextAlign.center),
-              const SizedBox(height: Espaco.pp),
-              Text(valor, style: t.numero, textAlign: TextAlign.center),
-              if (detalhe != null) Text(detalhe!, style: t.secundario, textAlign: TextAlign.center),
+              Text(title, style: t.secondary, textAlign: TextAlign.center),
+              const SizedBox(height: Spacing.pp),
+              Text(value, style: t.number, textAlign: TextAlign.center),
+              if (detail != null) Text(detail!, style: t.secondary, textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -551,10 +559,10 @@ class CartaoInfo extends StatelessWidget {
 }
 
 /// Avisos da API (impostos, estimativas, dados sinteticos...).
-class ListaAvisos extends StatelessWidget {
-  final List<String> avisos;
+class NoticeList extends StatelessWidget {
+  final List<String> notices;
 
-  const ListaAvisos(this.avisos, {super.key});
+  const NoticeList(this.notices, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -562,18 +570,18 @@ class ListaAvisos extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final aviso in avisos)
+        for (final notice in notices)
           Padding(
-            padding: const EdgeInsets.only(bottom: Espaco.p),
+            padding: const EdgeInsets.only(bottom: Spacing.p),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Icon(Icons.info_outline, size: t.icone - 4, color: t.destaque),
+                  child: Icon(Icons.info_outline, size: t.icon - 4, color: t.highlight),
                 ),
-                const SizedBox(width: Espaco.p),
-                Expanded(child: Text(aviso, style: t.secundario)),
+                const SizedBox(width: Spacing.p),
+                Expanded(child: Text(notice, style: t.secondary)),
               ],
             ),
           ),
@@ -583,30 +591,30 @@ class ListaAvisos extends StatelessWidget {
 }
 
 /// Titulo de secao (em amarelo, com o leitor de tela anunciando como cabecalho).
-class Titulo extends StatelessWidget {
-  final String texto;
+class SectionTitle extends StatelessWidget {
+  final String text;
 
-  const Titulo(this.texto, {super.key});
+  const SectionTitle(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Padding(
-      padding: const EdgeInsets.only(top: Espaco.g, bottom: Espaco.p),
+      padding: const EdgeInsets.only(top: Spacing.g, bottom: Spacing.p),
       child: Semantics(
         header: true,
-        child: Text(texto, style: t.forte.copyWith(color: t.destaque)),
+        child: Text(text, style: t.strong.copyWith(color: t.highlight)),
       ),
     );
   }
 }
 
 /// Erro com icone e texto (nao so a cor vermelha) e, quando da, o botao de tentar de novo.
-class MensagemErro extends StatelessWidget {
-  final String mensagem;
-  final VoidCallback? tentarDeNovo;
+class ErrorMessage extends StatelessWidget {
+  final String message;
+  final VoidCallback? tryAgain;
 
-  const MensagemErro(this.mensagem, {super.key, this.tentarDeNovo});
+  const ErrorMessage(this.message, {super.key, this.tryAgain});
 
   @override
   Widget build(BuildContext context) {
@@ -614,13 +622,13 @@ class MensagemErro extends StatelessWidget {
     return Semantics(
       liveRegion: true,
       child: Card(
-        color: t.fundoErro,
+        color: t.errorBackground,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(t.raio),
-          side: BorderSide(color: t.alerta.withValues(alpha: 0.7)),
+          borderRadius: BorderRadius.circular(t.radius),
+          side: BorderSide(color: t.alert.withValues(alpha: 0.7)),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(Espaco.m),
+          padding: const EdgeInsets.all(Spacing.m),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -628,16 +636,16 @@ class MensagemErro extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.error_outline, color: t.alerta),
-                  const SizedBox(width: Espaco.pm),
-                  Expanded(child: Text(mensagem, style: t.corpo)),
+                  Icon(Icons.error_outline, color: t.alert),
+                  const SizedBox(width: Spacing.pm),
+                  Expanded(child: Text(message, style: t.body)),
                 ],
               ),
-              if (tentarDeNovo != null)
+              if (tryAgain != null)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
-                    onPressed: tentarDeNovo,
+                    onPressed: tryAgain,
                     icon: const Icon(Icons.refresh),
                     label: Text(tr('Tentar de novo', 'Try again')),
                   ),
@@ -651,23 +659,62 @@ class MensagemErro extends StatelessWidget {
 }
 
 /// Carregando, com uma frase do que esta acontecendo (nao so a rodinha).
-class Carregando extends StatelessWidget {
-  final String? texto; // padrao: "Carregando..."
+class Loading extends StatefulWidget {
+  final String? text; // padrao: "Carregando..."
 
-  const Carregando({super.key, this.texto});
+  const Loading({super.key, this.text});
+
+  /// Depois desse tempo carregando, explica que o servidor pode estar acordando (Render gratis).
+  static const waitBeforeHint = Duration(seconds: 8);
+
+  @override
+  State<Loading> createState() => _LoadingState();
+}
+
+class _LoadingState extends State<Loading> {
+  Timer? _timer;
+  bool _slow = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(Loading.waitBeforeHint, () {
+      if (mounted) setState(() => _slow = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(Espaco.g),
+        padding: const EdgeInsets.all(Spacing.g),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const CircularProgressIndicator(),
-            const SizedBox(height: Espaco.m),
-            Text(texto ?? tr('Carregando...', 'Loading...'), style: t.secundario, textAlign: TextAlign.center),
+            const SizedBox(height: Spacing.m),
+            Text(widget.text ?? tr('Carregando...', 'Loading...'), style: t.secondary, textAlign: TextAlign.center),
+            if (_slow) ...[
+              const SizedBox(height: Spacing.p),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  tr(
+                    'O servidor estava em repouso e está acordando. Da primeira vez pode levar até 1 minuto.',
+                    'The server was asleep and is waking up. The first time it can take up to 1 minute.',
+                  ),
+                  style: t.secondary,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -676,22 +723,22 @@ class Carregando extends StatelessWidget {
 }
 
 /// Botao principal que vira "feito" com animacao (ex.: Adicionar -> Na sua casa).
-class BotaoComConfirmacao extends StatelessWidget {
-  final bool feito;
-  final String textoAcao;
-  final IconData iconeAcao;
-  final VoidCallback onAcao;
-  final String textoFeito;
-  final VoidCallback onFeito;
+class ConfirmButton extends StatelessWidget {
+  final bool done;
+  final String actionText;
+  final IconData actionIcon;
+  final VoidCallback onAction;
+  final String doneText;
+  final VoidCallback onDone;
 
-  const BotaoComConfirmacao({
+  const ConfirmButton({
     super.key,
-    required this.feito,
-    required this.textoAcao,
-    required this.iconeAcao,
-    required this.onAcao,
-    required this.textoFeito,
-    required this.onFeito,
+    required this.done,
+    required this.actionText,
+    required this.actionIcon,
+    required this.onAction,
+    required this.doneText,
+    required this.onDone,
   });
 
   @override
@@ -699,73 +746,73 @@ class BotaoComConfirmacao extends StatelessWidget {
     final t = Iamp.de(context);
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 350),
-      transitionBuilder: (filho, animacao) => ScaleTransition(
-        scale: Tween(begin: 0.9, end: 1.0).animate(CurvedAnimation(parent: animacao, curve: Curves.easeOutBack)),
-        child: FadeTransition(opacity: animacao, child: filho),
+      transitionBuilder: (child, animation) => ScaleTransition(
+        scale: Tween(begin: 0.9, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutBack)),
+        child: FadeTransition(opacity: animation, child: child),
       ),
-      child: feito
+      child: done
           ? OutlinedButton.icon(
               key: const ValueKey('feito'),
-              style: OutlinedButton.styleFrom(side: BorderSide(color: t.economia)),
-              onPressed: onFeito,
-              icon: Icon(Icons.check_circle, color: t.economia),
-              label: Text(textoFeito),
+              style: OutlinedButton.styleFrom(side: BorderSide(color: t.savings)),
+              onPressed: onDone,
+              icon: Icon(Icons.check_circle, color: t.savings),
+              label: Text(doneText),
             )
           : FilledButton.icon(
               key: const ValueKey('acao'),
-              onPressed: onAcao,
-              icon: Icon(iconeAcao),
-              label: Text(textoAcao),
+              onPressed: onAction,
+              icon: Icon(actionIcon),
+              label: Text(actionText),
             ),
     );
   }
 }
 
 /// Barra de "quanto do total" com o numero escrito ao lado (nao so o tamanho da barra).
-class BarraParte extends StatelessWidget {
-  final double fracao;
-  final String descricao;
+class PartBar extends StatelessWidget {
+  final double fraction;
+  final String description;
 
-  const BarraParte(this.fracao, {super.key, required this.descricao});
+  const PartBar(this.fraction, {super.key, required this.description});
 
   @override
   Widget build(BuildContext context) {
     final t = Iamp.de(context);
     return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: fracao.clamp(0.0, 1.0)),
+      tween: Tween(begin: 0, end: fraction.clamp(0.0, 1.0)),
       duration: const Duration(milliseconds: 600),
       curve: Curves.easeOutCubic,
       builder: (_, v, _) => ClipRRect(
-        borderRadius: BorderRadius.circular(t.raioPequeno / 2),
-        child: LinearProgressIndicator(value: v, minHeight: t.barraProgresso, semanticsLabel: descricao),
+        borderRadius: BorderRadius.circular(t.smallRadius / 2),
+        child: LinearProgressIndicator(value: v, minHeight: t.progressBar, semanticsLabel: description),
       ),
     );
   }
 }
 
 /// Dois blocos lado a lado com a mesma altura; com fonte grande, um embaixo do outro.
-class LadoALado extends StatelessWidget {
-  final Widget esquerda;
-  final Widget direita;
-  final Widget? meio;
+class SideBySide extends StatelessWidget {
+  final Widget left;
+  final Widget right;
+  final Widget? middle;
 
-  const LadoALado(this.esquerda, this.direita, {super.key, this.meio});
+  const SideBySide(this.left, this.right, {super.key, this.middle});
 
   @override
   Widget build(BuildContext context) {
-    if (fonteGrande(context)) {
+    if (largeFont(context)) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [esquerda, if (meio != null) Center(child: RotatedBox(quarterTurns: 1, child: meio)), direita],
+        children: [left, if (middle != null) Center(child: RotatedBox(quarterTurns: 1, child: middle)), right],
       );
     }
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(child: esquerda),
-          meio == null ? const SizedBox(width: Espaco.p) : Center(child: meio),
-          Expanded(child: direita),
+          Expanded(child: left),
+          middle == null ? const SizedBox(width: Spacing.p) : Center(child: middle),
+          Expanded(child: right),
         ],
       ),
     );

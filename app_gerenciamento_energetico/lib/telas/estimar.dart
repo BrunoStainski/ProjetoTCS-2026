@@ -13,9 +13,9 @@ import '../tema.dart';
 import 'comum.dart';
 import 'distribuidora.dart';
 
-enum Grupo { pesado, portatil }
+enum Group { heavy, smallAppliance }
 
-Map<String, String> get tiposDeGeladeira => {
+Map<String, String> get fridgeTypes => {
   'duplex': tr('Geladeira duplex (2 portas)', 'Two-door fridge (top freezer)'),
   '1_porta': tr('Geladeira 1 porta', 'One-door fridge'),
   'frigobar': tr('Frigobar', 'Mini fridge'),
@@ -24,101 +24,102 @@ Map<String, String> get tiposDeGeladeira => {
 };
 
 /// Uma pergunta da estimativa. Sem `validar`, e uma escolha: tocar numa opcao ja avanca.
-class _Pergunta {
-  final String titulo;
-  final String? ajuda;
-  final List<Widget> campos;
-  final String? Function()? validar;
-  final String? textoPular;
-  final VoidCallback? aoPular;
+class _Question {
+  final String title;
+  final String? help;
+  final List<Widget> fields;
+  final String? Function()? validate;
+  final String? skipText;
+  final VoidCallback? onSkip;
 
-  const _Pergunta(this.titulo, {this.ajuda, required this.campos, this.validar, this.textoPular, this.aoPular});
+  const _Question(this.title, {this.help, required this.fields, this.validate, this.skipText, this.onSkip});
 }
 
-class TelaEstimar extends StatefulWidget {
-  final Future<List<CategoriaEstimavel>> Function() carregarCategorias;
-  final Future<List<Resistivo>> Function() carregarResistivos;
+class EstimateScreen extends StatefulWidget {
+  final Future<List<EstimableCategory>> Function() loadCategories;
+  final Future<List<Resistive>> Function() loadResistive;
 
-  const TelaEstimar({
+  const EstimateScreen({
     super.key,
-    this.carregarCategorias = Api.categoriasEstimaveis,
-    this.carregarResistivos = Api.resistivos,
+    this.loadCategories = Api.estimableCategories,
+    this.loadResistive = Api.resistive,
   });
 
   @override
-  State<TelaEstimar> createState() => _TelaEstimarState();
+  State<EstimateScreen> createState() => _EstimateScreenState();
 }
 
-class _TelaEstimarState extends State<TelaEstimar> {
-  int _indice = 0;
-  String? _erro;
-  bool _falhouCarga = false;
+class _EstimateScreenState extends State<EstimateScreen> {
+  int _index = 0;
+  bool _forward = true; // sentido da ultima troca de pergunta (define de que lado a proxima entra)
+  String? _error;
+  bool _failedLoad = false;
 
-  Grupo? _grupo;
-  List<CategoriaEstimavel>? _categorias;
-  CategoriaEstimavel? _categoria;
+  Group? _group;
+  List<EstimableCategory>? _categories;
+  EstimableCategory? _category;
 
-  String? _tipoGeladeira;
+  String? _fridgeType;
   bool? _frostFree;
-  final _congelador = TextEditingController();
-  final _ano = TextEditingController();
+  final _freezer = TextEditingController();
+  final _year = TextEditingController();
 
-  FormaDeInformar? _forma; // numero que a pessoa achou no aparelho
-  bool _semNumero = false; // nao achou: usa tipo e tamanho
-  String? _tipo;
-  double? _tamanho;
-  bool _outroTamanho = false;
-  final _medida = TextEditingController();
-  final _etiqueta = TextEditingController();
-  final _tempo = ControleTempo();
-  final _ciclos = TextEditingController();
-  String? _velocidade;
-  final _nome = TextEditingController();
+  EntryMode? _shape; // numero que a pessoa achou no aparelho
+  bool _withoutNumber = false; // nao achou: usa tipo e tamanho
+  String? _type;
+  double? _size;
+  bool _otherSize = false;
+  final _measure = TextEditingController();
+  final _label = TextEditingController();
+  final _time = TimeControl();
+  final _cycles = TextEditingController();
+  String? _speed;
+  final _name = TextEditingController();
 
-  List<Resistivo>? _resistivos;
-  Resistivo? _resistivo;
-  final _potencia = TextEditingController();
-  final _tempoPortatil = ControleTempo();
-  final _dias = TextEditingController();
+  List<Resistive>? _resistiveItems;
+  Resistive? _resistive;
+  final _power = TextEditingController();
+  final _smallApplianceTime = TimeControl();
+  final _days = TextEditingController();
 
-  bool get _geladeira => _categoria?.especial ?? false;
-  bool get _soFreezer => _tipoGeladeira?.startsWith('freezer') ?? false;
-  bool get _comPotencia => _forma?.campo == 'potencia_w';
+  bool get _fridge => _category?.special ?? false;
+  bool get _freezerOnly => _fridgeType?.startsWith('freezer') ?? false;
+  bool get _withPower => _shape?.field == 'potencia_w';
 
   @override
   void initState() {
     super.initState();
-    _carregar();
+    _load();
   }
 
   @override
   void dispose() {
-    for (final c in [_congelador, _ano, _medida, _etiqueta, _ciclos, _nome, _potencia, _dias]) {
+    for (final c in [_freezer, _year, _measure, _label, _cycles, _name, _power, _days]) {
       c.dispose();
     }
-    _tempo.dispose();
-    _tempoPortatil.dispose();
+    _time.dispose();
+    _smallApplianceTime.dispose();
     super.dispose();
   }
 
-  Future<void> _carregar() async {
+  Future<void> _load() async {
     setState(() {
-      _erro = null;
-      _falhouCarga = false;
+      _error = null;
+      _failedLoad = false;
     });
     try {
-      final categorias = await widget.carregarCategorias();
-      final resistivos = await widget.carregarResistivos();
+      final categories = await widget.loadCategories();
+      final resistive = await widget.loadResistive();
       if (!mounted) return;
       setState(() {
-        _categorias = categorias;
-        _resistivos = resistivos;
+        _categories = categories;
+        _resistiveItems = resistive;
       });
     } catch (_) {
       if (mounted) {
         setState(() {
-          _falhouCarga = true;
-          _erro = tr(
+          _failedLoad = true;
+          _error = tr(
             'Não consegui carregar a lista de aparelhos. Confira a internet e tente de novo.',
             'Could not load the list of appliances. Check your internet connection and try again.',
           );
@@ -129,275 +130,277 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   // ---------- respostas ----------
 
-  void _escolherGrupo(Grupo g) {
-    if (_grupo != g) {
-      _categoria = null;
-      _resistivo = null;
+  void _chooseGroup(Group g) {
+    if (_group != g) {
+      _category = null;
+      _resistive = null;
     }
-    _grupo = g;
-    _avancar();
+    _group = g;
+    _advance();
   }
 
-  void _escolherCategoria(CategoriaEstimavel c) {
-    if (_categoria?.categoria != c.categoria) {
-      _forma = c.valorObrigatorio && c.formas.isNotEmpty ? c.formas.first : null;
-      _semNumero = false;
-      _tipo = null;
-      _tamanho = null;
-      _outroTamanho = false;
-      _tipoGeladeira = null;
+  void _chooseCategory(EstimableCategory c) {
+    if (_category?.category != c.category) {
+      _shape = c.requiredValue && c.shapes.isNotEmpty ? c.shapes.first : null;
+      _withoutNumber = false;
+      _type = null;
+      _size = null;
+      _otherSize = false;
+      _fridgeType = null;
       _frostFree = null;
-      _medida.clear();
-      _etiqueta.clear();
-      final uso = c.uso;
-      _tempo.definir(uso.pergunta == 'horas' ? (uso.padrao as num?)?.toDouble() : null);
-      _ciclos.text = uso.pergunta == 'ciclos' && uso.padrao != null
-          ? numero((uso.padrao as num).toDouble(), casas: 0)
+      _measure.clear();
+      _label.clear();
+      final usage = c.usage;
+      _time.define(usage.question == 'horas' ? (usage.defaults as num?)?.toDouble() : null);
+      _cycles.text = usage.question == 'ciclos' && usage.defaults != null
+          ? number((usage.defaults as num).toDouble(), homes: 0)
           : '';
-      _velocidade = uso.pergunta == 'velocidade' ? uso.padrao as String? : null;
+      _speed = usage.question == 'velocidade' ? usage.defaults as String? : null;
     }
-    _categoria = c;
-    _avancar();
+    _category = c;
+    _advance();
   }
 
-  void _escolherResistivo(Resistivo r) {
-    if (_resistivo?.categoria != r.categoria) {
-      _potencia.clear();
-      _tempoPortatil.definir(r.horasDia);
-      _dias.text = numero(r.diasMes, casas: 0);
+  void _chooseResistive(Resistive r) {
+    if (_resistive?.category != r.category) {
+      _power.clear();
+      _smallApplianceTime.define(r.dailyHours);
+      _days.text = number(r.daysPerMonth, homes: 0);
     }
-    _resistivo = r;
-    _avancar();
+    _resistive = r;
+    _advance();
   }
 
-  void _escolherForma(FormaDeInformar? forma) {
-    if (forma?.campo != _forma?.campo) _etiqueta.clear();
-    _forma = forma;
-    _semNumero = forma == null;
-    _avancar();
+  void _chooseShape(EntryMode? shape) {
+    if (shape?.field != _shape?.field) _label.clear();
+    _shape = shape;
+    _withoutNumber = shape == null;
+    _advance();
   }
 
-  void _escolherTamanho(double? tamanho) {
-    _tamanho = tamanho;
-    _outroTamanho = tamanho == null;
-    _avancar();
+  void _chooseSize(double? size) {
+    _size = size;
+    _otherSize = size == null;
+    _advance();
   }
 
-  void _escolher(VoidCallback mudar) {
-    mudar();
-    _avancar();
+  void _choose(VoidCallback applyChange) {
+    applyChange();
+    _advance();
   }
 
-  double? _opcional(TextEditingController c) => c.text.trim().isEmpty ? null : lerNumero(c.text);
+  double? _optional(TextEditingController c) => c.text.trim().isEmpty ? null : readNumber(c.text);
 
-  bool _invalido(TextEditingController c, {double minimo = 0, double maximo = double.infinity}) {
+  bool _invalid(TextEditingController c, {double minimum = 0, double maximum = double.infinity}) {
     if (c.text.trim().isEmpty) return false;
-    final v = lerNumero(c.text);
-    return v == null || v <= minimo || v > maximo;
+    final v = readNumber(c.text);
+    return v == null || v <= minimum || v > maximum;
   }
 
-  (String?, String?) _marcaEModelo() {
-    final partes = _nome.text.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
-    if (partes.isEmpty) return (null, null);
-    return (partes.first, partes.length > 1 ? partes.skip(1).join(' ') : null);
+  (String?, String?) _brandAndModel() {
+    final parts = _name.text.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return (null, null);
+    return (parts.first, parts.length > 1 ? parts.skip(1).join(' ') : null);
   }
 
   // ---------- navegacao entre as perguntas ----------
 
-  void _avancar() {
-    final ultima = _indice >= _perguntas().length - 1;
+  void _advance() {
+    final last = _index >= _questions().length - 1;
     setState(() {
-      _erro = null;
-      if (!ultima) _indice++;
+      _error = null;
+      _forward = true;
+      if (!last) _index++;
     });
-    if (ultima) _concluir();
+    if (last) _finish();
   }
 
-  void _voltar() => setState(() {
-    _erro = null;
-    _indice--;
+  void _back() => setState(() {
+    _error = null;
+    _forward = false;
+    _index--;
   });
 
-  void _continuar(_Pergunta p) {
-    final erro = p.validar!();
-    if (erro != null) {
-      setState(() => _erro = erro);
+  void _continue(_Question p) {
+    final error = p.validate!();
+    if (error != null) {
+      setState(() => _error = error);
       return;
     }
-    _avancar();
+    _advance();
   }
 
-  void _pular(_Pergunta p) {
-    p.aoPular?.call();
-    _avancar();
+  void _skip(_Question p) {
+    p.onSkip?.call();
+    _advance();
   }
 
-  void _concluir() {
-    final consulta = switch (_grupo) {
-      Grupo.portatil => _consultaPortatil(),
-      _ => _geladeira ? _consultaGeladeira() : _consultaPesado(_categoria!),
+  void _finish() {
+    final query = switch (_group) {
+      Group.smallAppliance => _smallApplianceQuery(),
+      _ => _fridge ? _fridgeQuery() : _heavyQuery(_category!),
     };
-    Navigator.push(context, MaterialPageRoute(builder: (_) => TelaEstado(consulta: consulta)));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => StateScreen(query: query)));
   }
 
-  Consulta _consultaGeladeira() {
-    final (marca, modelo) = _marcaEModelo();
-    return Consulta(
-      Aparelho(id: 0, categoria: 'refrigerador', marca: marca ?? tr('Geladeira', 'Fridge'), modelo: modelo ?? ''),
-      estimativa: Estimativa(rotaGeladeira, {
-        'tipo': _tipoGeladeira,
+  Query _fridgeQuery() {
+    final (brand, model) = _brandAndModel();
+    return Query(
+      Appliance(id: 0, category: 'refrigerador', brand: brand ?? tr('Geladeira', 'Fridge'), model: model ?? ''),
+      estimation: Estimate(fridgeRoute, {
+        'tipo': _fridgeType,
         'frost_free': _frostFree ?? false,
-        'volume_total_l': lerNumero(_medida.text),
-        'volume_congelador_l': _soFreezer ? null : _opcional(_congelador),
-        'ano_compra': int.tryParse(_ano.text.trim()),
-        'kwh_etiqueta': _opcional(_etiqueta),
-        'marca': marca,
-        'modelo': modelo,
+        'volume_total_l': readNumber(_measure.text),
+        'volume_congelador_l': _freezerOnly ? null : _optional(_freezer),
+        'ano_compra': int.tryParse(_year.text.trim()),
+        'kwh_etiqueta': _optional(_label),
+        'marca': brand,
+        'modelo': model,
       }),
     );
   }
 
-  Consulta _consultaPesado(CategoriaEstimavel c) {
-    final (marca, modelo) = _marcaEModelo();
-    final pedeHoras = c.uso.pergunta == 'horas' || c.uso.perguntarHoras;
-    return Consulta(
-      Aparelho(id: 0, categoria: c.categoria, marca: marca ?? c.nome, modelo: modelo ?? ''),
-      estimativa: Estimativa(rotaEstimado, {
-        'categoria': c.categoria,
-        'tipo': _tipo,
-        'medida': c.medida == null ? null : (_outroTamanho ? _opcional(_medida) : _tamanho),
-        'valor_etiqueta': _forma == null ? null : _opcional(_etiqueta),
-        'campo_etiqueta': _forma?.campo,
-        'marca': marca,
-        'modelo': modelo,
+  Query _heavyQuery(EstimableCategory c) {
+    final (brand, model) = _brandAndModel();
+    final asksHours = c.usage.question == 'horas' || c.usage.askHours;
+    return Query(
+      Appliance(id: 0, category: c.category, brand: brand ?? c.name, model: model ?? ''),
+      estimation: Estimate(estimatedRoute, {
+        'categoria': c.category,
+        'tipo': _type,
+        'medida': c.measure == null ? null : (_otherSize ? _optional(_measure) : _size),
+        'valor_etiqueta': _shape == null ? null : _optional(_label),
+        'campo_etiqueta': _shape?.field,
+        'marca': brand,
+        'modelo': model,
       }),
-      horasDia: pedeHoras ? _tempo.horasDia : null,
-      ciclosMes: c.uso.pergunta == 'ciclos' ? lerNumero(_ciclos.text) : null,
-      velocidade: c.uso.pergunta == 'velocidade' && _semNumero ? _velocidade : null,
+      dailyHours: asksHours ? _time.dailyHours : null,
+      monthlyCycles: c.usage.question == 'ciclos' ? readNumber(_cycles.text) : null,
+      speed: c.usage.question == 'velocidade' && _withoutNumber ? _speed : null,
     );
   }
 
-  Consulta _consultaPortatil() {
-    final r = _resistivo!;
-    return Consulta(
-      Aparelho(id: 0, categoria: r.categoria, marca: r.nome, modelo: ''),
-      estimativa: Estimativa(rotaResistivo, {
-        'categoria': r.categoria,
-        'potencia_w': _opcional(_potencia),
-        'dias_mes': _opcional(_dias),
+  Query _smallApplianceQuery() {
+    final r = _resistive!;
+    return Query(
+      Appliance(id: 0, category: r.category, brand: r.name, model: ''),
+      estimation: Estimate(resistiveRoute, {
+        'categoria': r.category,
+        'potencia_w': _optional(_power),
+        'dias_mes': _optional(_days),
       }),
-      horasDia: _tempoPortatil.horasDia,
+      dailyHours: _smallApplianceTime.dailyHours,
     );
   }
 
   // ---------- as perguntas ----------
 
-  List<_Pergunta> _perguntas() {
+  List<_Question> _questions() {
     return [
-      _perguntaGrupo(),
-      if (_grupo == Grupo.portatil) ..._perguntasPortatil(),
-      if (_grupo == Grupo.pesado) ...[
-        _perguntaAparelhoPesado(),
-        if (_categoria != null) ...(_geladeira ? _perguntasGeladeira() : _perguntasCategoria(_categoria!)),
-        if (_categoria != null) _perguntaNome(),
+      _groupQuestion(),
+      if (_group == Group.smallAppliance) ..._smallApplianceQuestions(),
+      if (_group == Group.heavy) ...[
+        _heavyApplianceQuestion(),
+        if (_category != null) ...(_fridge ? _fridgeQuestions() : _categoryQuestions(_category!)),
+        if (_category != null) _nameQuestion(),
       ],
     ];
   }
 
-  _Pergunta _perguntaGrupo() => _Pergunta(
+  _Question _groupQuestion() => _Question(
     tr('Que tipo de aparelho é?', 'What kind of appliance is it?'),
-    ajuda: tr(
+    help: tr(
       'Para aparelhos que não estão no catálogo do Inmetro. Calculamos um gasto aproximado '
           'com o que você souber.',
       "For appliances that are not in Inmetro's catalog. We calculate an approximate cost "
           'with whatever you know.',
     ),
-    campos: [
-      CartaoOpcao(
-        icone: Icons.kitchen,
-        titulo: tr('Eletrodoméstico grande', 'Large appliance'),
-        subtitulo: tr(
+    fields: [
+      OptionCard(
+        icon: Icons.kitchen,
+        title: tr('Eletrodoméstico grande', 'Large appliance'),
+        subtitle: tr(
           'Geladeira, máquina de lavar, ar-condicionado, chuveiro, TV...',
           'Fridge, washing machine, air conditioner, electric shower, TV...',
         ),
-        selecionada: _grupo == Grupo.pesado,
-        onTap: () => _escolherGrupo(Grupo.pesado),
+        selected: _group == Group.heavy,
+        onTap: () => _chooseGroup(Group.heavy),
       ),
-      CartaoOpcao(
-        icone: Icons.blender_outlined,
-        titulo: tr('Eletroportátil', 'Small appliance'),
-        subtitulo: tr(
+      OptionCard(
+        icon: Icons.blender_outlined,
+        title: tr('Eletroportátil', 'Small appliance'),
+        subtitle: tr(
           'Air fryer, secador de cabelo, ferro de passar, cafeteira...',
           'Air fryer, hair dryer, clothes iron, coffee maker...',
         ),
-        selecionada: _grupo == Grupo.portatil,
-        onTap: () => _escolherGrupo(Grupo.portatil),
+        selected: _group == Group.smallAppliance,
+        onTap: () => _chooseGroup(Group.smallAppliance),
       ),
     ],
   );
 
-  _Pergunta _perguntaAparelhoPesado() => _Pergunta(
+  _Question _heavyApplianceQuestion() => _Question(
     tr('Qual é o aparelho?', 'Which appliance is it?'),
-    campos: [
-      for (final c in _categorias!)
-        CartaoOpcao(
-          icone: iconeDaCategoria(c.categoria),
-          titulo: c.nome,
-          selecionada: _categoria?.categoria == c.categoria,
-          onTap: () => _escolherCategoria(c),
+    fields: [
+      for (final c in _categories!)
+        OptionCard(
+          icon: categoryIcon(c.category),
+          title: c.name,
+          selected: _category?.category == c.category,
+          onTap: () => _chooseCategory(c),
         ),
     ],
   );
 
-  List<_Pergunta> _perguntasGeladeira() => [
-    _Pergunta(
+  List<_Question> _fridgeQuestions() => [
+    _Question(
       tr('Qual é o tipo?', 'What type is it?'),
-      campos: [
-        for (final MapEntry(key: tipo, value: nome) in tiposDeGeladeira.entries)
-          CartaoOpcao(
-            titulo: nome,
-            selecionada: _tipoGeladeira == tipo,
-            onTap: () => _escolher(() => _tipoGeladeira = tipo),
+      fields: [
+        for (final MapEntry(key: kind, value: name) in fridgeTypes.entries)
+          OptionCard(
+            title: name,
+            selected: _fridgeType == kind,
+            onTap: () => _choose(() => _fridgeType = kind),
           ),
       ],
     ),
-    _Pergunta(
+    _Question(
       tr('Ela forma gelo nas paredes?', 'Does ice build up on the walls?'),
-      ajuda: tr(
+      help: tr(
         'Quem não forma gelo é "frost-free" e não precisa degelar.',
         'If no ice builds up, it is "frost-free" and never needs defrosting.',
       ),
-      campos: [
-        CartaoOpcao(
-          titulo: tr('Não forma gelo (frost-free)', 'No ice builds up (frost-free)'),
-          subtitulo: tr('Não precisa degelar.', 'No defrosting needed.'),
-          selecionada: _frostFree == true,
-          onTap: () => _escolher(() => _frostFree = true),
+      fields: [
+        OptionCard(
+          title: tr('Não forma gelo (frost-free)', 'No ice builds up (frost-free)'),
+          subtitle: tr('Não precisa degelar.', 'No defrosting needed.'),
+          selected: _frostFree == true,
+          onTap: () => _choose(() => _frostFree = true),
         ),
-        CartaoOpcao(
-          titulo: tr('Forma gelo', 'Ice builds up'),
-          subtitulo: tr('Precisa degelar de vez em quando.', 'Needs defrosting now and then.'),
-          selecionada: _frostFree == false,
-          onTap: () => _escolher(() => _frostFree = false),
+        OptionCard(
+          title: tr('Forma gelo', 'Ice builds up'),
+          subtitle: tr('Precisa degelar de vez em quando.', 'Needs defrosting now and then.'),
+          selected: _frostFree == false,
+          onTap: () => _choose(() => _frostFree = false),
         ),
       ],
     ),
-    _Pergunta(
+    _Question(
       tr('Qual é a capacidade total?', 'What is the total capacity?'),
-      ajuda: tr(
+      help: tr(
         'Em litros. Está na etiqueta dentro da porta ou no manual.',
         'In liters. It is on the label inside the door or in the manual.',
       ),
-      campos: [
-        _campo(
-          _medida,
+      fields: [
+        _field(
+          _measure,
           tr('Capacidade total', 'Total capacity'),
-          sufixo: tr('litros', 'liters'),
-          exemplo: tr('Ex.: 407', 'E.g.: 407'),
+          suffix: tr('litros', 'liters'),
+          example: tr('Ex.: 407', 'E.g.: 407'),
         ),
       ],
-      validar: () {
-        final volume = lerNumero(_medida.text);
+      validate: () {
+        final volume = readNumber(_measure.text);
         return volume == null || volume <= 0 || volume > 1000
             ? tr(
                 'Digite a capacidade total em litros (está na etiqueta ou no manual).',
@@ -406,128 +409,128 @@ class _TelaEstimarState extends State<TelaEstimar> {
             : null;
       },
     ),
-    if (!_soFreezer)
-      _Pergunta(
+    if (!_freezerOnly)
+      _Question(
         tr('Quantos litros tem o freezer?', 'How many liters is the freezer?'),
-        ajuda: tr(
+        help: tr(
           'Melhora a estimativa. Se não souber, toque em "Não sei".',
           'It improves the estimate. If you are not sure, tap "I don\'t know".',
         ),
-        campos: [
-          _campo(
-            _congelador,
+        fields: [
+          _field(
+            _freezer,
             tr('Litros do freezer', 'Freezer liters'),
-            sufixo: tr('litros', 'liters'),
-            exemplo: tr('Ex.: 90', 'E.g.: 90'),
+            suffix: tr('litros', 'liters'),
+            example: tr('Ex.: 90', 'E.g.: 90'),
           ),
         ],
-        validar: () {
-          final volume = lerNumero(_medida.text) ?? 0;
-          final congelador = _opcional(_congelador);
-          return _invalido(_congelador, minimo: -1) || (congelador ?? 0) > volume
+        validate: () {
+          final volume = readNumber(_measure.text) ?? 0;
+          final freezer = _optional(_freezer);
+          return _invalid(_freezer, minimum: -1) || (freezer ?? 0) > volume
               ? tr(
                   'Os litros do freezer precisam ser menores que a capacidade total.',
                   'The freezer liters must be less than the total capacity.',
                 )
               : null;
         },
-        textoPular: tr('Não sei', "I don't know"),
-        aoPular: _congelador.clear,
+        skipText: tr('Não sei', "I don't know"),
+        onSkip: _freezer.clear,
       ),
-    _Pergunta(
+    _Question(
       tr('Em que ano você comprou?', 'What year did you buy it?'),
-      ajuda: tr('Geladeiras mais antigas costumam gastar mais.', 'Older fridges usually use more energy.'),
-      campos: [_campo(_ano, tr('Ano de compra', 'Year of purchase'), exemplo: tr('Ex.: 2014', 'E.g.: 2014'), inteiro: true)],
-      validar: () {
-        final ano = int.tryParse(_ano.text.trim());
-        final anoAtual = DateTime.now().year;
-        return ano == null || ano < 1980 || ano > anoAtual
+      help: tr('Geladeiras mais antigas costumam gastar mais.', 'Older fridges usually use more energy.'),
+      fields: [_field(_year, tr('Ano de compra', 'Year of purchase'), example: tr('Ex.: 2014', 'E.g.: 2014'), whole: true)],
+      validate: () {
+        final year = int.tryParse(_year.text.trim());
+        final currentYear = DateTime.now().year;
+        return year == null || year < 1980 || year > currentYear
             ? tr(
-                'Digite o ano de compra entre 1980 e $anoAtual. Ex.: 2014.',
-                'Enter a year of purchase between 1980 and $anoAtual. E.g.: 2014.',
+                'Digite o ano de compra entre 1980 e $currentYear. Ex.: 2014.',
+                'Enter a year of purchase between 1980 and $currentYear. E.g.: 2014.',
               )
             : null;
       },
     ),
-    _Pergunta(
+    _Question(
       tr('Tem a etiqueta amarela do Inmetro?', "Does it have Inmetro's yellow energy label?"),
-      ajuda: tr(
+      help: tr(
         'É o número em kWh por mês da etiqueta colada no aparelho. Com ele o resultado fica bem mais preciso.',
         'It is the kWh per month number on the label stuck to the appliance. With it the result is much more accurate.',
       ),
-      campos: [
-        _campo(
-          _etiqueta,
+      fields: [
+        _field(
+          _label,
           tr('Consumo da etiqueta', 'Consumption on the label'),
-          sufixo: tr('kWh/mês', 'kWh/month'),
-          exemplo: tr('Ex.: 52,5', 'E.g.: 52.5'),
+          suffix: tr('kWh/mês', 'kWh/month'),
+          example: tr('Ex.: 52,5', 'E.g.: 52.5'),
         ),
       ],
-      validar: () => _invalido(_etiqueta, maximo: 300)
+      validate: () => _invalid(_label, maximum: 300)
           ? tr('Digite o número em kWh por mês. Ex.: 52,5.', 'Enter the number in kWh per month. E.g.: 52.5.')
           : null,
-      textoPular: tr('Não tenho a etiqueta', "I don't have the label"),
-      aoPular: _etiqueta.clear,
+      skipText: tr('Não tenho a etiqueta', "I don't have the label"),
+      onSkip: _label.clear,
     ),
   ];
 
-  List<_Pergunta> _perguntasCategoria(CategoriaEstimavel c) {
-    final forma = _forma;
+  List<_Question> _categoryQuestions(EstimableCategory c) {
+    final shape = _shape;
     return [
-      if (c.tipos.isNotEmpty)
-        _Pergunta(
+      if (c.types.isNotEmpty)
+        _Question(
           tr('Qual destes é o seu?', 'Which of these is yours?'),
-          campos: [
-            for (final tipo in c.tipos)
-              CartaoOpcao(
-                titulo: tipo.nome,
-                subtitulo: tipo.descricao,
-                selecionada: _tipo == tipo.valor,
-                onTap: () => _escolher(() => _tipo = tipo.valor),
+          fields: [
+            for (final kind in c.types)
+              OptionCard(
+                title: kind.name,
+                subtitle: kind.description,
+                selected: _type == kind.value,
+                onTap: () => _choose(() => _type = kind.value),
               ),
           ],
         ),
-      if (c.medida != null) _perguntaTamanho(c),
-      if (c.medida != null && _outroTamanho)
-        _Pergunta(
+      if (c.measure != null) _sizeQuestion(c),
+      if (c.measure != null && _otherSize)
+        _Question(
           tr('Digite o tamanho', 'Enter the size'),
-          ajuda: tr(
-            '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
-            '${legivel(c.medida!)}. It is usually written on the appliance, the box or in the manual.',
+          help: tr(
+            '${readable(c.measure!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+            '${readable(c.measure!)}. It is usually written on the appliance, the box or in the manual.',
           ),
-          campos: [_campo(_medida, legivel(c.medida!).split(' (').first, sufixo: c.unidadeMedida)],
-          validar: () => _opcional(_medida) == null || _invalido(_medida)
+          fields: [_field(_measure, readable(c.measure!).split(' (').first, suffix: c.measureUnit)],
+          validate: () => _optional(_measure) == null || _invalid(_measure)
               ? tr(
                   'Digite o número, como está escrito. Se não souber, volte e escolha um dos tamanhos.',
                   'Enter the number as it is written. If you are not sure, go back and pick one of the sizes.',
                 )
               : null,
         ),
-      if (!c.valorObrigatorio) _perguntaForma(c),
-      if (forma != null) _perguntaValor(forma),
-      ..._perguntasUso(c.uso, horasObrigatorias: _comPotencia, semVelocidade: !_semNumero),
+      if (!c.requiredValue) _shapeQuestion(c),
+      if (shape != null) _valueQuestion(shape),
+      ..._usageQuestions(c.usage, requiredHours: _withPower, withoutSpeed: !_withoutNumber),
     ];
   }
 
-  _Pergunta _perguntaForma(CategoriaEstimavel c) => _Pergunta(
+  _Question _shapeQuestion(EstimableCategory c) => _Question(
     tr('Você consegue ver algum destes no aparelho?', 'Can you see any of these on the appliance?'),
-    ajuda: tr(
+    help: tr(
       'Com o número do próprio aparelho o cálculo fica certo, mesmo se ele for antigo.',
       "With the appliance's own number the calculation is accurate, even if it is old.",
     ),
-    campos: [
-      for (final f in c.formas)
-        CartaoOpcao(
-          icone: f.campo == 'potencia_w' ? Icons.bolt : Icons.receipt_long_outlined,
-          titulo: f.nome,
-          subtitulo: f.onde,
-          selecionada: _forma?.campo == f.campo,
-          onTap: () => _escolherForma(f),
+    fields: [
+      for (final f in c.shapes)
+        OptionCard(
+          icon: f.field == 'potencia_w' ? Icons.bolt : Icons.receipt_long_outlined,
+          title: f.name,
+          subtitle: f.where,
+          selected: _shape?.field == f.field,
+          onTap: () => _chooseShape(f),
         ),
-      CartaoOpcao(
-        icone: Icons.help_outline,
-        titulo: tr('Não consigo ver nenhum', "I can't see any"),
-        subtitulo: c.medida == null
+      OptionCard(
+        icon: Icons.help_outline,
+        title: tr('Não consigo ver nenhum', "I can't see any"),
+        subtitle: c.measure == null
             ? tr(
                 'Tudo bem: calculamos com os modelos do catálogo do Inmetro.',
                 "That's fine: we calculate with the models in Inmetro's catalog.",
@@ -536,69 +539,69 @@ class _TelaEstimarState extends State<TelaEstimar> {
                 'Tudo bem: calculamos com os modelos parecidos do Inmetro.',
                 "That's fine: we calculate with similar models from Inmetro.",
               ),
-        selecionada: _semNumero,
-        onTap: () => _escolherForma(null),
+        selected: _withoutNumber,
+        onTap: () => _chooseShape(null),
       ),
     ],
   );
 
-  _Pergunta _perguntaValor(FormaDeInformar f) => _Pergunta(
-    f.campo == 'potencia_w'
+  _Question _valueQuestion(EntryMode f) => _Question(
+    f.field == 'potencia_w'
         ? tr('Qual é a potência?', 'What is the power?')
         : tr('Qual é o consumo de energia?', 'What is the energy consumption?'),
-    ajuda: [f.onde, if (f.dica != null) f.dica!].join(' '),
-    campos: [_campo(_etiqueta, f.rotulo, sufixo: f.unidade, exemplo: f.exemplo)],
-    validar: () {
-      final v = _opcional(_etiqueta);
-      return v == null || _invalido(_etiqueta, maximo: f.maximo)
+    help: [f.where, if (f.tip != null) f.tip!].join(' '),
+    fields: [_field(_label, f.label, suffix: f.unit, example: f.example)],
+    validate: () {
+      final v = _optional(_label);
+      return v == null || _invalid(_label, maximum: f.maximum)
           ? tr(
-              'Digite o número em ${f.unidade}, como está escrito. ${f.exemplo}.',
-              'Enter the number in ${f.unidade}, as it is written. ${f.exemplo}.',
+              'Digite o número em ${f.unit}, como está escrito. ${f.example}.',
+              'Enter the number in ${f.unit}, as it is written. ${f.example}.',
             )
           : null;
     },
   );
 
-  _Pergunta _perguntaTamanho(CategoriaEstimavel c) => _Pergunta(
+  _Question _sizeQuestion(EstimableCategory c) => _Question(
     tr('Qual é o tamanho?', 'What size is it?'),
-    ajuda: tr(
-      '${legivel(c.medida!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
-      '${legivel(c.medida!)}. It is usually written on the appliance, the box or in the manual.',
+    help: tr(
+      '${readable(c.measure!)}. Costuma estar escrito no aparelho, na caixa ou no manual.',
+      '${readable(c.measure!)}. It is usually written on the appliance, the box or in the manual.',
     ),
-    campos: [
-      for (final t in c.tamanhos)
-        CartaoOpcao(
-          titulo: t.nome,
-          selecionada: !_outroTamanho && _tamanho == t.valor,
-          onTap: () => _escolherTamanho(t.valor),
+    fields: [
+      for (final t in c.sizes)
+        OptionCard(
+          title: t.name,
+          selected: !_otherSize && _size == t.value,
+          onTap: () => _chooseSize(t.value),
         ),
-      CartaoOpcao(
-        icone: Icons.edit_outlined,
-        titulo: tr('Outro tamanho', 'Another size'),
-        subtitulo: tr('Digitar o número', 'Type the number'),
-        selecionada: _outroTamanho,
-        onTap: () => _escolherTamanho(null),
+      OptionCard(
+        icon: Icons.edit_outlined,
+        title: tr('Outro tamanho', 'Another size'),
+        subtitle: tr('Digitar o número', 'Type the number'),
+        selected: _otherSize,
+        onTap: () => _chooseSize(null),
       ),
     ],
   );
 
-  /// horasObrigatorias: com a potencia da plaqueta, so as horas dizem quanto gasta.
-  /// semVelocidade: com a potencia, a velocidade do ventilador nao entra na conta.
-  List<_Pergunta> _perguntasUso(PerguntaDeUso uso, {bool horasObrigatorias = false, bool semVelocidade = false}) {
-    final opcional = uso.opcional && !horasObrigatorias;
-    final horas = _Pergunta(
+  /// requiredHours: com a potencia da plaqueta, so as horas dizem quanto gasta.
+  /// withoutSpeed: com a potencia, a velocidade do ventilador nao entra na conta.
+  List<_Question> _usageQuestions(UsageQuestion usage, {bool requiredHours = false, bool withoutSpeed = false}) {
+    final optional = usage.optional && !requiredHours;
+    final hours = _Question(
       tr('Quanto tempo por dia ele fica ligado?', 'How long does it stay on per day?'),
-      ajuda: uso.perguntarHoras
+      help: usage.askHours
           ? tr(
               'Some o tempo de todos os usos do dia. Ex.: a noite toda = 8 h e 0 min.',
               'Add up every use in the day. E.g.: all night = 8 h and 0 min.',
             )
-          : opcional
+          : optional
           ? tr(
               'Se não souber, toque em "Não sei": usamos o consumo do ensaio do Inmetro.',
               'If you are not sure, tap "I don\'t know": we use the consumption from Inmetro\'s test.',
             )
-          : uso.padrao != null
+          : usage.defaults != null
           ? tr(
               'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
               'We filled in a typical value. Change it to your own use if it is different.',
@@ -607,127 +610,127 @@ class _TelaEstimarState extends State<TelaEstimar> {
               'Some o tempo de todos os usos do dia. Ex.: 0 h e 15 min.',
               'Add up every use in the day. E.g.: 0 h and 15 min.',
             ),
-      campos: [CampoTempo(controle: _tempo)],
-      validar: () {
-        if (!_tempo.valido) {
+      fields: [TimeField(control: _time)],
+      validate: () {
+        if (!_time.valid) {
           return tr(
             'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
             'Check the time: minutes from 0 to 59 and at most 24 hours per day.',
           );
         }
-        if (_tempo.horasDia == null && !opcional) return tr('Digite o tempo de uso por dia.', 'Enter the time of use per day.');
+        if (_time.dailyHours == null && !optional) return tr('Digite o tempo de uso por dia.', 'Enter the time of use per day.');
         return null;
       },
-      textoPular: opcional ? tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value") : null,
-      aoPular: _tempo.limpar,
+      skipText: optional ? tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value") : null,
+      onSkip: _time.clear,
     );
-    return switch (uso.pergunta) {
-      'horas' => [horas],
+    return switch (usage.question) {
+      'horas' => [hours],
       'ciclos' => [
-        _Pergunta(
+        _Question(
           tr('Quantas vezes por mês você lava roupa?', 'How many loads of laundry do you do per month?'),
-          ajuda: tr(
+          help: tr(
             'Já deixamos um valor comum preenchido. Troque pelo seu uso, se for diferente.',
             'We filled in a typical value. Change it to your own use if it is different.',
           ),
-          campos: [_campo(_ciclos, tr('Lavagens por mês', 'Loads per month'), sufixo: tr('vezes', 'times'), inteiro: true)],
-          validar: () {
-            final ciclos = lerNumero(_ciclos.text);
-            return ciclos == null || ciclos < 0
+          fields: [_field(_cycles, tr('Lavagens por mês', 'Loads per month'), suffix: tr('vezes', 'times'), whole: true)],
+          validate: () {
+            final cycles = readNumber(_cycles.text);
+            return cycles == null || cycles < 0
                 ? tr('Digite quantas lavagens por mês. Ex.: 12.', 'Enter how many loads per month. E.g.: 12.')
                 : null;
           },
         ),
       ],
       'velocidade' => [
-        if (!semVelocidade)
-          _Pergunta(
+        if (!withoutSpeed)
+          _Question(
             tr('Em qual velocidade você costuma usar?', 'Which speed do you usually use?'),
-            campos: [
-              for (final o in uso.opcoes)
-                CartaoOpcao(
-                  titulo: nomeDaVelocidade(o),
-                  selecionada: _velocidade == o,
-                  onTap: () => _escolher(() => _velocidade = o),
+            fields: [
+              for (final o in usage.options)
+                OptionCard(
+                  title: speedName(o),
+                  selected: _speed == o,
+                  onTap: () => _choose(() => _speed = o),
                 ),
             ],
           ),
-        if (uso.perguntarHoras) horas,
+        if (usage.askHours) hours,
       ],
       _ => const [],
     };
   }
 
-  _Pergunta _perguntaNome() => _Pergunta(
+  _Question _nameQuestion() => _Question(
     tr('Qual é a marca e o modelo?', 'What is the brand and model?'),
-    ajuda: tr(
+    help: tr(
       'Opcional. Serve só para você reconhecer o aparelho na sua casa.',
       'Optional. It only helps you recognize the appliance in your home.',
     ),
-    campos: [_campo(_nome, tr('Marca e modelo', 'Brand and model'), exemplo: tr('Ex.: Consul CRM45', 'E.g.: Consul CRM45'), texto: true)],
-    validar: () => null,
-    textoPular: tr('Pular', 'Skip'),
-    aoPular: _nome.clear,
+    fields: [_field(_name, tr('Marca e modelo', 'Brand and model'), example: tr('Ex.: Consul CRM45', 'E.g.: Consul CRM45'), text: true)],
+    validate: () => null,
+    skipText: tr('Pular', 'Skip'),
+    onSkip: _name.clear,
   );
 
-  List<_Pergunta> _perguntasPortatil() {
-    final r = _resistivo;
+  List<_Question> _smallApplianceQuestions() {
+    final r = _resistive;
     return [
-      _Pergunta(
+      _Question(
         tr('Qual é o aparelho?', 'Which appliance is it?'),
-        campos: [
-          for (final x in _resistivos!)
-            CartaoOpcao(
-              icone: iconeDaCategoria(x.categoria),
-              titulo: x.nome,
-              subtitulo: tr('Típica: ${numero(x.potenciaW, casas: 0)} W', 'Typical: ${numero(x.potenciaW, casas: 0)} W'),
-              selecionada: _resistivo?.categoria == x.categoria,
-              onTap: () => _escolherResistivo(x),
+        fields: [
+          for (final x in _resistiveItems!)
+            OptionCard(
+              icon: categoryIcon(x.category),
+              title: x.name,
+              subtitle: tr('Típica: ${number(x.powerW, homes: 0)} W', 'Typical: ${number(x.powerW, homes: 0)} W'),
+              selected: _resistive?.category == x.category,
+              onTap: () => _chooseResistive(x),
             ),
         ],
       ),
       if (r != null) ...[
-        _Pergunta(
+        _Question(
           tr('Qual é a potência?', 'What is the power?'),
-          ajuda: tr(
+          help: tr(
             'Em watts (W). Está na etiqueta embaixo ou atrás do aparelho.',
             'In watts (W). It is on the label under or behind the appliance.',
           ),
-          campos: [
-            _campo(
-              _potencia,
+          fields: [
+            _field(
+              _power,
               tr('Potência', 'Power'),
-              sufixo: 'W',
-              exemplo: tr('Típica: ${numero(r.potenciaW, casas: 0)} W', 'Typical: ${numero(r.potenciaW, casas: 0)} W'),
+              suffix: 'W',
+              example: tr('Típica: ${number(r.powerW, homes: 0)} W', 'Typical: ${number(r.powerW, homes: 0)} W'),
             ),
           ],
-          validar: () => _invalido(_potencia, maximo: 10000)
+          validate: () => _invalid(_power, maximum: 10000)
               ? tr('Digite a potência em watts. Ex.: 1500.', 'Enter the power in watts. E.g.: 1500.')
               : null,
-          textoPular: tr(
-            'Não sei, usar a típica (${numero(r.potenciaW, casas: 0)} W)',
-            "I don't know, use the typical one (${numero(r.potenciaW, casas: 0)} W)",
+          skipText: tr(
+            'Não sei, usar a típica (${number(r.powerW, homes: 0)} W)',
+            "I don't know, use the typical one (${number(r.powerW, homes: 0)} W)",
           ),
-          aoPular: _potencia.clear,
+          onSkip: _power.clear,
         ),
-        _Pergunta(
+        _Question(
           tr('Quanto tempo por dia você usa?', 'How long do you use it per day?'),
-          ajuda: tr(
-            'Sugerido: ${duracao(r.horasDia)}. Troque pelo seu uso real.',
-            'Suggested: ${duracao(r.horasDia)}. Change it to your real use.',
+          help: tr(
+            'Sugerido: ${duration(r.dailyHours)}. Troque pelo seu uso real.',
+            'Suggested: ${duration(r.dailyHours)}. Change it to your real use.',
           ),
-          campos: [CampoTempo(controle: _tempoPortatil)],
-          validar: () => _tempoPortatil.valido
+          fields: [TimeField(control: _smallApplianceTime)],
+          validate: () => _smallApplianceTime.valid
               ? null
               : tr(
                   'Confira o tempo: minutos de 0 a 59 e no máximo 24 horas por dia.',
                   'Check the time: minutes from 0 to 59 and at most 24 hours per day.',
                 ),
         ),
-        _Pergunta(
+        _Question(
           tr('Em quantos dias do mês você usa?', 'On how many days a month do you use it?'),
-          campos: [_campo(_dias, tr('Dias de uso no mês', 'Days of use per month'), sufixo: tr('dias', 'days'), inteiro: true)],
-          validar: () => _invalido(_dias, minimo: -1, maximo: 31)
+          fields: [_field(_days, tr('Dias de uso no mês', 'Days of use per month'), suffix: tr('dias', 'days'), whole: true)],
+          validate: () => _invalid(_days, minimum: -1, maximum: 31)
               ? tr('Digite um número de dias entre 0 e 31.', 'Enter a number of days between 0 and 31.')
               : null,
         ),
@@ -735,19 +738,19 @@ class _TelaEstimarState extends State<TelaEstimar> {
     ];
   }
 
-  Widget _campo(
-    TextEditingController controle,
-    String rotulo, {
-    String? exemplo,
-    String? sufixo,
-    bool inteiro = false,
-    bool texto = false,
+  Widget _field(
+    TextEditingController control,
+    String label, {
+    String? example,
+    String? suffix,
+    bool whole = false,
+    bool text = false,
   }) {
     return TextField(
-      controller: controle,
+      controller: control,
       autofocus: true,
-      keyboardType: texto ? TextInputType.text : TextInputType.numberWithOptions(decimal: !inteiro),
-      decoration: InputDecoration(labelText: rotulo, hintText: exemplo, suffixText: sufixo),
+      keyboardType: text ? TextInputType.text : TextInputType.numberWithOptions(decimal: !whole),
+      decoration: InputDecoration(labelText: label, hintText: example, suffixText: suffix),
     );
   }
 
@@ -755,50 +758,66 @@ class _TelaEstimarState extends State<TelaEstimar> {
 
   @override
   Widget build(BuildContext context) {
-    final carregado = _categorias != null && _resistivos != null;
-    if (!carregado) {
-      return Pagina(
-        titulo: tr('Estimar o gasto', 'Estimate the cost'),
-        filho: _falhouCarga ? MensagemErro(_erro!, tentarDeNovo: _carregar) : const Carregando(),
+    final loaded = _categories != null && _resistiveItems != null;
+    if (!loaded) {
+      return AppPage(
+        title: tr('Estimar o gasto', 'Estimate the cost'),
+        child: _failedLoad ? ErrorMessage(_error!, tryAgain: _load) : const Loading(),
       );
     }
-    final perguntas = _perguntas();
-    final indice = _indice.clamp(0, perguntas.length - 1);
-    final p = perguntas[indice];
+    final questions = _questions();
+    final index = _index.clamp(0, questions.length - 1);
+    final p = questions[index];
     return PopScope(
-      canPop: indice == 0,
-      onPopInvokedWithResult: (saiu, _) {
-        if (!saiu) _voltar();
+      canPop: index == 0,
+      onPopInvokedWithResult: (left, _) {
+        if (!left) _back();
       },
-      child: Pagina(
-        titulo: tr('Estimar o gasto', 'Estimate the cost'),
-        etapa: Etapa(indice + 1, perguntas.length),
-        rodape: p.validar == null ? null : _rodape(p),
-        filho: ListView(
-          key: ValueKey(indice), // cada pergunta comeca do topo
-          children: [
-            CabecalhoPergunta(p.titulo, ajuda: p.ajuda),
-            ...p.campos,
-            if (_erro != null) ...[
-              const SizedBox(height: Espaco.m),
-              MensagemErro(_erro!),
+      child: AppPage(
+        title: tr('Estimar o gasto', 'Estimate the cost'),
+        step: FlowStep(index + 1, questions.length),
+        footer: p.validate == null ? null : _footer(p),
+        // as perguntas ficam na mesma tela: a troca imita a transicao entre telas (StepTransition)
+        child: AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : StepTransition.duration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          layoutBuilder: (current, previous) => Stack(children: [...previous, ?current]),
+          transitionBuilder: (child, animation) {
+            // a pergunta que entra vem do lado para onde a pessoa esta indo; a que sai so apaga
+            final entering = child.key == ValueKey(index);
+            final from = Offset(entering ? (_forward ? 0.16 : -0.16) : 0, 0);
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: Tween(begin: from, end: Offset.zero).animate(animation), child: child),
+            );
+          },
+          child: ListView(
+            key: ValueKey(index), // cada pergunta comeca do topo
+            children: [
+              QuestionHeader(p.title, help: p.help),
+              ...p.fields,
+              if (_error != null) ...[
+                const SizedBox(height: Spacing.m),
+                ErrorMessage(_error!),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _rodape(_Pergunta p) {
-    final continuar = FilledButton(onPressed: () => _continuar(p), child: Text(tr('Continuar', 'Continue')));
-    if (p.textoPular == null) return continuar;
+  Widget _footer(_Question p) {
+    final proceed = FilledButton(onPressed: () => _continue(p), child: Text(tr('Continuar', 'Continue')));
+    if (p.skipText == null) return proceed;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        continuar,
-        const SizedBox(height: Espaco.p),
-        TextButton(onPressed: () => _pular(p), child: Text(p.textoPular!)),
+        proceed,
+        const SizedBox(height: Spacing.p),
+        TextButton(onPressed: () => _skip(p), child: Text(p.skipText!)),
       ],
     );
   }

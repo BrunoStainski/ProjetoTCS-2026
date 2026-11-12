@@ -20,65 +20,65 @@ import pandas as pd
 import config
 
 
-def _sem_acento(texto):
-    return unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode().lower().strip()
+def _without_accent(text):
+    return unicodedata.normalize("NFKD", str(text)).encode("ascii", "ignore").decode().lower().strip()
 
 
-def _chave_coluna(nome):
-    return re.sub(r"[^a-z0-9]", "", _sem_acento(nome))
+def _column_key(name):
+    return re.sub(r"[^a-z0-9]", "", _without_accent(name))
 
 
-def _coluna(df, candidatos, contem=None, nao_contem=None):
+def _column(df, candidates, contains=None, does_not_contain=None):
     """Acha a coluna pelo nome, ignorando maiuscula, acento, espaco e _."""
-    chaves = {_chave_coluna(c): c for c in df.columns}
-    for cand in candidatos:
-        if cand in chaves:
-            return chaves[cand]
-    if contem:
-        for chave, original in chaves.items():
-            if all(p in chave for p in contem) and not any(p in chave for p in (nao_contem or [])):
+    keys = {_column_key(c): c for c in df.columns}
+    for cand in candidates:
+        if cand in keys:
+            return keys[cand]
+    if contains:
+        for key, original in keys.items():
+            if all(p in key for p in contains) and not any(p in key for p in (does_not_contain or [])):
                 return original
     return None
 
 
-def _numero(serie):
-    valor = serie.fillna("").astype(str).str.strip()
-    tem_virgula = valor.str.contains(",", regex=False)  # "1.234,56" -> 1234.56; "245.67" fica igual
-    valor = valor.where(~tem_virgula, valor.str.replace(".", "", regex=False).str.replace(",", "."))
-    return pd.to_numeric(valor, errors="coerce")
+def _number(series):
+    value = series.fillna("").astype(str).str.strip()
+    has_comma = value.str.contains(",", regex=False)  # "1.234,56" -> 1234.56; "245.67" fica igual
+    value = value.where(~has_comma, value.str.replace(".", "", regex=False).str.replace(",", "."))
+    return pd.to_numeric(value, errors="coerce")
 
 
-def ler_csv(caminho):
+def read_csv(path):
     for enc in ("utf-8-sig", "latin-1"):
         try:
-            return pd.read_csv(caminho, sep=None, engine="python", encoding=enc, dtype=str)
+            return pd.read_csv(path, sep=None, engine="python", encoding=enc, dtype=str)
         except UnicodeDecodeError:
             continue
-    raise ValueError(f"nao consegui ler {caminho}")
+    raise ValueError(f"nao consegui ler {path}")
 
 
-def detectar_colunas(df):
+def detect_columns(df):
     return {
-        "nome": _coluna(df, ["sigagente", "agente", "distribuidora", "nomagente", "nomedistribuidora"],
-                        contem=["agente"], nao_contem=["acessante", "cnpj"]),
-        "tarifa": _coluna(df, ["tarifakwh", "tarifa", "valorkwh", "tarifatotal", "tarifarkwh", "tarifafinal"]),
-        "tusd": _coluna(df, ["vlrtusd", "tusd", "valortusd"], contem=["tusd"]),
-        "te": _coluna(df, ["vlrte", "te", "valorte", "tarifate"]),
-        "inicio": _coluna(df, ["datiniciovigencia", "iniciovigencia", "vigenciainicio", "datainicio"],
-                          contem=["inicio"]),
-        "base": _coluna(df, ["dscbasetarifaria", "basetarifaria"], contem=["base", "tarif"]),
-        "subgrupo": _coluna(df, ["dscsubgrupo", "subgrupo"], contem=["subgrupo"]),
-        "modalidade": _coluna(df, ["dscmodalidadetarifaria", "modalidadetarifaria", "modalidade"],
-                              contem=["modalidade"]),
-        "classe": _coluna(df, ["dscclasse", "classe"]),
-        "subclasse": _coluna(df, ["dscsubclasse", "subclasse"]),
-        "detalhe": _coluna(df, ["dscdetalhe", "detalhe"]),
-        "posto": _coluna(df, ["nompostotarifario", "postotarifario", "posto"], contem=["posto"]),
+        "nome": _column(df, ["sigagente", "agente", "distribuidora", "nomagente", "nomedistribuidora"],
+                        contains=["agente"], does_not_contain=["acessante", "cnpj"]),
+        "tarifa": _column(df, ["tarifakwh", "tarifa", "valorkwh", "tarifatotal", "tarifarkwh", "tarifafinal"]),
+        "tusd": _column(df, ["vlrtusd", "tusd", "valortusd"], contains=["tusd"]),
+        "te": _column(df, ["vlrte", "te", "valorte", "tarifate"]),
+        "inicio": _column(df, ["datiniciovigencia", "iniciovigencia", "vigenciainicio", "datainicio"],
+                          contains=["inicio"]),
+        "base": _column(df, ["dscbasetarifaria", "basetarifaria"], contains=["base", "tarif"]),
+        "subgrupo": _column(df, ["dscsubgrupo", "subgrupo"], contains=["subgrupo"]),
+        "modalidade": _column(df, ["dscmodalidadetarifaria", "modalidadetarifaria", "modalidade"],
+                              contains=["modalidade"]),
+        "classe": _column(df, ["dscclasse", "classe"]),
+        "subclasse": _column(df, ["dscsubclasse", "subclasse"]),
+        "detalhe": _column(df, ["dscdetalhe", "detalhe"]),
+        "posto": _column(df, ["nompostotarifario", "postotarifario", "posto"], contains=["posto"]),
     }
 
 
 # coluna -> valor aceito (comparado sem acento e em minusculo)
-FILTROS = {
+FILTERS = {
     "base": "tarifa de aplicacao",
     "subgrupo": "b1",
     "modalidade": "convencional",
@@ -89,66 +89,66 @@ FILTROS = {
 }
 
 
-def ler_tarifas_residenciais(caminho=None, mostrar=False):
+def read_residential_tariffs(path=None, display=False):
     """Devolve DataFrame [nome, tarifa_kwh, vigencia_inicio, fonte], com historico de vigencias."""
-    caminho = caminho or config.TARIFAS_CSV
-    df = ler_csv(caminho)
-    col = detectar_colunas(df)
+    path = path or config.TARIFFS_CSV
+    df = read_csv(path)
+    col = detect_columns(df)
 
     if not col["nome"] or not (col["tarifa"] or (col["tusd"] and col["te"])):
         raise KeyError(
-            f"nao reconheci as colunas de {caminho.name}. Preciso de uma coluna com o nome da "
+            f"nao reconheci as colunas de {path.name}. Preciso de uma coluna com o nome da "
             f"distribuidora e de tarifa (ou TUSD + TE).\nColunas do arquivo: {list(df.columns)}"
         )
 
-    aplicados = []
-    for chave, aceito in FILTROS.items():
-        nome_col = col[chave]
-        if not nome_col:
+    applied = []
+    for key, accepted in FILTERS.items():
+        col_name = col[key]
+        if not col_name:
             continue
-        valores = df[nome_col].map(_sem_acento)
-        if (valores == aceito).any():  # so filtra se o valor existe (o arquivo pode ja vir filtrado)
-            df = df[valores == aceito]
-            aplicados.append(f"{nome_col} = {aceito}")
+        values = df[col_name].map(_without_accent)
+        if (values == accepted).any():  # so filtra se o valor existe (o arquivo pode ja vir filtrado)
+            df = df[values == accepted]
+            applied.append(f"{col_name} = {accepted}")
 
     if col["tarifa"]:
-        tarifa = _numero(df[col["tarifa"]])
+        tariff = _number(df[col["tarifa"]])
     else:
-        tarifa = _numero(df[col["tusd"]]) + _numero(df[col["te"]])
-    if tarifa.median() > 10:  # R$/MWh -> R$/kWh
-        tarifa = tarifa / 1000
+        tariff = _number(df[col["tusd"]]) + _number(df[col["te"]])
+    if tariff.median() > 10:  # R$/MWh -> R$/kWh
+        tariff = tariff / 1000
 
-    vigencia = None
+    validity = None
     if col["inicio"]:
         datas = df[col["inicio"]].fillna("").astype(str).str.strip().str[:10]
-        dia_primeiro = datas.str.contains("/", regex=False).any()  # 24/06/2026 ou 2026-06-24
-        vigencia = pd.to_datetime(datas, errors="coerce", dayfirst=dia_primeiro).dt.strftime("%Y-%m-%d")
+        first_day = datas.str.contains("/", regex=False).any()  # 24/06/2026 ou 2026-06-24
+        validity = pd.to_datetime(datas, errors="coerce", dayfirst=first_day).dt.strftime("%Y-%m-%d")
 
-    saida = pd.DataFrame({
+    output = pd.DataFrame({
         "nome": df[col["nome"]].astype(str).str.strip(),
-        "tarifa_kwh": tarifa.round(5),
-        "vigencia_inicio": vigencia,
+        "tarifa_kwh": tariff.round(5),
+        "vigencia_inicio": validity,
         "fonte": "ANEEL – tarifas homologadas, B1 residencial",
     })
-    saida = saida[saida["tarifa_kwh"] > 0]
-    saida = saida.drop_duplicates(subset=["nome", "vigencia_inicio"], keep="first")
+    output = output[output["tarifa_kwh"] > 0]
+    output = output.drop_duplicates(subset=["nome", "vigencia_inicio"], keep="first")
 
-    if mostrar:
-        print(f"Arquivo: {caminho}")
+    if display:
+        print(f"Arquivo: {path}")
         print("Colunas reconhecidas:")
-        for chave, nome_col in col.items():
-            print(f"  {chave:<11} -> {nome_col or '(nao encontrada)'}")
-        print(f"Filtros aplicados: {', '.join(aplicados) or 'nenhum (arquivo ja filtrado?)'}")
-        print(f"Distribuidoras com tarifa: {saida['nome'].nunique()}")
-        print(f"Faixa da tarifa: R$ {saida['tarifa_kwh'].min():.4f} a R$ {saida['tarifa_kwh'].max():.4f} por kWh")
-    return saida.reset_index(drop=True)
+        for key, col_name in col.items():
+            print(f"  {key:<11} -> {col_name or '(nao encontrada)'}")
+        print(f"Filtros aplicados: {', '.join(applied) or 'nenhum (arquivo ja filtrado?)'}")
+        print(f"Distribuidoras com tarifa: {output['nome'].nunique()}")
+        print(f"Faixa da tarifa: R$ {output['tarifa_kwh'].min():.4f} a R$ {output['tarifa_kwh'].max():.4f} por kWh")
+    return output.reset_index(drop=True)
 
 
 if __name__ == "__main__":
     try:
-        tarifas = ler_tarifas_residenciais(mostrar=True)
-    except (KeyError, FileNotFoundError, ValueError) as erro:
-        print(f"Erro: {erro}")
+        tariffs = read_residential_tariffs(display=True)
+    except (KeyError, FileNotFoundError, ValueError) as error:
+        print(f"Erro: {error}")
         sys.exit(1)
     print("\nExemplo (5 primeiras):")
-    print(tarifas.head().to_string(index=False))
+    print(tariffs.head().to_string(index=False))
