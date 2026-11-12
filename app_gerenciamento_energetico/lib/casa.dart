@@ -1,5 +1,6 @@
-// Estado do app: o que o usuario esta calculando agora (Consulta) e a lista "Minha casa".
-// Fica so na memoria: ao fechar o app, a lista recomeca vazia.
+// Estado do app: o que o usuario esta calculando agora (Consulta) e as casas da pessoa (Minha casa).
+// Sem conta, as casas ficam so na memoria (somem ao fechar o app). Com conta, conta.dart grava cada
+// mudanca na nuvem (PUT /casas/{id}); por isso a casa e os itens sabem virar JSON e voltar.
 
 import 'package:flutter/foundation.dart';
 
@@ -25,6 +26,19 @@ class TariffChoice {
       _distributor = null,
       tariffKwh = tariff;
 
+  TariffChoice.fromJson(Map<String, dynamic> j)
+    : distributorId = j['distribuidora_id'],
+      manualTariff = (j['tarifa_manual'] as num?)?.toDouble(),
+      _distributor = j['distribuidora'],
+      tariffKwh = (j['tarifa_kwh'] as num).toDouble();
+
+  Map<String, dynamic> toJson() => {
+    'distribuidora_id': distributorId,
+    'tarifa_manual': manualTariff,
+    'distribuidora': _distributor,
+    'tarifa_kwh': tariffKwh,
+  };
+
   /// Calculada na hora: segue o idioma, mesmo se a tarifa foi escolhida antes da troca.
   String get description => _distributor ?? tr('Tarifa da conta de luz', 'Rate from your electricity bill');
 
@@ -40,6 +54,10 @@ class Estimate {
   final Map<String, dynamic> data;
 
   const Estimate(this.route, this.data);
+
+  Estimate.fromJson(Map<String, dynamic> j) : route = j['rota'], data = Map<String, dynamic>.from(j['dados']);
+
+  Map<String, dynamic> toJson() => {'rota': route, 'dados': data};
 }
 
 /// O que o usuario ja escolheu ao longo das telas.
@@ -52,6 +70,23 @@ class Query {
   TariffChoice? tariff;
 
   Query(this.appliance, {this.estimation, this.dailyHours, this.monthlyCycles, this.speed, this.tariff});
+
+  Query.fromJson(Map<String, dynamic> j)
+    : appliance = Appliance.fromJson(j['aparelho']),
+      estimation = j['estimativa'] == null ? null : Estimate.fromJson(j['estimativa']),
+      dailyHours = (j['horas_dia'] as num?)?.toDouble(),
+      monthlyCycles = (j['ciclos_mes'] as num?)?.toDouble(),
+      speed = j['velocidade'],
+      tariff = j['tarifa'] == null ? null : TariffChoice.fromJson(j['tarifa']);
+
+  Map<String, dynamic> toJson() => {
+    'aparelho': appliance.toJson(),
+    'estimativa': estimation?.toJson(),
+    'horas_dia': dailyHours,
+    'ciclos_mes': monthlyCycles,
+    'velocidade': speed,
+    'tarifa': tariff?.toJson(),
+  };
 
   bool get estimated => estimation != null;
   bool get smallAppliance => estimation?.route == resistiveRoute;
@@ -95,6 +130,59 @@ class Home extends ChangeNotifier {
   int _nextId = 1;
   int residents = 2;
 
+  /// Nome que a pessoa deu ("Casa", "Apartamento da praia").
+  String name;
+
+  /// Id da casa na nuvem (null = ainda nao foi gravada, ou a pessoa nao entrou na conta).
+  int? cloudId;
+
+  /// Sobe a cada mudanca que precisa ir para a nuvem (perfil e plano nao contam: a API nao guarda).
+  int version = 0;
+
+  Home({String? name}) : name = name ?? tr('Minha casa', 'My home');
+
+  /// Casa que veio de GET /casas. Item que nao da para ler (formato antigo) fica de fora.
+  Home.fromCloud(Map<String, dynamic> j) : name = j['nome'], cloudId = j['id'], residents = j['moradores'] {
+    final tariff = j['ultima_tarifa'];
+    if (tariff is Map<String, dynamic>) lastTariff = TariffChoice.fromJson(tariff);
+    for (final i in j['itens'] as List) {
+      try {
+        final data = i['dados'] as Map<String, dynamic>;
+        _items.add(
+          ItemHome(
+            _nextId++,
+            Query.fromJson(data['consulta']),
+            Result.fromJson(data['resultado']),
+            quantity: i['quantidade'],
+          ),
+        );
+      } catch (_) {}
+    }
+  }
+
+  /// Corpo de PUT /casas/{id}: a casa inteira (kWh e R$ de 1 unidade, como o app guarda).
+  Map<String, dynamic> toCloud() => {
+    'nome': name,
+    'moradores': residents,
+    'ultima_tarifa': lastTariff?.toJson(),
+    'itens': [
+      for (final i in _items)
+        {
+          'quantidade': i.quantity,
+          'categoria': i.result.category,
+          'kwh_mes': i.result.monthlyKwh,
+          'custo_mes': i.result.monthlyCost,
+          'dados': {'consulta': i.query.toJson(), 'resultado': i.result.json},
+        },
+    ],
+  };
+
+  void rename(String newName) {
+    name = newName.trim();
+    version++;
+    notifyListeners();
+  }
+
   /// Ultima tarifa usada: a tela da distribuidora oferece usar de novo.
   TariffChoice? lastTariff;
 
@@ -128,6 +216,7 @@ class Home extends ChangeNotifier {
   void _changed() {
     profile = null;
     plan = null;
+    version++;
     notifyListeners();
   }
 
@@ -173,6 +262,7 @@ class Home extends ChangeNotifier {
 
   void rememberTariff(TariffChoice tariff) {
     lastTariff = tariff;
+    version++;
     notifyListeners();
   }
 
@@ -224,5 +314,68 @@ class Home extends ChangeNotifier {
   }
 }
 
-/// Unica casa do app (sem login, sem banco no celular).
-final home = Home();
+/// As casas da pessoa (uma ou mais) e qual esta aberta. Sempre tem pelo menos uma.
+/// Repassa os avisos de mudanca de todas as casas: as telas escutam `homes` e redesenham tanto quando
+/// a casa aberta muda quanto quando a pessoa troca de casa.
+class Homes extends ChangeNotifier {
+  final List<Home> _list = [];
+  late Home _active;
+
+  Homes() {
+    _active = _attach(Home());
+    _list.add(_active);
+  }
+
+  List<Home> get list => List.unmodifiable(_list);
+  Home get active => _active;
+
+  Home _attach(Home h) {
+    h.addListener(notifyListeners);
+    return h;
+  }
+
+  /// Cria uma casa vazia e ja abre ela.
+  Home add(String name) {
+    final h = _attach(Home(name: name.trim()));
+    _list.add(h);
+    _active = h;
+    notifyListeners();
+    return h;
+  }
+
+  void select(Home h) {
+    if (!_list.contains(h) || identical(h, _active)) return;
+    _active = h;
+    notifyListeners();
+  }
+
+  /// Tira a casa da lista (a ultima nao sai). Se era a aberta, abre a primeira.
+  void remove(Home h) {
+    if (_list.length == 1 || !_list.contains(h)) return;
+    _list.remove(h);
+    h.removeListener(notifyListeners);
+    if (identical(h, _active)) _active = _list.first;
+    notifyListeners();
+  }
+
+  /// Troca todas as casas (ao entrar na conta). `open` = a que fica aberta.
+  void replaceAll(List<Home> newHomes, {Home? open}) {
+    if (newHomes.isEmpty) return reset();
+    for (final h in _list) {
+      h.removeListener(notifyListeners);
+    }
+    _list
+      ..clear()
+      ..addAll(newHomes.map(_attach));
+    _active = open != null && newHomes.contains(open) ? open : newHomes.first;
+    notifyListeners();
+  }
+
+  /// Volta para uma casa vazia so no aparelho (ao sair da conta; os testes tambem usam).
+  void reset() => replaceAll([Home()]);
+}
+
+final homes = Homes();
+
+/// Casa aberta agora: as telas usam `home` como antes (calcular, Minha casa, Economizar).
+Home get home => homes.active;

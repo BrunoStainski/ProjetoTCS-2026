@@ -584,7 +584,7 @@ class _HomeSummary extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: home,
+      listenable: homes,
       builder: (context, _) {
         if (home.isEmpty) return const SizedBox.shrink();
         final n = home.totalAppliances;

@@ -78,7 +78,7 @@ class MenuIamp extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([currentTab, home, account, lightMode]),
+          listenable: Listenable.merge([currentTab, homes, account, lightMode]),
           builder: (context, _) {
             final openItem = _tabItem[currentTab.value];
             Widget item(_Item i, IconData icon, IconData openIcon, String text, {Widget Function(Widget)? brand}) {
@@ -121,8 +121,8 @@ class MenuIamp extends StatelessWidget {
                   Icons.person_outline,
                   Icons.person,
                   account.value == null
-                      ? tr('Criar cadastro', 'Sign up')
-                      : tr('Meu cadastro (${account.value!.firstName})', 'My account (${account.value!.firstName})'),
+                      ? tr('Entrar ou criar conta', 'Log in or sign up')
+                      : tr('Minha conta (${account.value!.firstName})', 'My account (${account.value!.firstName})'),
                 ),
                 const SizedBox(height: Spacing.p),
                 const Divider(indent: Spacing.m, endIndent: Spacing.m),

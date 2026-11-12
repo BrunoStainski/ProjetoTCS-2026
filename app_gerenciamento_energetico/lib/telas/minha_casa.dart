@@ -5,6 +5,7 @@ import '../casa.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
+import 'casas.dart';
 import 'comum.dart';
 import 'dicas.dart';
 import 'sugestoes.dart';
@@ -62,9 +63,20 @@ class _MyHomeScreenState extends State<MyHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: home,
-      builder: (context, _) =>
-          AppPage(title: tr('Minha casa', 'My home'), footer: _footer(), child: home.isEmpty ? const _EmptyHome() : _list()),
+      listenable: homes,
+      builder: (context, _) => AppPage(
+        title: tr('Minha casa', 'My home'),
+        footer: _footer(),
+        // casa aberta no topo: tocar leva para a lista de casas (trocar, criar, renomear, apagar)
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const HomeSwitcher(),
+            const SizedBox(height: Spacing.m),
+            Expanded(child: home.isEmpty ? const _EmptyHome() : _list()),
+          ],
+        ),
+      ),
     );
   }
 

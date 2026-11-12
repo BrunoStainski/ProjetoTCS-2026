@@ -80,7 +80,7 @@ class WelcomeScreen extends StatelessWidget {
                         label: Text(tr('Comece a economizar', 'Start saving')),
                       ),
                       const SizedBox(height: Spacing.p),
-                      // cadastro opcional: quem nao quiser segue direto pelo botao de cima
+                      // conta opcional (salva as casas na nuvem): quem nao quiser segue direto pelo botao de cima
                       ValueListenableBuilder<Account?>(
                         valueListenable: account,
                         builder: (context, registered, _) => OutlinedButton.icon(
@@ -88,7 +88,7 @@ class WelcomeScreen extends StatelessWidget {
                               Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
                           icon: Icon(registered == null ? Icons.person_add_alt : Icons.person_outline),
                           label: Text(
-                            registered == null ? tr('Criar cadastro', 'Sign up') : tr('Meu cadastro', 'My account'),
+                            registered == null ? tr('Entrar ou criar conta', 'Log in or sign up') : tr('Minha conta', 'My account'),
                           ),
                         ),
                       ),

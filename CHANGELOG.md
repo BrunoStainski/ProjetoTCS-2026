@@ -6,6 +6,11 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Conta e várias casas na nuvem: a pessoa cria uma conta (nome, e-mail e senha, com o aceite do aviso de
+  privacidade) ou entra, e as casas ficam salvas no servidor. Uma conta pode ter várias casas (ex.: a casa e a casa
+  da praia), cada uma com os próprios aparelhos e moradores; dá para criar, trocar, renomear e apagar. Sem conta,
+  o app funciona como antes. API 0.6.0: rotas `/contas`, `/login`, `/logout`, `/conta`, `/conta/dados` e `/casas`;
+  tabelas `usuarios`, `sessoes`, `casas` e `itens_casa` (não são apagadas ao recarregar o catálogo).
 - Eco-Coach mais curto, a pedido do professor: o plano tem no máximo ~120 palavras (1 frase de diagnóstico
   e 3 ações curtas) e as dicas por aparelho ~80 (1 frase e 3 dicas). Antes eram ~250 e ~180. Avisos e
   mensagem de espera também mais curtos.

@@ -90,11 +90,119 @@ MockClient apiFake({List<Uri>? requests, List<String?>? languages}) => MockClien
   return body == null ? http.Response('{"detail": "nao existe"}', 404) : http.Response(jsonEncode(body), 200, headers: _json);
 });
 
+const profileJson = {
+  'perfil': 'Moderado',
+  'kwh_total': 80,
+  'kwh_por_morador': 40,
+  'comparacao_media': {'mediana_kwh_por_morador': 50, 'diferenca_percentual': -20, 'texto': '20% abaixo'},
+  'fracoes': {'frac_refrigerador': 1.0},
+  'aviso': 'sintetico',
+};
+
+/// Casa como o GET /casas devolve, com um item.
+Map<String, dynamic> savedHome(int id, String name, String category) => {
+  'id': id,
+  'nome': name,
+  'moradores': 2,
+  'ultima_tarifa': null,
+  'atualizado_em': '2026-11-12T10:00:00',
+  'itens': [
+    {
+      'quantidade': 1,
+      'categoria': category,
+      'kwh_mes': 30.0,
+      'custo_mes': 24.0,
+      'dados': {'consulta': query(category).toJson(), 'resultado': resultJson(category, 30, 24)},
+    },
+  ],
+};
+
+/// Espera um Future que depende da API falsa: no teste o tempo e falso, entao cada pump anda um pouco.
+Future<void> finish(WidgetTester tester, Future<void> future) async {
+  var done = false;
+  future.whenComplete(() => done = true);
+  for (var i = 0; i < 50 && !done; i++) {
+    await tester.pump(const Duration(milliseconds: 20));
+  }
+  await future;
+}
+
+/// API falsa da conta (POST /contas, /login, /logout, /casas...) com o resto igual a apiFake.
+class CloudFake {
+  final requests = <String>[];
+  final signUps = <Map<String, dynamic>>[];
+  final homes = <Map<String, dynamic>>[];
+  bool hasAccount = false;
+  bool deleted = false;
+  bool expired = false;
+  int saves = 0;
+  int _tokens = 0;
+  int _nextHome = 100;
+
+  void addAccount({List<Map<String, dynamic>> homes = const []}) {
+    hasAccount = true;
+    this.homes.addAll(homes);
+  }
+
+  Map<String, dynamic> _session() => {
+    'token': 'token-${++_tokens}',
+    'conta': {'id': 1, 'nome': 'Maria Silva', 'email': 'maria@exemplo.com'},
+  };
+
+  late final MockClient client = MockClient((r) async {
+    final auth = r.headers['Authorization'];
+    requests.add('${r.method} ${r.url.path} ${auth ?? ''}');
+    final body = r.body.isEmpty ? null : jsonDecode(r.body);
+    http.Response json(Object? o, [int status = 200]) => http.Response(jsonEncode(o), status, headers: _json);
+    final path = r.url.path;
+    if (path == '/contas') {
+      signUps.add(body);
+      hasAccount = true;
+      return json(_session(), 201);
+    }
+    if (path == '/login') {
+      return hasAccount && body['senha'] == 'senha-forte-1'
+          ? json(_session())
+          : json({'detail': 'e-mail ou senha incorretos'}, 401);
+    }
+    if (path == '/logout') return http.Response('', 204);
+    if (path.startsWith('/conta') || path.startsWith('/casas')) {
+      if (expired || auth == null) return json({'detail': 'entre na sua conta de novo'}, 401);
+      if (path == '/conta' && r.method == 'DELETE') {
+        deleted = true;
+        homes.clear();
+        return http.Response('', 204);
+      }
+      if (path == '/casas' && r.method == 'GET') return json(homes);
+      if (path == '/casas' && r.method == 'POST') {
+        final h = {'id': _nextHome++, 'nome': body['nome'], 'moradores': body['moradores'], 'itens': [], 'atualizado_em': ''};
+        homes.add(h);
+        return json(h, 201);
+      }
+      final id = int.parse(path.split('/').last);
+      final i = homes.indexWhere((h) => h['id'] == id);
+      if (i < 0) return json({'detail': 'casa nao existe'}, 404);
+      if (r.method == 'PUT') {
+        saves++;
+        homes[i] = {...body, 'id': id, 'atualizado_em': ''};
+        return json(homes[i]);
+      }
+      homes.removeAt(i);
+      return http.Response('', 204);
+    }
+    final copy = http.Request(r.method, r.url)
+      ..headers.addAll(r.headers)
+      ..body = r.body;
+    return apiFake().send(copy).then(http.Response.fromStream);
+  });
+}
+
 void main() {
   setUp(() {
     lightMode.value = false;
     account.value = null;
-    home.clear();
+    Api.token = null;
+    homes.reset();
     currentTab.value = AppTab.calculate;
     language.value = Language.pt; // o app sempre abre em portugues
   });
@@ -326,73 +434,182 @@ void main() {
     });
   });
 
-  group('Cadastro', () {
-    testWidgets('pelas boas-vindas: valida, cria, cumprimenta pelo nome e apaga', (tester) async {
-      phoneScreen(tester);
+  group('Conta e casas na nuvem', () {
+    Finder field(String label) => find.widgetWithText(TextField, label);
+
+    testWidgets('criar conta: valida, exige o aceite, cumprimenta e leva a casa para a nuvem', (tester) async {
+      phoneScreen(tester, tall: true);
+      final cloud = CloudFake();
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68)); // montou a casa antes de criar a conta
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
-        expect(find.text('Comece a economizar'), findsOneWidget); // continua dando para usar sem cadastro
-        await tester.tap(find.text('Criar cadastro'));
+        expect(find.text('Comece a economizar'), findsOneWidget); // continua dando para usar sem conta
+        await tester.tap(find.text('Entrar ou criar conta'));
         await tester.pumpAndSettle();
         expect(find.byType(SignUpScreen), findsOneWidget);
-        expect(find.textContaining('ficam só neste aparelho'), findsOneWidget); // aviso antes de preencher
+        expect(find.textContaining('O Iamp guarda no servidor'), findsOneWidget); // aviso antes de criar
 
-        // nome vazio e e-mail errado: nao cria
-        await tester.enterText(find.byType(TextField).last, 'maria@');
-        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
+        // nada preenchido: nao chama a API
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
         await tester.pumpAndSettle();
         expect(find.text('Digite o seu nome.'), findsOneWidget);
         expect(find.textContaining('Digite um e-mail válido'), findsOneWidget);
+        expect(find.textContaining('A senha precisa ter pelo menos 8'), findsOneWidget);
+        expect(find.text('Para criar a conta, aceite o aviso de privacidade.'), findsOneWidget);
+
+        await tester.enterText(field('Nome'), 'Maria Silva');
+        await tester.enterText(field('E-mail'), 'maria@exemplo.com');
+        await tester.enterText(field('Senha'), 'senha-forte-1');
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
+        await tester.pumpAndSettle();
+        expect(cloud.signUps, isEmpty); // ainda falta aceitar o aviso
+
+        await tester.ensureVisible(find.text('Li e aceito o aviso de privacidade'));
+        await tester.tap(find.text('Li e aceito o aviso de privacidade'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
+        await tester.pumpAndSettle();
+      }, () => cloud.client);
+      expect(cloud.signUps.single['aceite_privacidade'], isTrue);
+      expect(account.value!.email, 'maria@exemplo.com');
+      expect(find.text('Olá, Maria!'), findsOneWidget);
+      // a casa montada antes foi criada e gravada na conta
+      expect(cloud.homes.single['nome'], 'Minha casa');
+      expect((cloud.homes.single['itens'] as List).single['categoria'], 'chuveiro');
+      expect(cloud.requests.where((r) => r.startsWith('PUT /casas/') && r.endsWith('Bearer token-1')), hasLength(1));
+    });
+
+    testWidgets('entrar traz as casas da conta sem perder a que a pessoa montou antes', (tester) async {
+      tallScreen(tester);
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa da praia', 'geladeira')]);
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const SignUpScreen(logIn: true)));
+        await tester.enterText(field('E-mail'), 'maria@exemplo.com');
+        await tester.enterText(field('Senha'), 'errada-123');
+        await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
+        await tester.pumpAndSettle();
+        expect(find.text('e-mail ou senha incorretos'), findsOneWidget);
         expect(account.value, isNull);
 
-        await tester.enterText(find.byType(TextField).first, 'Maria Silva');
-        await tester.enterText(find.byType(TextField).last, 'maria@exemplo.com');
-        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
+        await tester.enterText(field('Senha'), 'senha-forte-1');
+        await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
         await tester.pumpAndSettle();
-        expect(account.value!.email, 'maria@exemplo.com');
-        expect(find.byType(SignUpScreen), findsNothing);
-        expect(find.text('Olá, Maria!'), findsOneWidget);
-        expect(find.text('Cadastro criado.'), findsOneWidget);
-
-        // o botao vira "Meu cadastro", com os dados preenchidos e a opcao de apagar
-        await tester.tap(find.text('Meu cadastro'));
-        await tester.pumpAndSettle();
-        expect(find.text('Maria Silva'), findsOneWidget);
-        await tester.tap(find.text('Apagar meu cadastro'));
-        await tester.pumpAndSettle();
-      }, apiFake);
-      expect(account.value, isNull);
-      expect(find.textContaining('Olá'), findsNothing);
-      expect(find.text('Criar cadastro'), findsOneWidget);
+      }, () => cloud.client);
+      expect(account.value!.name, 'Maria Silva');
+      expect([for (final h in homes.list) h.name], ['Casa da praia', 'Minha casa']);
+      expect(home.name, 'Minha casa'); // continua na casa que estava montando
+      expect(homes.list.first.items.single.result.category, 'geladeira'); // item lido do JSON da nuvem
+      expect(cloud.homes.length, 2); // a casa local subiu
     });
 
-    testWidgets('o cadastro não faz nenhuma chamada para a API', (tester) async {
-      phoneScreen(tester);
-      final requests = <Uri>[];
+    testWidgets('com conta, mudar a casa grava na nuvem (uma vez só, depois de uma pausa)', (tester) async {
+      final cloud = CloudFake()..addAccount();
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const SignUpScreen()));
-        await tester.enterText(find.byType(TextField).first, 'João');
-        await tester.enterText(find.byType(TextField).last, 'joao@exemplo.com');
-        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
-        await tester.pump();
-      }, () => apiFake(requests: requests));
-      expect(account.value!.firstName, 'João');
-      expect(requests, isEmpty);
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        final before = cloud.saves;
+        final item = home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+        home.changeQuantity(item, 2);
+        home.changeQuantity(item, 3);
+        await tester.pump(saveDelay);
+        await finish(tester, Future<void>.value());
+        expect(cloud.saves - before, 1);
+        expect((cloud.homes.single['itens'] as List).single['quantidade'], 3);
+        expect(syncState.value, SyncState.saved);
+
+        // perfil e plano nao vao para a nuvem: nao grava de novo
+        home.storeProfile(Classification.fromJson(profileJson));
+        await tester.pump(saveDelay);
+        expect(cloud.saves - before, 1);
+
+        await finish(tester, logOut());
+      }, () => cloud.client);
+      expect(account.value, isNull);
+      expect(Api.token, isNull);
+      expect(home.isEmpty, isTrue); // saiu: o aparelho volta para uma casa vazia; a conta continua com tudo
+      expect((cloud.homes.single['itens'] as List), isNotEmpty);
     });
 
-    testWidgets('cadastro e boas-vindas cabem na tela com a fonte do sistema em 2x', (tester) async {
+    testWidgets('apagar a conta pede confirmação e apaga tudo do servidor', (tester) async {
+      tallScreen(tester);
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa', 'geladeira')]);
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const SignUpScreen()));
+        expect(find.text('Minha conta'), findsOneWidget);
+        expect(find.widgetWithText(TextField, 'Maria Silva'), findsOneWidget);
+        await tester.tap(find.text('Apagar minha conta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancelar'));
+        await tester.pumpAndSettle();
+        expect(cloud.deleted, isFalse);
+        await tester.tap(find.text('Apagar minha conta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Apagar tudo'));
+        await tester.pumpAndSettle();
+      }, () => cloud.client);
+      expect(cloud.deleted, isTrue);
+      expect(account.value, isNull);
+      expect(homes.list.single.isEmpty, isTrue);
+    });
+
+    testWidgets('sessão vencida (401) sai da conta sem travar o app', (tester) async {
+      final cloud = CloudFake()..addAccount();
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        cloud.expired = true;
+        home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+        await tester.pump(saveDelay);
+        await finish(tester, Future<void>.value());
+      }, () => cloud.client);
+      expect(account.value, isNull);
+    });
+
+    testWidgets('conta e boas-vindas cabem na tela com a fonte do sistema em 2x', (tester) async {
       phoneScreen(tester, fontScale: 2);
-      account.value = const Account('Maria Aparecida', 'maria@exemplo.com');
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
-        await tester.tap(find.text('Meu cadastro'));
+        await tester.tap(find.text('Entrar ou criar conta'));
         await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Li e aceito o aviso de privacidade'),
+          300,
+          scrollable: find.descendant(of: find.byType(SignUpScreen), matching: find.byType(Scrollable)).first,
+        );
       }, apiFake);
       expect(tester.takeException(), isNull);
-      expect(find.text('Apagar meu cadastro'), findsOneWidget);
+      expect(find.text('Li e aceito o aviso de privacidade'), findsOneWidget);
+    });
+
+    test('casa vira JSON e volta igual (o que vai para a nuvem)', () {
+      final h = Home(name: 'Casa da praia')..changeResidents(4);
+      final q = Query(
+        const Appliance(id: 9, category: 'chuveiro', brand: 'LORENZETTI', model: 'X', detail: '5500 W'),
+        dailyHours: 0.25,
+        tariff: TariffChoice.manual(0.85),
+      );
+      h.changeQuantity(h.add(q, result('chuveiro', 41.25, 31.68)), 2);
+      final estimated = Query(
+        const Appliance(id: 0, category: 'televisor', brand: 'Sua TV', model: ''),
+        estimation: const Estimate(estimatedRoute, {'categoria': 'televisor', 'medida': 42}),
+      );
+      h.add(estimated, result('televisor', 10, 8));
+      h.rememberTariff(TariffChoice.manual(0.85));
+
+      final back = Home.fromCloud({...jsonDecode(jsonEncode(h.toCloud())), 'id': 5});
+      expect(back.name, 'Casa da praia');
+      expect(back.cloudId, 5);
+      expect(back.residents, 4);
+      expect(back.lastTariff!.tariffKwh, 0.85);
+      expect(back.monthlyCost, h.monthlyCost);
+      expect(back.items.first.quantity, 2);
+      expect(back.items.first.query.dailyHours, 0.25);
+      expect(back.items.first.query.appliance.detail, '5500 W');
+      expect(back.items.first.query.tariff!.manualTariff, 0.85);
+      expect(back.items.last.query.estimation!.route, estimatedRoute);
+      expect(back.items.last.query.estimation!.data['medida'], 42);
     });
 
     test('formato do e-mail', () {
@@ -400,6 +617,106 @@ void main() {
       for (final wrong in ['', 'maria', 'maria@', '@exemplo.com', 'maria@exemplo', 'ma ria@exemplo.com']) {
         expect(validEmail(wrong), isFalse, reason: wrong);
       }
+    });
+  });
+
+  group('Várias casas', () {
+    testWidgets('criar, trocar, renomear e apagar casas; cada casa tem a sua conta', (tester) async {
+      tallScreen(tester);
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        goTo(AppTab.home);
+        await tester.pumpAndSettle();
+        expect(find.text('R\$ 31,68 por mês'), findsWidgets);
+
+        // nova casa: abre vazia
+        await tester.tap(find.text('Criar outra casa'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Sem conta, as casas ficam só neste aparelho'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Nova casa'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Digite um nome para a casa.'), findsOneWidget);
+        await tester.enterText(find.byType(TextField), 'Casa da praia');
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Casa da praia'), findsOneWidget);
+        expect(find.text('Sua casa ainda está vazia'), findsOneWidget);
+        home.add(query('geladeira'), result('geladeira', 30, 24));
+        await tester.pumpAndSettle();
+        expect(find.text('R\$ 24,00 por mês'), findsWidgets);
+
+        // trocar de volta: a primeira casa continua com o chuveiro
+        await tester.tap(find.text('Trocar de casa ou criar outra'));
+        await tester.pumpAndSettle();
+        expect(find.text('R\$ 31,68 por mês · 1 aparelho'), findsOneWidget);
+        expect(find.textContaining('Aberta agora'), findsOneWidget);
+        await tester.tap(find.widgetWithText(OptionCard, 'Minha casa'));
+        await tester.pumpAndSettle();
+        expect(find.text('R\$ 31,68 por mês'), findsWidgets);
+
+        // renomear a primeira e apagar a outra
+        await tester.tap(find.text('Trocar de casa ou criar outra'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Renomear').first);
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'Casa da cidade');
+        await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Casa da cidade'), findsOneWidget);
+        await tester.tap(find.text('Apagar').last);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('O aparelho dela também sai'), findsOneWidget);
+        await tester.tap(find.widgetWithText(FilledButton, 'Apagar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Casa da praia'), findsNothing);
+        expect(find.text('Apagar'), findsNothing); // a ultima casa nao sai
+      }, apiFake);
+      expect([for (final h in homes.list) h.name], ['Casa da cidade']);
+    });
+
+    testWidgets('aparelho calculado vai para a casa aberta e o aviso diz qual', (tester) async {
+      phoneScreen(tester);
+      homes.add('Casa da praia');
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Geladeira ou freezer'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'brastemp');
+        await tester.tap(find.text('Buscar'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('BRASTEMP GELA'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Paraná'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('COPEL-DIS'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Adicionar à minha casa'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(find.textContaining('foi para "Casa da praia"'), findsOneWidget);
+      expect(homes.list.first.isEmpty, isTrue);
+      expect(homes.list.last.items.single.result.category, 'refrigerador');
+    });
+
+    testWidgets('lista de casas cabe na tela com a fonte do sistema em 2x', (tester) async {
+      phoneScreen(tester, fontScale: 2);
+      homes.add('Apartamento da praia com nome comprido');
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        goTo(AppTab.home);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Trocar de casa ou criar outra'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Minhas casas'), findsOneWidget);
     });
   });
 

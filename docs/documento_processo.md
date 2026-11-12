@@ -2,7 +2,7 @@
 
 **Documentação do Projeto Integrador de IA Aplicada (TCS 2026)**
 
-Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.0.0 / API 0.5.0
+Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.0.0 / API 0.6.0
 
 Integrantes: Bruno Stainski, Gianluca Graciano, João Lucas D'Almas, Matheus Gusmão
 
@@ -223,7 +223,9 @@ números de consumo e trechos de documentos públicos, nenhum dado pessoal.
 
 **Principais endpoints:** `GET /aparelhos`, `GET /marcas`, `GET /modelos`, `GET /distribuidoras`,
 `POST /calcular`, `POST /classificar`, `POST /sugestoes`, `POST /comparar`, `POST /eco-coach` e
-`POST /eco-coach/aparelho`, além dos de estimativa fora do catálogo. Com o cabeçalho
+`POST /eco-coach/aparelho`, além dos de estimativa fora do catálogo e dos da conta opcional
+(`POST /contas`, `POST /login`, `GET/PATCH/DELETE /conta`, `GET /conta/dados` e `/casas`, com
+`Authorization: Bearer <token>`). Com o cabeçalho
 `Accept-Language: en` os textos das respostas vêm em inglês. A lista completa e o formato de cada um
 ficam em `/docs`.
 
@@ -263,8 +265,11 @@ e como foram tratados:
 ### 4.3 Persistência e consultas SQL
 
 - **Esquema** em `src/banco.py`: `aparelhos`, `distribuidoras`, `tarifas`, `cargas`,
-  `consultas`, `portateis` e `trechos_rag` (pgvector). O diagrama entidade-relacionamento está em
-  `docs/der.png` (fonte em `docs/der.mmd`).
+  `consultas`, `portateis` e `trechos_rag` (pgvector). As contas ficam em `src/contas.py`:
+  `usuarios`, `sessoes`, `casas` e `itens_casa`, ligadas por chaves estrangeiras com exclusão em
+  cascata (apagar a conta apaga tudo dela) e criadas com `IF NOT EXISTS`, para a recarga do catálogo
+  não apagar as contas. O diagrama entidade-relacionamento está em `docs/der.png` (fonte em
+  `docs/der.mmd`).
 - A *view* `vw_tarifa_vigente` resolve, no SQL, qual tarifa vale hoje para cada distribuidora.
 - **Toda consulta é parametrizada**: o código nunca concatena texto do usuário no SQL.
 - O histórico (`consultas`) guarda só o aparelho, o uso e o resultado, sem nenhum dado pessoal,
@@ -437,7 +442,11 @@ Decisões de usabilidade:
   VoiceOver, nenhuma informação só por cor e valores em reais como informação principal.
 - **Idioma**: o app inteiro troca para o inglês pelo menu, para apresentar a quem não fala
   português; a API responde no mesmo idioma.
-- **Cadastro opcional** (nome e e-mail) que fica só na memória do aparelho e não vai para a API.
+- **Conta opcional e várias casas**: a pessoa pode ter mais de uma casa (ex.: a casa e a casa da
+  praia), cada uma com os próprios aparelhos, moradores, perfil e plano, e troca de casa no topo de
+  "Minha casa". Com conta (nome, e-mail e senha), as casas ficam salvas na nuvem e aparecem em
+  qualquer celular; cada mudança é gravada sozinha. Sem conta, o app funciona igual, com as casas só
+  no aparelho.
 - **Transparência**: cada resultado mostra o método do cálculo, a fonte do dado e os avisos
   (estimativa, valor sem impostos, dado imputado, texto gerado por IA).
 
@@ -448,9 +457,10 @@ Distribuição: APK Android assinado com a chave do projeto (Releases no GitHub)
 - **Separação de camadas:** regras de cálculo (`calculadora_residencial.py`), serviços
   (`servico.py`) e interface (API, terminal, app). As mesmas regras alimentam o app, a API e a
   geração dos dados de treino do ML.
-- **Testes automatizados:** 151 testes em Python (cálculo, API, estimativa, idioma, ML, RAG), dos
-  quais 60 usam o banco e são pulados quando ele não está no ar, e 67 testes de widget no app
-  Flutter (fluxo completo com API falsa, contraste, tamanho de toque, fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
+- **Testes automatizados:** 168 testes em Python (cálculo, API, contas, estimativa, idioma, ML,
+  RAG), dos quais 70 usam o banco e são pulados quando ele não está no ar, e 76 testes de widget no
+  app Flutter (fluxo completo com API falsa, conta e várias casas, contraste, tamanho de toque,
+  fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
   R$ 31,68/mês) é conferido nos testes e na infraestrutura.
 - **Fluxo de Git:** branch por pessoa ou tarefa e merge na `main` por Pull Request.
 - **Versionamento semântico** do app e da API, com histórico em `CHANGELOG.md` e tags no GitHub.
@@ -568,13 +578,20 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 ### 8.4 Privacidade e LGPD
 
-- O servidor do iamp **não recebe dados pessoais**: não há login, endereço ou documento. O
-  histórico guarda só aparelho, uso e resultado.
-- O **cadastro opcional** (nome e e-mail) fica só na memória do aparelho e não é enviado à API (há
-  teste que confere isso). Nome e e-mail são dados pessoais, e a LGPD vale mesmo num projeto de
-  curso. Antes de gravar o cadastro no banco faltam: consentimento registrado e aviso de
-  privacidade, senha com *hash* (argon2 ou bcrypt), HTTPS, rotas para ver, corrigir e apagar os
-  dados, e não enviar dado pessoal ao Gemini.
+- O uso sem conta continua sem nenhum dado pessoal: não pedimos endereço, documento nem a conta de
+  luz, e o histórico (`consultas`) guarda só aparelho, uso e resultado, sem ligação com a conta.
+- A **conta opcional** guarda nome e e-mail, que são dados pessoais; a LGPD vale mesmo num projeto
+  de curso. Por isso a conta só foi para o banco junto com os cuidados que ela exige:
+  - **Aviso de privacidade e consentimento registrado:** antes de criar, o app mostra o que fica
+    guardado, para quê, onde (servidor nos Estados Unidos, Render e Neon) e como apagar. Sem o
+    aceite a API recusa o cadastro, e o banco grava a data e a versão do aviso aceito.
+  - **Senha nunca gravada:** só o *hash* scrypt com sal (biblioteca padrão do Python), comparado em
+    tempo constante. Do token de sessão o banco guarda só o SHA-256; a sessão vence em 30 dias.
+  - **Direitos do titular:** ver tudo o que foi guardado (`GET /conta/dados`), corrigir nome e
+    e-mail (`PATCH /conta`) e apagar a conta com as casas (`DELETE /conta`, em cascata).
+  - **Minimização:** só nome, e-mail e as casas. O celular não guarda o token: fechar o app sai da
+    conta.
+  - **Isolamento:** a casa de outra pessoa responde como se não existisse (404), e há teste para isso.
 - Para o Gemini vão apenas números de consumo, trechos de documentos públicos e as perguntas da
   busca vetorial (nomes de aparelhos).
 - No plano gratuito da API do Gemini, o Google pode usar o conteúdo enviado para melhorar seus
@@ -590,9 +607,13 @@ ao lado do plano e mostra as fontes para o usuário conferir.
   `.env.example` (arquivo de modelo, versionado) e chegou a ser preparada para commit. A revisão
   antes do *push* barrou o arquivo. A lição virou regra: o `.env.example` só tem campos vazios, e
   qualquer chave exposta em canal não seguro deve ser trocada.
-- **Limitações assumidas do protótipo:** a API não tem autenticação, o CORS está aberto e, fora
-  do Render (que entrega HTTPS), roda em HTTP. Para produção: domínio com TLS (proxy reverso), CORS restrito, limite de requisições e
-  *state* do Terraform num backend remoto com controle de acesso.
+- **Contas:** as rotas da conta e das casas exigem o token; o login responde com a mesma mensagem
+  e no mesmo tempo para e-mail inexistente ou senha errada, para não revelar quem tem conta.
+- **Limitações assumidas do protótipo:** as rotas de cálculo são abertas, o CORS está aberto, não há
+  limite de tentativas de login nem confirmação do e-mail e, fora do Render (que entrega HTTPS), a
+  API roda em HTTP. Para produção: domínio com TLS (proxy reverso), CORS restrito, limite de
+  requisições (principalmente no login), confirmação do e-mail e *state* do Terraform num backend
+  remoto com controle de acesso.
 
 ### 8.6 Viabilidade
 
@@ -616,7 +637,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |
 | Base do RAG | 5 documentos, 45 trechos com origem registrada |
-| Testes | Python: 151 (91 sem banco + 60 com banco), aprovados em 11/11/2026; app: 67 testes de widget, aprovados em 12/11/2026 |
+| Testes | Python: 168 (98 sem banco + 70 com banco); app: 76 testes de widget. Rodados em 12/11/2026: os do app e os de Python passam, exceto 7 do Eco-Coach com banco, que pedem a base vetorial atual (recarregar com `carregar_rag.py`) |
 | Exemplo de ROI | Geladeira de 2005 → modelo atual de 415 L: economia de R$ 32,66/mês, payback de 7,7 anos a R$ 3.000 |
 | Exemplo de referência | Chuveiro 5.500 W, 15 min/dia, Copel: 41,25 kWh = R$ 31,68/mês (conferido via API) |
 

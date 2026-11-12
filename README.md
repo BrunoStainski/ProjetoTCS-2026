@@ -86,6 +86,7 @@ O usuário escolhe um aparelho (marca e modelo) e a distribuidora de energia da 
 | `vw_tarifa_vigente` | Visão com a tarifa que vale hoje para cada distribuidora |
 | `cargas` | De qual arquivo veio cada dado e quando foi carregado |
 | `consultas` | Histórico dos cálculos feitos no app (sem dados pessoais) |
+| `usuarios`, `sessoes`, `casas`, `itens_casa` | Contas (opcionais) e as casas de cada pessoa, salvas na nuvem; a senha só como hash |
 | `portateis` | Eletroportáteis (air fryer, secador...) com potência e uso típicos e a fonte de cada um |
 | `trechos_rag` | Trechos dos documentos oficiais e seus vetores, para a busca do Eco-Coach |
 
@@ -343,6 +344,9 @@ Documentação interativa: **http://localhost:8000/docs** (dá para testar cada 
 | `GET /resistivos`, `POST /calcular/resistivo` | Eletroportáteis (air fryer, secador, ferro...) por potência e tempo de uso |
 | `GET /categorias`, `GET /ufs` | Listas para preencher filtros no app |
 | `GET /saude` | Diz se a API e o banco estão no ar |
+| `POST /contas`, `POST /login`, `POST /logout` | Criar conta (com o aceite do aviso de privacidade), entrar e sair. Devolvem um token |
+| `GET`/`PATCH`/`DELETE /conta`, `GET /conta/dados` | Ver, corrigir e apagar a conta; baixar tudo o que ela guarda |
+| `GET`/`POST /casas`, `PUT`/`DELETE /casas/{id}` | As casas da pessoa (uma ou mais) com os aparelhos de cada uma |
 
 Com o cabeçalho `Accept-Language: en`, os textos das respostas (método, avisos, mensagens e o plano do Eco-Coach) vêm em inglês; sem ele, em português. As chaves do JSON e os números não mudam.
 
@@ -405,9 +409,11 @@ No menu (☰) a pessoa também escolhe:
 
 - **Aparência:** escuro (padrão) ou claro. No modo claro o amarelo fica só nos preenchimentos e os detalhes usam um âmbar escuro, para manter o contraste.
 - **Idioma:** português (padrão) ou inglês, para apresentar a quem não fala português. Os textos da API vêm no mesmo idioma.
-- **Cadastro (opcional):** nome e e-mail, só para o app cumprimentar a pessoa. Fica só na memória do celular e não vai para a API nem para o banco.
+- **Conta (opcional):** nome, e-mail e senha. Com ela, as casas ficam salvas na nuvem e aparecem em qualquer celular. Antes de criar, o app mostra o aviso de privacidade (o que fica guardado, para quê e onde) e só cria a conta com o aceite. Em "Minha conta" dá para corrigir os dados, sair ou apagar a conta com tudo o que ela guarda.
 
-As escolhas não ficam gravadas: o app sempre abre escuro, em português e sem cadastro.
+Aparência e idioma não ficam gravados: o app sempre abre escuro e em português. A conta também não fica aberta: ao fechar o app, é preciso entrar de novo.
+
+**Várias casas:** no topo de "Minha casa" fica a casa aberta. Tocando nela, a pessoa troca de casa, cria outra (ex.: "Casa da praia"), renomeia ou apaga. Cada casa tem os próprios aparelhos, moradores, perfil e plano. Sem conta, as casas ficam só no celular até fechar o app.
 
 | Regra | Como aparece no app |
 |---|---|
@@ -596,6 +602,7 @@ python scripts/treinar_kmeans.py
 - API FastAPI no Docker, subindo junto com o banco (`docker compose up -d`)
 - Machine Learning: residências sintéticas (CTGAN) e perfil de consumo (K-Means)
 - App Flutter ligado à API: cálculo, "Minha casa", perfil da casa, sugestão de troca e payback
+- Conta opcional com várias casas salvas na nuvem (senha com hash, aviso de privacidade, apagar tudo)
 - Diagramas BPMN em níveis (`docs/bpmn/`) e o completo (`docs/bpmn_processo.bpmn`), DER do banco (`docs/der.png`)
 - Análise exploratória com gráficos (`notebooks/eda.ipynb`, imagens em `docs/graficos/`)
 - Eco-Coach: plano de economia com RAG (pgvector + Gemini) e tela no app
