@@ -344,7 +344,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 - Escolhidos porque a Oracle (instituição) só libera o acesso em até 2 semanas e a apresentação é antes; os dois
   são grátis, sem cartão, com login pelo GitHub. `infra/oracle/` continua pronto como alternativa.
-- `render.yaml` (Blueprint): serviço web Docker, plano free, região virginia (perto do Neon AWS us-east-1),
+- `render.yaml` (Blueprint): serviço web Docker, plano free, região ohio (a mesma do projeto Neon "Iamp", AWS us-east-2),
   `healthCheckPath: /saude`, deploy a cada push na `main`. Segredos no painel: `DATABASE_URL` (Neon) e
   `GEMINI_API_KEY`. `Dockerfile` usa `${PORT:-8000}`; `config.py` troca `postgresql://` por
   `postgresql+psycopg2://` (o SQLAlchemy 2.1 usa o psycopg 3 nesse formato e o projeto usa o psycopg2).

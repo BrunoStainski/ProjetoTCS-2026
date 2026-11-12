@@ -9,7 +9,7 @@ services:
     name: iamp-api
     runtime: docker
     plan: free
-    region: virginia  # perto do Neon em AWS us-east-1: cada calculo faz varias consultas ao banco
+    region: ohio  # mesma regiao do Neon (AWS us-east-2, Ohio): cada calculo faz varias consultas ao banco
     dockerfilePath: ./Dockerfile
     healthCheckPath: /saude
     branch: main
