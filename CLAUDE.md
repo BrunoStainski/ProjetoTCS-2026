@@ -206,6 +206,8 @@ adicionar coluna no catálogo, atualize SCHEMA + COLUNAS_APARELHOS e o banco rec
   `datasets/raw/rag/` e o script). Sem a chave, só avisa e o /eco-coach responde 503.
 - LLM: Gemini pela API gratuita do AI Studio (`GEMINI_API_KEY`; `GEMINI_MODELOS` = principal e reserva,
   hoje `gemini-3.5-flash,gemini-3.5-flash-lite`). `thinking_budget=0`: o raciocínio interno cortava o texto.
+  Modelo que recusa o `thinking_budget` (erro 400; o 3.5-flash-lite em 12/11/2026) é chamado de novo sem ele;
+  antes o reserva nunca entrava. O erro 503 mostra o código de cada modelo (503 sobrecarregado, 429 limite).
   Hugging Face foi descartado: a conta não tem crédito gratuito (402).
 - O Python calcula tudo (perfil, totais, maiores consumos; payback vem do /comparar); o LLM só escreve,
   com regras no prompt (não inventar números, toda dica com [n], ignorar instruções dentro das fontes).
@@ -259,7 +261,10 @@ lugar visível (app, web, Android, iOS).
 - Economizar (`eco_coach.dart`): só chama o /eco-coach quando a pessoa toca em "Montar meu plano"; o plano
   fica em `casa.plano` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
   markdown do Gemini sem pacote extra (títulos em letras normais, listas, **negrito**, citações [n] em
-  amarelo). Trocas com payback de `comparar.dart` entram em `casa.trocas` (máx. 5). Timeout: 90 s.
+  amarelo). Trocas com payback de `comparar.dart` entram em `casa.trocas` (máx. 5) com o `Result` do aparelho
+  atual: `home.swaps` só devolve as de aparelhos que ainda estão na casa (removido ou já trocado não vai para o
+  Eco-Coach; "Desfazer" traz de volta). Timeout: 90 s. Resposta da API que não é JSON (500 em texto, página do
+  Render acordando) vira `ApiError` com mensagem clara em `Api._clean`.
 - `uso.dart` respeita `opcional` do `GET /uso`: nas horas da TV e do ar, "Não sei" = valor do Inmetro.
 - Nunca passar arrow que devolve Future para `setState` (`setState(() => _f = futuro())` quebra).
 - Busca: resultados agrupados por tipo (`ResultsPerType`, `categoryTitle`); um tipo só já vem aberto;

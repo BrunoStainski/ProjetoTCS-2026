@@ -73,6 +73,55 @@ def test_without_gemini_key_gives_clear_error(monkeypatch):
         rag_agent.call_llm("oi")
 
 
+class _GeminiError(Exception):
+    def __init__(self, code):
+        super().__init__(f"erro {code}")
+        self.code = code
+
+
+def _fake_gemini(monkeypatch, behavior):
+    """Troca o cliente do Gemini: behavior(model, config) devolve o texto ou levanta o erro."""
+    from types import SimpleNamespace
+
+    from google import genai
+
+    calls = []
+
+    def generate_content(model, contents, config):
+        calls.append((model, config.thinking_config is not None))
+        text = behavior(model, config)
+        return SimpleNamespace(text=text, candidates=[SimpleNamespace(finish_reason="STOP")])
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=generate_content))
+    monkeypatch.setattr(genai, "Client", lambda api_key: client)
+    monkeypatch.setattr(rag_agent.config, "_ENV", {"GEMINI_API_KEY": "teste", "GEMINI_MODELOS": "principal,reserva"})
+    return calls
+
+
+def test_backup_model_that_refuses_thinking_budget_is_called_again_without_it(monkeypatch):
+    """Caso real (12/11/2026): principal sobrecarregado (503) e reserva recusando o thinking_budget (400)."""
+    def behavior(model, config):
+        if model == "principal":
+            raise _GeminiError(503)
+        if config.thinking_config is not None:
+            raise _GeminiError(400)
+        return "Plano [1]."
+
+    calls = _fake_gemini(monkeypatch, behavior)
+    assert rag_agent.call_llm("oi") == ("Plano [1].", "reserva")
+    # o 503 nao repete no mesmo modelo; o 400 repete sem o thinking_budget
+    assert calls == [("principal", True), ("reserva", True), ("reserva", False)]
+
+
+def test_llm_error_message_shows_the_http_code(monkeypatch):
+    def behavior(model, config):
+        raise _GeminiError(503 if model == "principal" else 429)
+
+    _fake_gemini(monkeypatch, behavior)
+    with pytest.raises(RuntimeError, match=r"principal: _GeminiError 503; reserva: _GeminiError 429"):
+        rag_agent.call_llm("oi")
+
+
 def test_source_without_section_or_page_becomes_none(monkeypatch, fake_llm):
     """Paginas HTML nao tem secao/pagina: o pandas devolve NaN, que quebrava a resposta (erro 500)."""
     nan = float("nan")

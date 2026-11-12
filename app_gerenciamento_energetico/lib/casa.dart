@@ -106,7 +106,11 @@ class Home extends ChangeNotifier {
 
   /// Trocas com payback calculado em "Vale a pena trocar?" (no maximo 5, as mais recentes).
   final List<EvaluatedSwap> _swaps = [];
-  List<EvaluatedSwap> get swaps => List.unmodifiable(_swaps);
+
+  /// So as trocas de aparelhos que ainda estao na casa: removido ou ja trocado, o Eco-Coach nao recomenda
+  /// de novo. "Desfazer" a remocao traz o mesmo item (o mesmo resultado), entao a troca volta junto.
+  List<EvaluatedSwap> get swaps =>
+      List.unmodifiable(_swaps.where((s) => s.current == null || _items.any((i) => identical(i.result, s.current))));
 
   List<ItemHome> get items => List.unmodifiable(_items);
   bool get isEmpty => _items.isEmpty;

@@ -6,6 +6,16 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Correção: "Ver modelos que gastam menos" dava erro quando o tempo de uso era 0 h 0 min (ou 0 ciclos). Agora
+  explica que, com esse uso, o aparelho não gasta energia.
+- Correção: quando a API respondia com erro em texto (ou o servidor ainda estava acordando), o app mostrava
+  "FormatException" ou não mostrava nada. Agora aparece "O Iamp está com um problema agora. Tente de novo em
+  instantes."
+- Correção: o Eco-Coach continuava recebendo trocas de aparelhos que já tinham saído da casa (removidos ou já
+  trocados) e podia recomendar uma troca feita. Agora só entram as trocas de aparelhos que estão na casa.
+- Correção: o modelo reserva do Gemini (`gemini-3.5-flash-lite`) recusava o pedido e nunca entrava quando o
+  principal estava sobrecarregado. Agora ele é chamado de novo sem a opção que recusava.
+
 - Modo claro: no menu (☰), seção "Aparência" com "Escuro" e "Claro". O app abre no escuro (a identidade do
   Iamp) e a escolha não fica gravada. No claro, o amarelo fica só nos preenchimentos (botões, aba escolhida) e
   os detalhes usam um âmbar escuro, para manter o contraste AA no fundo branco.
