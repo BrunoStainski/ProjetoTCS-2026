@@ -5,7 +5,7 @@
     <bpmn:textAnnotation id="N_saidas"><bpmn:text>Roda pelos scripts, não a cada requisição. Os .pkl guardam só números: a imagem da API não precisa do scikit-learn.</bpmn:text></bpmn:textAnnotation>
   </bpmn:collaboration>
   <bpmn:process id="Proc_P_Off" isExecutable="false">
-    <bpmn:startEvent id="ini" name="Novos dados Inmetro / ANEEL / ANP"><bpmn:outgoing>F_ini_limpar</bpmn:outgoing></bpmn:startEvent>
+    <bpmn:startEvent id="ini" name="Novos dados Inmetro / ANEEL"><bpmn:outgoing>F_ini_limpar</bpmn:outgoing></bpmn:startEvent>
     <bpmn:serviceTask id="limpar" name="Limpar e tratar nulos (tratar_dados_*.py, Pandas)"><bpmn:incoming>F_ini_limpar</bpmn:incoming><bpmn:outgoing>F_limpar_carregar</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:serviceTask id="carregar" name="Carregar no PostgreSQL (criar_banco.py)"><bpmn:incoming>F_limpar_carregar</bpmn:incoming><bpmn:outgoing>F_carregar_abre</bpmn:outgoing></bpmn:serviceTask>
     <bpmn:parallelGateway id="abre"><bpmn:incoming>F_carregar_abre</bpmn:incoming><bpmn:outgoing>F_abre_seed</bpmn:outgoing><bpmn:outgoing>F_abre_rf</bpmn:outgoing><bpmn:outgoing>F_abre_emb</bpmn:outgoing><bpmn:outgoing>F_abre_eda</bpmn:outgoing></bpmn:parallelGateway>

@@ -24,8 +24,7 @@
 <polyline points="1225.0,225.0 1302.0,225.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <circle cx="100" cy="225" r="18" fill="#fff" stroke="#000" stroke-width="1.8"/>
 <text x="100.0" y="257.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Novos dados</text>
-<text x="100.0" y="270.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Inmetro / ANEEL /</text>
-<text x="100.0" y="283.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">ANP</text>
+<text x="100.0" y="270.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Inmetro / ANEEL</text>
 <rect x="160.0" y="185.0" width="160" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
 <text x="240.0" y="218.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Limpar e tratar nulos</text>
 <text x="240.0" y="233.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(tratar_dados_*.py,</text>

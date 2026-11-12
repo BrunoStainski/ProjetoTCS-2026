@@ -624,7 +624,7 @@ def offline_training():
     d.pool("P_Off", "Preparação de dados e treino (offline, scripts)", 10, 10, 1400, 430)
     Y = 225
     lines = {"seed": 70, "rf": 170, "rag": 280, "eda": 380}
-    d.no("P_Off", "ini", "inicio", "Novos dados Inmetro / ANEEL / ANP", 100, Y)
+    d.no("P_Off", "ini", "inicio", "Novos dados Inmetro / ANEEL", 100, Y)
     d.no("P_Off", "limpar", "servico", "Limpar e tratar nulos (tratar_dados_*.py, Pandas)", 240, Y, w=160)
     d.no("P_Off", "carregar", "servico", "Carregar no PostgreSQL (criar_banco.py)", 410, Y, w=140)
     d.no("P_Off", "abre", "and", "", 525, Y)
