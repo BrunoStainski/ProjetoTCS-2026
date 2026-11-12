@@ -320,6 +320,26 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 - Segredos só no state/tfvars (no `.gitignore`), nunca nos metadados da VM. State local, API em HTTP.
 - Credenciais da Oracle: `~/.oci/config` (perfil `oci_perfil`). App: `--dart-define=API_URL=<api_url>`.
 
+## Modo claro, transições e cadastro (app)
+
+- Modo claro: `Palette.dark`/`Palette.light` (tema.dart) com os mesmos papéis de cor; `iampTheme(light:)` e
+  `Iamp.forPalette`. `lightMode` (ValueNotifier) é escutado pelo MaterialApp; menu, seção "Aparência"
+  (Escuro/Claro). Abre no escuro e não grava a escolha. No claro o amarelo `#FFD000` não tem contraste no branco:
+  fica só em preenchimento (`t.highlightFill` + `t.onFill` preto) e `t.highlight` vira âmbar `#7A5A00`. Nas telas,
+  preenchimento amarelo = `highlightFill`; ícone/texto de destaque = `highlight`. Nunca `AppColors.*` direto
+  (são as cores do escuro). Teste de contraste AA no claro em `widget_test.dart` (grupo "Modo claro").
+- Transições: `StepTransition` (tema.dart) no `pageTransitionsTheme` de todas as plataformas (280 ms, desliza
+  + apaga); barra de etapa com `TweenAnimationBuilder` na `AppPage`; perguntas da estimativa com
+  `AnimatedSwitcher` (`_forward` dá o lado). Tudo respeita `MediaQuery.disableAnimationsOf`.
+- Cadastro: `conta.dart` (`account` = ValueNotifier<Account?>, nome + e-mail) e `telas/cadastro.dart`
+  (`SignUpScreen`), aberto pelas boas-vindas e pelo menu. Opcional, só em memória, **sem chamada à API**
+  (há teste disso). O menu ficou mais comprido: nos testes, rolar com `scrollUntilVisible` até Aparência/Idioma.
+- Cadastro e LGPD: nome e e-mail são dados pessoais; a LGPD vale mesmo em projeto de curso gratuito (a exceção
+  acadêmica do art. 4º é parcial e não cobre um app distribuído a terceiros). Para ligar o cadastro ao banco
+  falta: consentimento registrado e aviso de privacidade, senha com hash (argon2/bcrypt), HTTPS (o Render dá),
+  rotas para ver/corrigir/apagar os dados, não mandar dado pessoal ao Gemini e, na tabela `consultas`, decidir
+  se o histórico fica ligado à pessoa. Enquanto isso não existir, o cadastro não sai do aparelho.
+
 ## Nuvem: Render (API) + Neon (banco)
 
 - Escolhidos porque a Oracle (instituição) só libera o acesso em até 2 semanas e a apresentação é antes; os dois

@@ -1,4 +1,7 @@
 // Identidade visual do Iamp: fundo preto, amarelo de energia nos destaques e texto branco.
+// Modo claro (opcao no menu): mesmos papeis de cor numa paleta clara (Palette.light). O amarelo
+// #FFD000 nao tem contraste no branco, entao no claro ele fica so em preenchimentos (botao, aba
+// escolhida, com texto preto) e os detalhes (icones, bordas, valor em destaque) usam um ambar escuro.
 // Regra 60/30/10: 60% preto (fundo), 30% branco e superficies escuras, 10% amarelo
 // (botoes e o valor principal). Verde e vermelho so aparecem quando tem significado:
 // verde = economia / coisa boa, vermelho = alerta / erro. A cor nunca e o unico aviso:
@@ -34,6 +37,101 @@ class AppColors {
   static const example = Color(0xB3FFFFFF); // exemplo dentro do campo (70%, contraste ~10:1)
 }
 
+/// Cores de um modo (escuro ou claro), com os mesmos papeis. O tema e a extensao Iamp saem daqui.
+class Palette {
+  final Brightness brightness;
+  final Color background;
+  final Color surface; // cartoes
+  final Color highSurface; // campos, menus
+  final Color border;
+  final Color divider;
+  final Color track;
+  final Color fill; // preenchimento de acao (botao, aba escolhida): sempre o amarelo
+  final Color onFill; // texto e icone sobre o preenchimento
+  final Color accent; // destaque sobre o fundo: icones, valor principal, links
+  final Color softHighlight; // fundo de destaque suave
+  final Color green;
+  final Color red;
+  final Color errorBackground;
+  final Color onErrorBackground;
+  final Color strongText;
+  final Color bodyText;
+  final Color secondaryText;
+  final Color exampleText;
+
+  const Palette({
+    required this.brightness,
+    required this.background,
+    required this.surface,
+    required this.highSurface,
+    required this.border,
+    required this.divider,
+    required this.track,
+    required this.fill,
+    required this.onFill,
+    required this.accent,
+    required this.softHighlight,
+    required this.green,
+    required this.red,
+    required this.errorBackground,
+    required this.onErrorBackground,
+    required this.strongText,
+    required this.bodyText,
+    required this.secondaryText,
+    required this.exampleText,
+  });
+
+  static const dark = Palette(
+    brightness: Brightness.dark,
+    background: AppColors.black,
+    surface: AppColors.surface,
+    highSurface: AppColors.highSurface,
+    border: AppColors.border,
+    divider: AppColors.divider,
+    track: AppColors.track,
+    fill: AppColors.yellow,
+    onFill: AppColors.black,
+    accent: AppColors.yellow,
+    softHighlight: AppColors.yellowDark,
+    green: AppColors.green,
+    red: AppColors.red,
+    errorBackground: AppColors.errorBackground,
+    onErrorBackground: Color(0xFFFFDAD6),
+    strongText: AppColors.white,
+    bodyText: AppColors.body,
+    secondaryText: AppColors.secondary,
+    exampleText: AppColors.example,
+  );
+
+  /// Claro: contraste AA conferido no branco e na superficie (ambar 6,4:1, verde 5,4:1, vermelho 5,9:1,
+  /// borda 4,2:1; texto mais apagado = preto a 70%, ~8:1).
+  static const light = Palette(
+    brightness: Brightness.light,
+    background: Color(0xFFFFFFFF),
+    surface: Color(0xFFF6F3E8),
+    highSurface: Color(0xFFECE8DA),
+    border: Color(0xFF9A7600),
+    divider: Color(0x409A7600),
+    track: Color(0xFFE3DFD0),
+    fill: AppColors.yellow,
+    onFill: AppColors.black,
+    accent: Color(0xFF7A5A00),
+    softHighlight: Color(0xFFFFF3BF),
+    green: Color(0xFF0A7A3D),
+    red: Color(0xFFC0271F),
+    errorBackground: Color(0xFFFDECEA),
+    onErrorBackground: Color(0xFF5C0F0A),
+    strongText: Color(0xFF111111),
+    bodyText: Color(0xE6000000),
+    secondaryText: Color(0xCC000000),
+    exampleText: Color(0xB3000000),
+  );
+}
+
+/// Modo claro ligado? O MaterialApp escuta este valor (main.dart). Comeca no escuro (a identidade
+/// do app) e a escolha, como o idioma, nao fica gravada.
+final lightMode = ValueNotifier<bool>(false);
+
 /// Espacamentos em multiplos de 4 e 8 (grade de 8).
 class Spacing {
   static const pp = 4.0;
@@ -62,7 +160,9 @@ class Iamp extends ThemeExtension<Iamp> {
   final TextStyle label;
 
   // cores com significado
-  final Color highlight; // acao e valor principal (amarelo)
+  final Color highlight; // destaque sobre o fundo: icone, valor principal (amarelo; ambar escuro no claro)
+  final Color highlightFill; // preenchimento amarelo (aba escolhida, item aberto do menu)
+  final Color onFill; // texto e icone sobre o preenchimento (preto)
   final Color savings; // verde
   final Color alert; // vermelho
   final Color surface;
@@ -93,6 +193,8 @@ class Iamp extends ThemeExtension<Iamp> {
     required this.secondary,
     required this.label,
     required this.highlight,
+    required this.highlightFill,
+    required this.onFill,
     required this.savings,
     required this.alert,
     required this.surface,
@@ -111,25 +213,28 @@ class Iamp extends ThemeExtension<Iamp> {
     required this.maxWidth,
   });
 
-  static const defaults = Iamp(
-    value: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.yellow),
-    averageValue: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.white),
-    question: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.white, height: 1.3),
-    title: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.white),
-    strong: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.white),
-    body: TextStyle(fontSize: 18, color: AppColors.body, height: 1.4),
-    number: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: AppColors.white),
-    secondary: TextStyle(fontSize: 16, color: AppColors.secondary, height: 1.35),
-    label: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.secondary),
-    highlight: AppColors.yellow,
-    savings: AppColors.green,
-    alert: AppColors.red,
-    surface: AppColors.surface,
-    highlightBackground: AppColors.yellowDark,
-    errorBackground: AppColors.errorBackground,
-    border: AppColors.border,
-    strongText: AppColors.white,
-    secondaryText: AppColors.secondary,
+  /// Estilos e cores de um modo. Os tamanhos sao os mesmos; so as cores mudam.
+  factory Iamp.forPalette(Palette c) => Iamp(
+    value: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: c.accent),
+    averageValue: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: c.strongText),
+    question: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c.strongText, height: 1.3),
+    title: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: c.strongText),
+    strong: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c.strongText),
+    body: TextStyle(fontSize: 18, color: c.bodyText, height: 1.4),
+    number: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, fontFeatures: _numbers, color: c.strongText),
+    secondary: TextStyle(fontSize: 16, color: c.secondaryText, height: 1.35),
+    label: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.secondaryText),
+    highlight: c.accent,
+    highlightFill: c.fill,
+    onFill: c.onFill,
+    savings: c.green,
+    alert: c.red,
+    surface: c.surface,
+    highlightBackground: c.softHighlight,
+    errorBackground: c.errorBackground,
+    border: c.border,
+    strongText: c.strongText,
+    secondaryText: c.secondaryText,
     radius: 16,
     smallRadius: 8,
     icon: 24,
@@ -139,6 +244,9 @@ class Iamp extends ThemeExtension<Iamp> {
     progressBar: 8,
     maxWidth: 640,
   );
+
+  /// Modo escuro (o padrao do app).
+  static final defaults = Iamp.forPalette(Palette.dark);
 
   /// Le do tema; fora do app (testes de um widget so) usa o padrao.
   static Iamp de(BuildContext context) => Theme.of(context).extension<Iamp>() ?? defaults;
@@ -166,32 +274,71 @@ class Iamp extends ThemeExtension<Iamp> {
   Iamp lerp(Iamp? other, double t) => t < 0.5 || other == null ? this : other;
 }
 
-ThemeData iampTheme() {
-  const t = Iamp.defaults;
-  const schema = ColorScheme(
-    brightness: Brightness.dark,
-    primary: AppColors.yellow,
-    onPrimary: AppColors.black,
-    primaryContainer: AppColors.yellowDark,
-    onPrimaryContainer: AppColors.yellow,
-    secondary: AppColors.green,
-    onSecondary: AppColors.black,
-    secondaryContainer: AppColors.highSurface,
-    onSecondaryContainer: AppColors.white,
-    error: AppColors.red,
-    onError: AppColors.black,
-    errorContainer: AppColors.errorBackground,
-    onErrorContainer: Color(0xFFFFDAD6),
-    surface: AppColors.black,
-    onSurface: AppColors.white,
-    onSurfaceVariant: AppColors.secondary,
-    surfaceContainerLowest: AppColors.black,
-    surfaceContainerLow: AppColors.surface,
-    surfaceContainer: AppColors.surface,
-    surfaceContainerHigh: AppColors.highSurface,
-    surfaceContainerHighest: AppColors.highSurface,
-    outline: AppColors.border,
-    outlineVariant: AppColors.border,
+/// Transicao entre as etapas (toda troca de tela): a tela nova entra deslizando um pouco da direita
+/// enquanto aparece, e a anterior recua para a esquerda e apaga; ao voltar, o caminho inverso.
+/// Curta (280 ms) para nao atrasar quem ja conhece o app. Com "remover animacoes" ligado no sistema
+/// (acessibilidade), a tela troca direto.
+class StepTransition extends PageTransitionsBuilder {
+  const StepTransition();
+
+  static const duration = Duration(milliseconds: 280);
+  static final _enter = Tween(begin: const Offset(0.16, 0), end: Offset.zero).chain(CurveTween(curve: Curves.easeOutCubic));
+  static final _leave = Tween(begin: Offset.zero, end: const Offset(-0.10, 0)).chain(CurveTween(curve: Curves.easeOutCubic));
+  static final _appear = CurveTween(curve: Curves.easeOut);
+  static final _fade = Tween(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeOut));
+
+  @override
+  Duration get transitionDuration => duration;
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+    return SlideTransition(
+      position: secondaryAnimation.drive(_leave),
+      child: FadeTransition(
+        opacity: secondaryAnimation.drive(_fade),
+        child: SlideTransition(
+          position: animation.drive(_enter),
+          child: FadeTransition(opacity: animation.drive(_appear), child: child),
+        ),
+      ),
+    );
+  }
+}
+
+ThemeData iampTheme({bool light = false}) {
+  final c = light ? Palette.light : Palette.dark;
+  final t = Iamp.forPalette(c);
+  final schema = ColorScheme(
+    brightness: c.brightness,
+    primary: c.fill,
+    onPrimary: c.onFill,
+    primaryContainer: c.softHighlight,
+    onPrimaryContainer: c.accent,
+    secondary: c.green,
+    onSecondary: c.onFill,
+    secondaryContainer: c.highSurface,
+    onSecondaryContainer: c.strongText,
+    error: c.red,
+    onError: c.onFill,
+    errorContainer: c.errorBackground,
+    onErrorContainer: c.onErrorBackground,
+    surface: c.background,
+    onSurface: c.strongText,
+    onSurfaceVariant: c.secondaryText,
+    surfaceContainerLowest: c.background,
+    surfaceContainerLow: c.surface,
+    surfaceContainer: c.surface,
+    surfaceContainerHigh: c.highSurface,
+    surfaceContainerHighest: c.highSurface,
+    outline: c.border,
+    outlineVariant: c.border,
   );
 
   final base = ThemeData(colorScheme: schema, useMaterial3: true);
@@ -209,7 +356,7 @@ ThemeData iampTheme() {
         labelMedium: t.label,
         labelSmall: t.secondary,
       )
-      .apply(bodyColor: AppColors.body, displayColor: AppColors.white);
+      .apply(bodyColor: c.bodyText, displayColor: c.strongText);
 
   final corners = RoundedRectangleBorder(borderRadius: BorderRadius.circular(t.radius));
   final fieldCorners = BorderRadius.circular(t.radius - 4);
@@ -218,67 +365,71 @@ ThemeData iampTheme() {
   const buttonSpacing = EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.pm);
 
   return base.copyWith(
-    scaffoldBackgroundColor: AppColors.black,
+    scaffoldBackgroundColor: c.background,
+    // a mesma transicao em todas as plataformas (Android, iOS, navegador)
+    pageTransitionsTheme: PageTransitionsTheme(
+      builders: {for (final p in TargetPlatform.values) p: const StepTransition()},
+    ),
     textTheme: text,
-    extensions: const [t],
+    extensions: [t],
     materialTapTargetSize: MaterialTapTargetSize.padded,
     visualDensity: VisualDensity.standard,
     appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.black,
-      foregroundColor: AppColors.white,
+      backgroundColor: c.background,
+      foregroundColor: c.strongText,
       surfaceTintColor: Colors.transparent,
       centerTitle: false,
       titleTextStyle: t.title,
-      iconTheme: const IconThemeData(color: AppColors.yellow), // seta de voltar
-      actionsIconTheme: const IconThemeData(color: AppColors.yellow),
+      iconTheme: IconThemeData(color: c.accent), // seta de voltar
+      actionsIconTheme: IconThemeData(color: c.accent),
     ),
-    iconTheme: IconThemeData(color: AppColors.yellow, size: t.icon),
+    iconTheme: IconThemeData(color: c.accent, size: t.icon),
     cardTheme: CardThemeData(
-      color: AppColors.surface,
+      color: c.surface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       margin: const EdgeInsets.symmetric(vertical: Spacing.pp),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(t.radius),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: c.border),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surface,
+      fillColor: c.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.m + 2),
       border: OutlineInputBorder(borderRadius: fieldCorners),
       enabledBorder: OutlineInputBorder(
         borderRadius: fieldCorners,
-        borderSide: const BorderSide(color: AppColors.border),
+        borderSide: BorderSide(color: c.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: fieldCorners,
-        borderSide: const BorderSide(color: AppColors.yellow, width: 2),
+        borderSide: BorderSide(color: c.accent, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: fieldCorners,
-        borderSide: const BorderSide(color: AppColors.red, width: 2),
+        borderSide: BorderSide(color: c.red, width: 2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: fieldCorners,
-        borderSide: const BorderSide(color: AppColors.red, width: 2),
+        borderSide: BorderSide(color: c.red, width: 2),
       ),
-      labelStyle: const TextStyle(color: AppColors.secondary, fontSize: 18),
-      floatingLabelStyle: const TextStyle(color: AppColors.yellow, fontSize: 18),
+      labelStyle: TextStyle(color: c.secondaryText, fontSize: 18),
+      floatingLabelStyle: TextStyle(color: c.accent, fontSize: 18),
       helperStyle: t.secondary,
       helperMaxLines: 4,
-      errorStyle: t.secondary.copyWith(color: AppColors.red),
+      errorStyle: t.secondary.copyWith(color: c.red),
       errorMaxLines: 4,
-      hintStyle: const TextStyle(color: AppColors.example, fontSize: 18),
+      hintStyle: TextStyle(color: c.exampleText, fontSize: 18),
       suffixStyle: t.body,
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: AppColors.yellow,
-        foregroundColor: AppColors.black,
+        backgroundColor: c.fill,
+        foregroundColor: c.onFill,
         disabledBackgroundColor: const Color(0x66FFD000),
-        disabledForegroundColor: AppColors.black,
+        disabledForegroundColor: c.onFill,
         minimumSize: buttonHeight,
         padding: buttonSpacing,
         shape: corners,
@@ -287,18 +438,18 @@ ThemeData iampTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.white,
-        iconColor: AppColors.yellow,
+        foregroundColor: c.strongText,
+        iconColor: c.accent,
         minimumSize: buttonHeight,
         padding: buttonSpacing,
         shape: corners,
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: c.border),
         textStyle: buttonText,
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: AppColors.yellow,
+        foregroundColor: c.accent,
         minimumSize: Size(t.touchTarget, t.touchTarget),
         padding: const EdgeInsets.symmetric(horizontal: Spacing.pm, vertical: Spacing.pm),
         textStyle: buttonText,
@@ -308,16 +459,16 @@ ThemeData iampTheme() {
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
         minimumSize: Size(t.touchTarget, t.touchTarget),
-        foregroundColor: AppColors.yellow,
+        foregroundColor: c.accent,
         disabledForegroundColor: const Color(0x66FFD000),
         iconSize: t.icon + 4,
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.yellow, linearTrackColor: AppColors.track),
-    dividerTheme: const DividerThemeData(color: AppColors.divider, space: 1),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: c.accent, linearTrackColor: c.track),
+    dividerTheme: DividerThemeData(color: c.divider, space: 1),
     listTileTheme: ListTileThemeData(
-      iconColor: AppColors.yellow,
-      textColor: AppColors.white,
+      iconColor: c.accent,
+      textColor: c.strongText,
       titleTextStyle: t.strong,
       subtitleTextStyle: t.secondary,
       minVerticalPadding: Spacing.pm,
@@ -325,64 +476,64 @@ ThemeData iampTheme() {
       contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.m),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: AppColors.highSurface,
-      contentTextStyle: t.body.copyWith(color: AppColors.white),
-      actionTextColor: AppColors.yellow,
+      backgroundColor: c.highSurface,
+      contentTextStyle: t.body.copyWith(color: c.strongText),
+      actionTextColor: c.accent,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(t.radius),
-        side: const BorderSide(color: AppColors.border),
+        side: BorderSide(color: c.border),
       ),
     ),
     // secoes que abrem (busca agrupada por tipo de aparelho): sem linhas extras, seta amarela
-    expansionTileTheme: const ExpansionTileThemeData(
-      iconColor: AppColors.yellow,
-      collapsedIconColor: AppColors.yellow,
-      textColor: AppColors.white,
-      collapsedTextColor: AppColors.white,
+    expansionTileTheme: ExpansionTileThemeData(
+      iconColor: c.accent,
+      collapsedIconColor: c.accent,
+      textColor: c.strongText,
+      collapsedTextColor: c.strongText,
       shape: Border(),
       collapsedShape: Border(),
       tilePadding: EdgeInsets.symmetric(horizontal: Spacing.m, vertical: Spacing.pp),
       childrenPadding: EdgeInsets.zero,
     ),
     badgeTheme: BadgeThemeData(
-      backgroundColor: AppColors.yellow,
-      textColor: AppColors.black,
+      backgroundColor: c.fill,
+      textColor: c.onFill,
       textStyle: t.label.copyWith(fontSize: 13),
     ),
     // navegacao inferior: icone + texto; a aba escolhida tem o fundo amarelo E o texto em negrito
     // (nao depende so da cor)
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: AppColors.surface,
+      backgroundColor: c.surface,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: AppColors.yellow,
+      indicatorColor: c.fill,
       height: 80,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       iconTheme: WidgetStateProperty.resolveWith(
         (states) => IconThemeData(
-          color: states.contains(WidgetState.selected) ? AppColors.black : AppColors.yellow,
+          color: states.contains(WidgetState.selected) ? c.onFill : c.accent,
           size: t.icon + 4,
         ),
       ),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected)
-            ? const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.yellow)
-            : const TextStyle(fontSize: 16, color: AppColors.body),
+            ? TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: c.accent)
+            : TextStyle(fontSize: 16, color: c.bodyText),
       ),
     ),
     radioTheme: RadioThemeData(
       fillColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? AppColors.yellow : AppColors.secondary,
+        (states) => states.contains(WidgetState.selected) ? c.accent : c.secondaryText,
       ),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? AppColors.black : AppColors.secondary,
+        (states) => states.contains(WidgetState.selected) ? c.onFill : c.secondaryText,
       ),
       trackColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected) ? AppColors.yellow : AppColors.highSurface,
+        (states) => states.contains(WidgetState.selected) ? c.fill : c.highSurface,
       ),
     ),
-    popupMenuTheme: PopupMenuThemeData(color: AppColors.highSurface, shape: corners, textStyle: t.body),
+    popupMenuTheme: PopupMenuThemeData(color: c.highSurface, shape: corners, textStyle: t.body),
   );
 }

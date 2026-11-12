@@ -6,6 +6,16 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Modo claro: no menu (☰), seção "Aparência" com "Escuro" e "Claro". O app abre no escuro (a identidade do
+  Iamp) e a escolha não fica gravada. No claro, o amarelo fica só nos preenchimentos (botões, aba escolhida) e
+  os detalhes usam um âmbar escuro, para manter o contraste AA no fundo branco.
+- Transição entre as etapas: a tela nova entra deslizando da direita enquanto a anterior apaga, a barra
+  "Etapa n de 6" avança animada e as perguntas da estimativa trocam do mesmo jeito. Com "remover animações"
+  ligado no celular, as telas trocam direto.
+- Cadastro (opcional) nas boas-vindas e no menu: nome e e-mail, com aviso de privacidade antes de preencher,
+  correção e "Apagar meu cadastro". Os dados ficam só no aparelho (memória): não vão para a API nem para o
+  banco. Quem se cadastra vê "Olá, <nome>!" nas boas-vindas.
+
 - Código padronizado em inglês: nomes de classes, métodos, funções e variáveis (Python e Dart). Textos para o
   usuário, mensagens, comentários e nomes de arquivo continuam em português, e o contrato da API não muda: o
   JSON segue com as chaves em português (`JSON_NAMES` + `ApiModel` em main.py) e os parâmetros de URL também

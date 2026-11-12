@@ -23,13 +23,14 @@ class IampApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // trocar o idioma no menu troca o locale: os textos do Flutter (voltar, copiar...) acompanham
-    return ValueListenableBuilder<Language>(
-      valueListenable: language,
-      builder: (context, current, _) => MaterialApp(
+    // trocar o modo claro/escuro no menu troca o tema (o MaterialApp anima a troca das cores)
+    return ListenableBuilder(
+      listenable: Listenable.merge([language, lightMode]),
+      builder: (context, _) => MaterialApp(
         title: 'Iamp',
         debugShowCheckedModeBanner: false,
-        theme: iampTheme(),
-        locale: current.locale,
+        theme: iampTheme(light: lightMode.value),
+        locale: language.value.locale,
         supportedLocales: [for (final i in Language.values) i.locale],
         localizationsDelegates: GlobalMaterialLocalizations.delegates,
         // com '/boas-vindas' o Flutter monta '/' (as abas) e a boas-vindas por cima:

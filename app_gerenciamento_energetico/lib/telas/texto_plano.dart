@@ -13,20 +13,26 @@ final _numbered = RegExp(r'^(\d+)[.)]\s+');
 final _marker = RegExp(r'^[-*•]\s+');
 
 /// Texto de uma linha -> pedacos com estilo (negrito e citacoes destacadas).
-List<TextSpan> textPieces(String text, TextStyle base) {
+/// strong/citation: cores do negrito e das citacoes (mudam com o modo claro/escuro; padrao = escuro).
+List<TextSpan> textPieces(
+  String text,
+  TextStyle base, {
+  Color strong = AppColors.white,
+  Color citation = AppColors.yellow,
+}) {
   final pieces = <TextSpan>[];
   // primeiro separa o negrito, depois as citacoes dentro de cada parte
   var start = 0;
   for (final m in _bold.allMatches(text)) {
-    if (m.start > start) pieces.addAll(_withCitations(text.substring(start, m.start), base));
-    pieces.addAll(_withCitations(m.group(1)!, base.copyWith(fontWeight: FontWeight.bold, color: AppColors.white)));
+    if (m.start > start) pieces.addAll(_withCitations(text.substring(start, m.start), base, citation));
+    pieces.addAll(_withCitations(m.group(1)!, base.copyWith(fontWeight: FontWeight.bold, color: strong), citation));
     start = m.end;
   }
-  if (start < text.length) pieces.addAll(_withCitations(text.substring(start), base));
+  if (start < text.length) pieces.addAll(_withCitations(text.substring(start), base, citation));
   return pieces;
 }
 
-List<TextSpan> _withCitations(String text, TextStyle style) {
+List<TextSpan> _withCitations(String text, TextStyle style, Color citation) {
   final pieces = <TextSpan>[];
   var start = 0;
   for (final m in _citation.allMatches(text)) {
@@ -35,7 +41,7 @@ List<TextSpan> _withCitations(String text, TextStyle style) {
     pieces.add(
       TextSpan(
         text: '[$numbers]',
-        style: style.copyWith(color: AppColors.yellow, fontWeight: FontWeight.bold),
+        style: style.copyWith(color: citation, fontWeight: FontWeight.bold),
       ),
     );
     start = m.end;
@@ -102,7 +108,7 @@ class PlanText extends StatelessWidget {
                           child: Icon(Icons.bolt, size: t.icon - 4, color: t.highlight),
                         ),
                 ),
-                Expanded(child: Text.rich(TextSpan(children: textPieces(text, t.body)))),
+                Expanded(child: Text.rich(TextSpan(children: textPieces(text, t.body, strong: t.strongText, citation: t.highlight)))),
               ],
             ),
           ),
@@ -112,7 +118,7 @@ class PlanText extends StatelessWidget {
       blocks.add(
         Padding(
           padding: const EdgeInsets.only(bottom: Spacing.p),
-          child: Text.rich(TextSpan(children: textPieces(line, t.body))),
+          child: Text.rich(TextSpan(children: textPieces(line, t.body, strong: t.strongText, citation: t.highlight))),
         ),
       );
     }

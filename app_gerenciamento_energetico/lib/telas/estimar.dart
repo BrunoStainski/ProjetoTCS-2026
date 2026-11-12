@@ -51,6 +51,7 @@ class EstimateScreen extends StatefulWidget {
 
 class _EstimateScreenState extends State<EstimateScreen> {
   int _index = 0;
+  bool _forward = true; // sentido da ultima troca de pergunta (define de que lado a proxima entra)
   String? _error;
   bool _failedLoad = false;
 
@@ -208,6 +209,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
     final last = _index >= _questions().length - 1;
     setState(() {
       _error = null;
+      _forward = true;
       if (!last) _index++;
     });
     if (last) _finish();
@@ -215,6 +217,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
 
   void _back() => setState(() {
     _error = null;
+    _forward = false;
     _index--;
   });
 
@@ -774,16 +777,32 @@ class _EstimateScreenState extends State<EstimateScreen> {
         title: tr('Estimar o gasto', 'Estimate the cost'),
         step: FlowStep(index + 1, questions.length),
         footer: p.validate == null ? null : _footer(p),
-        child: ListView(
-          key: ValueKey(index), // cada pergunta comeca do topo
-          children: [
-            QuestionHeader(p.title, help: p.help),
-            ...p.fields,
-            if (_error != null) ...[
-              const SizedBox(height: Spacing.m),
-              ErrorMessage(_error!),
+        // as perguntas ficam na mesma tela: a troca imita a transicao entre telas (StepTransition)
+        child: AnimatedSwitcher(
+          duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : StepTransition.duration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeIn,
+          layoutBuilder: (current, previous) => Stack(children: [...previous, ?current]),
+          transitionBuilder: (child, animation) {
+            // a pergunta que entra vem do lado para onde a pessoa esta indo; a que sai so apaga
+            final entering = child.key == ValueKey(index);
+            final from = Offset(entering ? (_forward ? 0.16 : -0.16) : 0, 0);
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: Tween(begin: from, end: Offset.zero).animate(animation), child: child),
+            );
+          },
+          child: ListView(
+            key: ValueKey(index), // cada pergunta comeca do topo
+            children: [
+              QuestionHeader(p.title, help: p.help),
+              ...p.fields,
+              if (_error != null) ...[
+                const SizedBox(height: Spacing.m),
+                ErrorMessage(_error!),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

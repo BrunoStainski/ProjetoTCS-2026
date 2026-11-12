@@ -1,13 +1,15 @@
 // Boas-vindas: primeira tela ao abrir o app (e pelo menu, em "Início").
-// So a marca (icone grande com o nome ao lado) e o botao "Comece a economizar",
-// que leva para o calculo (aba Calcular, etapa 1).
+// So a marca (icone grande com o nome ao lado), o botao "Comece a economizar", que leva para o
+// calculo (aba Calcular, etapa 1), e o cadastro (opcional). Quem se cadastrou ve "Olá, <nome>".
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../conta.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
+import 'cadastro.dart';
 import 'comum.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -30,11 +32,27 @@ class WelcomeScreen extends StatelessWidget {
         if (!left) SystemNavigator.pop();
       },
       child: Scaffold(
-        body: const SafeArea(
+        body: SafeArea(
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(Spacing.g),
-              child: IampBrand(size: 120, nameSize: 56),
+              padding: const EdgeInsets.all(Spacing.g),
+              child: ValueListenableBuilder<Account?>(
+                valueListenable: account,
+                builder: (context, registered, _) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const IampBrand(size: 120, nameSize: 56),
+                    if (registered != null) ...[
+                      const SizedBox(height: Spacing.g),
+                      Text(
+                        tr('Olá, ${registered.firstName}!', 'Hello, ${registered.firstName}!'),
+                        style: t.question,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -52,10 +70,29 @@ class WelcomeScreen extends StatelessWidget {
                 constraints: BoxConstraints(maxWidth: t.maxWidth),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.m),
-                  child: FilledButton.icon(
-                    onPressed: () => _start(context),
-                    icon: const Icon(Icons.bolt),
-                    label: Text(tr('Comece a economizar', 'Start saving')),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: () => _start(context),
+                        icon: const Icon(Icons.bolt),
+                        label: Text(tr('Comece a economizar', 'Start saving')),
+                      ),
+                      const SizedBox(height: Spacing.p),
+                      // cadastro opcional: quem nao quiser segue direto pelo botao de cima
+                      ValueListenableBuilder<Account?>(
+                        valueListenable: account,
+                        builder: (context, registered, _) => OutlinedButton.icon(
+                          onPressed: () =>
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
+                          icon: Icon(registered == null ? Icons.person_add_alt : Icons.person_outline),
+                          label: Text(
+                            registered == null ? tr('Criar cadastro', 'Sign up') : tr('Meu cadastro', 'My account'),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

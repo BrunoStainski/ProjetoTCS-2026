@@ -2,6 +2,7 @@
 // aba ou arrastando da borda esquerda. Topo: a marca (icone com contorno amarelo e o nome).
 // Itens feitos com ListTile (e nao NavigationDrawerDestination) porque o texto precisa quebrar a
 // linha com a fonte do sistema grande (o app aceita ate 2x).
+// Depois vem o cadastro (opcional) e a aparencia (modo escuro ou claro; o app abre no escuro).
 // No fim, o idioma: o app sempre abre em portugues e aqui troca para o ingles (apresentacao para
 // estrangeiros). O titulo da secao e os nomes dos idiomas aparecem nas duas linguas, para quem nao
 // entende o idioma atual tambem achar a opcao.
@@ -9,14 +10,16 @@
 import 'package:flutter/material.dart';
 
 import '../casa.dart';
+import '../conta.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
 import '../tema.dart';
 import 'boas_vindas.dart';
+import 'cadastro.dart';
 import 'comum.dart';
 import 'estimar.dart';
 
-enum _Item { start, calculate, estimate, home, save }
+enum _Item { start, calculate, estimate, home, save, account }
 
 class MenuIamp extends StatelessWidget {
   const MenuIamp({super.key});
@@ -45,7 +48,14 @@ class MenuIamp extends StatelessWidget {
         open(AppTab.home);
       case _Item.save:
         open(AppTab.save);
+      case _Item.account:
+        navigator.push(MaterialPageRoute(builder: (_) => const SignUpScreen()));
     }
+  }
+
+  void _setLightMode(BuildContext context, bool light) {
+    Scaffold.of(context).closeDrawer();
+    lightMode.value = light; // o MaterialApp troca o tema; as telas abertas continuam onde estavam
   }
 
   void _swapLanguage(BuildContext context, Language rewritten) {
@@ -68,7 +78,7 @@ class MenuIamp extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       child: SafeArea(
         child: ListenableBuilder(
-          listenable: Listenable.merge([currentTab, home]),
+          listenable: Listenable.merge([currentTab, home, account, lightMode]),
           builder: (context, _) {
             final openItem = _tabItem[currentTab.value];
             Widget item(_Item i, IconData icon, IconData openIcon, String text, {Widget Function(Widget)? brand}) {
@@ -106,23 +116,32 @@ class MenuIamp extends StatelessWidget {
                   ),
                 ),
                 item(_Item.save, Icons.savings_outlined, Icons.savings, tr('Economizar', 'Save energy')),
+                item(
+                  _Item.account,
+                  Icons.person_outline,
+                  Icons.person,
+                  account.value == null
+                      ? tr('Criar cadastro', 'Sign up')
+                      : tr('Meu cadastro (${account.value!.firstName})', 'My account (${account.value!.firstName})'),
+                ),
                 const SizedBox(height: Spacing.p),
                 const Divider(indent: Spacing.m, endIndent: Spacing.m),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.pp),
-                  child: Semantics(
-                    header: true,
-                    child: Row(
-                      children: [
-                        Icon(Icons.language, color: t.highlight),
-                        const SizedBox(width: Spacing.pm),
-                        Expanded(child: Text('Idioma · Language', style: t.label)),
-                      ],
-                    ),
-                  ),
+                _SectionHeader(Icons.contrast, tr('Aparência', 'Appearance')),
+                _ItemChoice(
+                  tr('Escuro', 'Dark'),
+                  chosen: !lightMode.value,
+                  onTap: () => _setLightMode(context, false),
                 ),
+                _ItemChoice(
+                  tr('Claro', 'Light'),
+                  chosen: lightMode.value,
+                  onTap: () => _setLightMode(context, true),
+                ),
+                const SizedBox(height: Spacing.p),
+                const Divider(indent: Spacing.m, endIndent: Spacing.m),
+                const _SectionHeader(Icons.language, 'Idioma · Language'),
                 for (final i in Language.values)
-                  _ItemLanguage(i, chosen: i == language.value, onTap: () => _swapLanguage(context, i)),
+                  _ItemChoice(i.name, chosen: i == language.value, onTap: () => _swapLanguage(context, i)),
               ],
             );
           },
@@ -148,10 +167,10 @@ class _ItemMenu extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: Spacing.pp),
       child: ListTile(
         leading: icon,
-        title: Text(text, style: selected ? t.strong.copyWith(color: AppColors.black) : t.body),
+        title: Text(text, style: selected ? t.strong.copyWith(color: t.onFill) : t.body),
         selected: selected,
-        selectedTileColor: t.highlight,
-        selectedColor: AppColors.black,
+        selectedTileColor: t.highlightFill,
+        selectedColor: t.onFill,
         iconColor: t.highlight,
         minTileHeight: 56,
         shape: const StadiumBorder(),
@@ -161,14 +180,40 @@ class _ItemMenu extends StatelessWidget {
   }
 }
 
-/// Idioma no menu: escolha entre opcoes (como um botao de radio). O escolhido tem o sinal de "certo"
-/// e o nome em negrito; a faixa amarela fica so para a aba aberta.
-class _ItemLanguage extends StatelessWidget {
-  final Language option;
+/// Titulo de uma secao de escolha no menu (Aparencia, Idioma).
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SectionHeader(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.pp),
+      child: Semantics(
+        header: true,
+        child: Row(
+          children: [
+            Icon(icon, color: t.highlight),
+            const SizedBox(width: Spacing.pm),
+            Expanded(child: Text(text, style: t.label)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Escolha entre opcoes no menu (idioma, aparencia), como um botao de radio. O escolhido tem o sinal
+/// de "certo" e o nome em negrito; a faixa amarela fica so para a aba aberta.
+class _ItemChoice extends StatelessWidget {
+  final String option;
   final bool chosen;
   final VoidCallback onTap;
 
-  const _ItemLanguage(this.option, {required this.chosen, required this.onTap});
+  const _ItemChoice(this.option, {required this.chosen, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +226,7 @@ class _ItemLanguage extends StatelessWidget {
           inMutuallyExclusiveGroup: true,
           child: ListTile(
             leading: Icon(chosen ? Icons.check_circle : Icons.circle_outlined),
-            title: Text(option.name, style: chosen ? t.strong : t.body),
+            title: Text(option, style: chosen ? t.strong : t.body),
             selected: chosen,
             iconColor: t.highlight,
             selectedColor: t.highlight,

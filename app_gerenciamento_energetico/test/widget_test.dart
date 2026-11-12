@@ -7,11 +7,13 @@ import 'package:http/testing.dart';
 
 import 'package:app_gerenciamento_energetico/api.dart';
 import 'package:app_gerenciamento_energetico/casa.dart';
+import 'package:app_gerenciamento_energetico/conta.dart';
 import 'package:app_gerenciamento_energetico/idioma.dart';
 import 'package:app_gerenciamento_energetico/main.dart';
 import 'package:app_gerenciamento_energetico/navegacao.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
 import 'package:app_gerenciamento_energetico/telas/busca.dart';
+import 'package:app_gerenciamento_energetico/telas/cadastro.dart';
 import 'package:app_gerenciamento_energetico/telas/comparar.dart';
 import 'package:app_gerenciamento_energetico/telas/comum.dart';
 import 'package:app_gerenciamento_energetico/telas/dicas.dart';
@@ -90,6 +92,8 @@ MockClient apiFake({List<Uri>? requests, List<String?>? languages}) => MockClien
 
 void main() {
   setUp(() {
+    lightMode.value = false;
+    account.value = null;
     home.clear();
     currentTab.value = AppTab.calculate;
     language.value = Language.pt; // o app sempre abre em portugues
@@ -216,12 +220,202 @@ void main() {
     });
   });
 
+  group('Modo claro', () {
+    Finder inMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+
+    Future<void> chooseAppearance(WidgetTester tester, String name) async {
+      await tester.tap(find.byTooltip('Menu'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(inMenu(find.text(name)), 120, scrollable: inMenu(find.byType(Scrollable)).first);
+      await tester.pumpAndSettle();
+      expect(inMenu(find.text('Aparência')), findsOneWidget);
+      await tester.tap(inMenu(find.text(name)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('abre no escuro; o menu troca para o claro e de volta, sem sair da tela', (tester) async {
+      phoneScreen(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        Finder question() => find.text('Qual aparelho você quer calcular?');
+        expect(Theme.of(tester.element(question())).scaffoldBackgroundColor, AppColors.black);
+
+        await chooseAppearance(tester, 'Claro');
+        expect(lightMode.value, isTrue);
+        final light = Theme.of(tester.element(question()));
+        expect(light.brightness, Brightness.light);
+        expect(light.scaffoldBackgroundColor, Palette.light.background);
+        expect(light.colorScheme.primary, AppColors.yellow); // botoes continuam amarelos
+        expect(Iamp.de(tester.element(question())).highlight, Palette.light.accent);
+
+        await chooseAppearance(tester, 'Escuro');
+        expect(lightMode.value, isFalse);
+        expect(Theme.of(tester.element(question())).scaffoldBackgroundColor, AppColors.black);
+      }, apiFake);
+    });
+
+    testWidgets('modo claro tem contraste de texto suficiente (AA) nas telas principais', (tester) async {
+      phoneScreen(tester);
+      final handle = tester.ensureSemantics();
+      lightMode.value = true;
+      home.add(query('refrigerador'), result('refrigerador', 40, 32));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        await expectLater(tester, meetsGuideline(textContrastGuideline)); // boas-vindas
+        await tester.tap(find.text('Comece a economizar'));
+        await tester.pumpAndSettle();
+        await expectLater(tester, meetsGuideline(textContrastGuideline)); // etapa 1
+        await tester.tap(find.text('Minha casa'));
+        await tester.pumpAndSettle();
+        await expectLater(tester, meetsGuideline(textContrastGuideline)); // minha casa com 1 aparelho
+        await tester.tap(find.byTooltip('Menu'));
+        await tester.pumpAndSettle();
+        await expectLater(tester, meetsGuideline(textContrastGuideline)); // menu
+      }, apiFake);
+      handle.dispose();
+    });
+  });
+
+  group('Transição entre as etapas', () {
+    test('todas as plataformas usam a mesma transição, nos dois modos', () {
+      for (final light in [false, true]) {
+        final builders = iampTheme(light: light).pageTransitionsTheme.builders;
+        for (final platform in TargetPlatform.values) {
+          expect(builders[platform], isA<StepTransition>());
+        }
+      }
+    });
+
+    testWidgets('a tela nova entra enquanto a anterior ainda aparece, e a barra avança até a etapa', (tester) async {
+      phoneScreen(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Geladeira ou freezer'));
+        await tester.pump(); // comeca a transicao
+        await tester.pump(const Duration(milliseconds: 100));
+        // no meio da transicao as duas etapas estao na tela
+        expect(find.text('Etapa 1 de 6'), findsOneWidget);
+        expect(find.text('Etapa 2 de 6'), findsOneWidget);
+        final bars = tester.widgetList<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+        expect(bars.any((b) => b.value! > 1 / 6 && b.value! < 2 / 6), isTrue); // barra a caminho de 2/6
+        await tester.pumpAndSettle();
+        expect(find.text('Etapa 1 de 6'), findsNothing);
+        final bar = tester.widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator));
+        expect(bar.value, closeTo(2 / 6, 0.001));
+      }, apiFake);
+    });
+
+    testWidgets('com "remover animações" do sistema a tela troca direto', (tester) async {
+      phoneScreen(tester);
+      tester.platformDispatcher.accessibilityFeaturesTestValue = const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp(showWelcome: false));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Geladeira ou freezer'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(find.text('Etapa 2 de 6'), findsOneWidget);
+      expect(find.byType(SlideTransition).evaluate().where((e) {
+        final w = e.widget as SlideTransition;
+        return w.position.value != Offset.zero;
+      }), isEmpty);
+    });
+  });
+
+  group('Cadastro', () {
+    testWidgets('pelas boas-vindas: valida, cria, cumprimenta pelo nome e apaga', (tester) async {
+      phoneScreen(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsOneWidget); // continua dando para usar sem cadastro
+        await tester.tap(find.text('Criar cadastro'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SignUpScreen), findsOneWidget);
+        expect(find.textContaining('ficam só neste aparelho'), findsOneWidget); // aviso antes de preencher
+
+        // nome vazio e e-mail errado: nao cria
+        await tester.enterText(find.byType(TextField).last, 'maria@');
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
+        await tester.pumpAndSettle();
+        expect(find.text('Digite o seu nome.'), findsOneWidget);
+        expect(find.textContaining('Digite um e-mail válido'), findsOneWidget);
+        expect(account.value, isNull);
+
+        await tester.enterText(find.byType(TextField).first, 'Maria Silva');
+        await tester.enterText(find.byType(TextField).last, 'maria@exemplo.com');
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
+        await tester.pumpAndSettle();
+        expect(account.value!.email, 'maria@exemplo.com');
+        expect(find.byType(SignUpScreen), findsNothing);
+        expect(find.text('Olá, Maria!'), findsOneWidget);
+        expect(find.text('Cadastro criado.'), findsOneWidget);
+
+        // o botao vira "Meu cadastro", com os dados preenchidos e a opcao de apagar
+        await tester.tap(find.text('Meu cadastro'));
+        await tester.pumpAndSettle();
+        expect(find.text('Maria Silva'), findsOneWidget);
+        await tester.tap(find.text('Apagar meu cadastro'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(account.value, isNull);
+      expect(find.textContaining('Olá'), findsNothing);
+      expect(find.text('Criar cadastro'), findsOneWidget);
+    });
+
+    testWidgets('o cadastro não faz nenhuma chamada para a API', (tester) async {
+      phoneScreen(tester);
+      final requests = <Uri>[];
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const SignUpScreen()));
+        await tester.enterText(find.byType(TextField).first, 'João');
+        await tester.enterText(find.byType(TextField).last, 'joao@exemplo.com');
+        await tester.tap(find.widgetWithText(FilledButton, 'Criar cadastro'));
+        await tester.pump();
+      }, () => apiFake(requests: requests));
+      expect(account.value!.firstName, 'João');
+      expect(requests, isEmpty);
+    });
+
+    testWidgets('cadastro e boas-vindas cabem na tela com a fonte do sistema em 2x', (tester) async {
+      phoneScreen(tester, fontScale: 2);
+      account.value = const Account('Maria Aparecida', 'maria@exemplo.com');
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.tap(find.text('Meu cadastro'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(tester.takeException(), isNull);
+      expect(find.text('Apagar meu cadastro'), findsOneWidget);
+    });
+
+    test('formato do e-mail', () {
+      expect(validEmail(' maria@exemplo.com '), isTrue);
+      for (final wrong in ['', 'maria', 'maria@', '@exemplo.com', 'maria@exemplo', 'ma ria@exemplo.com']) {
+        expect(validEmail(wrong), isFalse, reason: wrong);
+      }
+    });
+  });
+
   group('Idioma', () {
     Finder inMenu(Finder f) => find.descendant(of: find.byType(Drawer), matching: f);
+
+    /// Rola o menu ate o item aparecer (aparencia e idioma ficam no fim da lista).
+    Future<void> showInMenu(WidgetTester tester, String text) async {
+      await tester.scrollUntilVisible(inMenu(find.text(text)), 120, scrollable: inMenu(find.byType(Scrollable)).first);
+      await tester.pumpAndSettle();
+    }
 
     Future<void> chooseLanguage(WidgetTester tester, String name) async {
       await tester.tap(find.byTooltip('Menu'));
       await tester.pumpAndSettle();
+      await showInMenu(tester, name);
       expect(inMenu(find.text('Idioma · Language')), findsOneWidget);
       await tester.tap(inMenu(find.text(name)));
       await tester.pumpAndSettle();
@@ -274,13 +468,18 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byTooltip('Menu'));
         await tester.pumpAndSettle();
+        await showInMenu(tester, 'English');
       }, apiFake);
       expect(
         tester.getSemantics(inMenu(find.text('Português'))),
         isSemantics(isSelected: true, isInMutuallyExclusiveGroup: true, isButton: true),
       );
       expect(tester.getSemantics(inMenu(find.text('English'))), isSemantics(isSelected: false));
-      expect(inMenu(find.byIcon(Icons.check_circle)), findsOneWidget);
+      // o sinal de "certo" fica no idioma escolhido
+      final chosen = find.ancestor(of: find.text('Português'), matching: find.byType(ListTile));
+      expect(find.descendant(of: chosen, matching: find.byIcon(Icons.check_circle)), findsOneWidget);
+      final other = find.ancestor(of: find.text('English'), matching: find.byType(ListTile));
+      expect(find.descendant(of: other, matching: find.byIcon(Icons.check_circle)), findsNothing);
     });
 
     testWidgets('trocar o idioma volta as abas para o começo e mantém a casa', (tester) async {

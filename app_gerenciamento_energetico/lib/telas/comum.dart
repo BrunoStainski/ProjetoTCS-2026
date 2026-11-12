@@ -326,10 +326,16 @@ class AppPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (e != null) ...[
-                LinearProgressIndicator(
-                  value: e.current / e.total,
-                  minHeight: t.progressBar / 2,
-                  semanticsLabel: tr('Etapa ${e.current} de ${e.total}', 'Step ${e.current} of ${e.total}'),
+                // a barra avanca da etapa anterior ate a atual (junto com a transicao da tela)
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: (e.current - 1) / e.total, end: e.current / e.total),
+                  duration: MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 450),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) => LinearProgressIndicator(
+                    value: value,
+                    minHeight: t.progressBar / 2,
+                    semanticsLabel: tr('Etapa ${e.current} de ${e.total}', 'Step ${e.current} of ${e.total}'),
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, 0),
