@@ -53,10 +53,10 @@ python scripts/carregar_rag.py
 pytest                               # tudo;   pytest -m "not banco"  # só os rápidos
 ```
 
-## Banco (definido em `src/banco.py`, constante ESQUEMA)
+## Banco (definido em `src/banco.py`, constante SCHEMA)
 
 DER: fonte Mermaid em `docs/der.mmd` e imagem em `docs/der.png` (comando para gerar no topo do .mmd). Só há uma
-FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas). Ao mudar o ESQUEMA, atualizar o DER.
+FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas). Ao mudar o SCHEMA, atualizar o DER.
 
 | Tabela | Conteúdo |
 |---|---|
@@ -176,7 +176,7 @@ GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `ba
 tabela `fogoes` ainda existir.
 
 `database_loaded()` compara as colunas de `aparelhos` com `APPLIANCE_COLUMNS` (criar_banco.py): ao
-adicionar coluna no catálogo, atualize ESQUEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
+adicionar coluna no catálogo, atualize SCHEMA + COLUNAS_APARELHOS e o banco recarrega sozinho.
 
 ## Sugestão de troca (`servico.sugerir_alternativas` e `servico.comparar`)
 
