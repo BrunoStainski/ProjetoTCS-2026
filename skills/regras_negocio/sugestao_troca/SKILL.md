@@ -1,11 +1,11 @@
 ---
 name: regra-negocio-sugestao-troca
-description: Regras de negócio para sugerir modelos mais econômicos equivalentes ao aparelho do usuário e calcular economia e payback da troca no iamp. Use ao alterar EQUIVALENCIA, SEM_SUGESTAO, servico.sugerir_alternativas, servico.comparar ou as rotas /sugestoes e /comparar.
+description: Regras de negócio para sugerir modelos mais econômicos equivalentes ao aparelho do usuário e calcular economia e payback da troca no iamp. Use ao alterar EQUIVALENCE, NO_SUGGESTION, servico.suggest_alternatives, servico.compare ou as rotas /sugestoes e /comparar.
 ---
 
 # Regra de negócio: sugestão de troca e payback
 
-Use esta skill ao implementar, alterar ou revisar as rotas `POST /sugestoes`, `POST /comparar` e suas versões `/estimado`. A lógica está em `servico.sugerir_alternativas`, `servico._suggest`, `servico.comparar` e nas constantes de `calculadora_residencial.py`. O objetivo é recomendar só trocas honestas: mesmo serviço, mesmo uso, mesma tarifa, dado confiável.
+Use esta skill ao implementar, alterar ou revisar as rotas `POST /sugestoes`, `POST /comparar` e suas versões `/estimado`. A lógica está em `servico.suggest_alternatives`, `servico.suggest_for_estimated`, `servico._suggest`, `servico.compare`, `servico.compare_estimated` e nas constantes de `calculadora_residencial.py`. O objetivo é recomendar só trocas honestas: mesmo serviço, mesmo uso, mesma tarifa, dado confiável.
 
 ## Equivalência (`EQUIVALENCE`)
 
@@ -36,13 +36,13 @@ Um modelo só é candidato se fizer o mesmo serviço que o atual:
 
 Chuveiro, micro-ondas e lâmpada de vapor de sódio não recebem sugestão e a resposta traz o **motivo** para o app mostrar (eficiência parecida, só potência informada, sem lumens no dataset). Eletroportáteis também não têm sugestão (não têm etiqueta do Inmetro); o app oferece as dicas do Eco-Coach (`POST /eco-coach/aparelho`). Ao incluir uma categoria nova, decidir explicitamente entre `EQUIVALENCE` e `NO_SUGGESTION`.
 
-## Comparação e payback (`servico.comparar`, `_comparison`)
+## Comparação e payback (`servico.compare`, `_comparison`)
 
 - Entrada: aparelho atual, `alternativa_id`, mesmo uso e tarifa, e `preco_novo` opcional em reais (o catálogo do Inmetro não tem preço; o usuário digita o que encontrou).
 - `economia_mes = custo_atual − custo_novo`; `economia_ano = × 12`.
 - `payback_meses = preco_novo / economia_mes`, calculado em Python na API, nunca pelo LLM nem pelo app. Sem economia positiva, a troca "não se paga" e a resposta diz isso.
 - Payback simples: sem juros, sem revenda do antigo, sem reajuste de tarifa. Esse limite está na documentação e deve continuar visível ao usuário.
-- No app: payback verde até 60 meses, amarelo acima, vermelho se não se paga (corte do grupo). Trocas avaliadas podem entrar em `casa.trocas` (máximo 5) e vão no corpo do `/eco-coach` com exatamente a economia e o payback calculados.
+- No app: payback verde até 60 meses, amarelo acima, vermelho se não se paga (corte do grupo). Trocas avaliadas podem entrar em `casa.swaps` (máximo 5) e vão no corpo do `/eco-coach` com exatamente a economia e o payback calculados.
 
 ## Limites desta regra
 

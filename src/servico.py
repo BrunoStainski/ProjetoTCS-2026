@@ -472,6 +472,13 @@ def _suggest(con, current, current_kwh, usage, distributor_id, manual_tariff, li
         "sugestoes": [],
     }
 
+    if current_kwh <= 0:
+        # 0 h por dia ou 0 ciclos: nao ha consumo para reduzir (e a economia em % dividiria por zero)
+        response["mensagem"] = tr("Com esse uso o aparelho não gasta energia, então não há o que economizar "
+                                  "trocando de modelo. Calcule de novo com o tempo de uso real.",
+                                  "With this use the appliance uses no energy, so there is nothing to save by "
+                                  "changing models. Calculate again with the actual time of use.")
+        return response
     rule = EQUIVALENCE.get(current["categoria"])
     if rule is None:
         response["mensagem"] = t(NO_SUGGESTION.get(

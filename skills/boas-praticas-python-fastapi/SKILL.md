@@ -25,7 +25,7 @@ Ao criar, alterar ou revisar código Python neste repositório, siga estas conve
 - Use type hints quando esclarecerem o contrato (como em `scripts/config.py`); não é obrigatório em todo lugar.
 - Trate erros específicos com mensagem em português para o usuário (`ValueError("informe quantas horas por dia o aparelho fica ligado")`, `ConnectionError` em `banco.connect`). Nunca `except` genérico silencioso.
 - Use `with` para conexões e arquivos; feche conexões abertas com `connect()`.
-- Separe regra de negócio (`calculadora_residencial.py`, `estimativa.py`, `gas.py`: funções puras, sem banco) de acesso a dados (`banco.py`, `servico.py`) e de HTTP (`main.py`).
+- Separe regra de negócio (`calculadora_residencial.py`, `estimativa.py`: funções puras, sem banco) de acesso a dados (`banco.py`, `servico.py`) e de HTTP (`main.py`).
 - Nunca coloque segredos no código, em logs ou em mensagens de erro. Credenciais vêm do `.env` por `config.py`; a chave do Gemini e a senha do banco não aparecem em saída de terminal (mascare antes de exibir).
 
 ## Dados e Pandas
@@ -41,7 +41,7 @@ Ao criar, alterar ou revisar código Python neste repositório, siga estas conve
 - Acesso só por SQLAlchemy **Core** com SQL parametrizado: `banco.query(con, sql, params)` e `banco.run(con, sql, params)` com `?`. Não há ORM e não se deve criar um.
 - **Nunca** monte SQL concatenando ou interpolando texto do usuário.
 - O esquema vive em `banco.SCHEMA`; coluna nova no catálogo exige atualizar `SCHEMA` e `APPLIANCE_COLUMNS` (`criar_banco.py`), e a API recarrega o banco sozinha. A tabela `trechos_rag` é criada por `scripts/carregar_rag.py`.
-- Tabelas de dados são recriadas a cada carga; `consultas` e `consultas_gas` são histórico e não guardam dados pessoais.
+- Tabelas de dados são recriadas a cada carga; `consultas` é histórico, preservado entre cargas, e não guarda dados pessoais.
 
 ## FastAPI
 
@@ -70,7 +70,7 @@ Ao criar, alterar ou revisar código Python neste repositório, siga estas conve
 
 - Branch por pessoa ou tarefa; merge na `main` por Pull Request.
 - Commits em português, no imperativo, descrevendo o efeito ("Adiciona a versão 1.2.0"). Sem linha `Co-Authored-By` nem rodapé de atribuição à IA.
-- Nunca versionar `.env`, `terraform.tfvars`, `*.tfstate`, `models/fastembed/`, `key.properties`, `.jks` ou APK.
+- Nunca versionar `.env`, `terraform.tfvars`, `*.tfstate`, `key.properties`, `.jks` ou APK. O `.env.example` só tem campos vazios: nunca coloque uma chave real nele.
 
 ## Ambiente
 

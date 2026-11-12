@@ -9,32 +9,32 @@ O iamp é o projeto final do bootcamp. Ao trabalhar em documentação, infraestr
 
 ## Entregáveis obrigatórios e onde ficam no iamp
 
-| Exigência do professor | Onde está no iamp | Situação (10/11/2026) |
+| Exigência do professor | Onde está no iamp | Situação (12/11/2026) |
 |---|---|---|
 | README com tema, objetivo, tecnologias e instruções de execução | `README.md` (seções 1 a 8) | feito; manter atualizado a cada rota ou passo novo |
-| Documento das etapas do processo (markdown ou PDF), com justificativa técnica das escolhas e análise de ética e segurança | `docs/documento_processo.md` | **vazio**: prioridade |
-| BPMN 2.0 da regra de negócio | `docs/bpmn_processo.bpmn` + `.png` (editar em demo.bpmn.io) | feito para `/calcular` e `/classificar`; **falta** `/sugestoes`, `/comparar`, `/eco-coach` |
+| Documento das etapas do processo (markdown ou PDF), com justificativa técnica das escolhas e análise de ética e segurança | `docs/documento_processo.md` + PDF (`scripts/gerar_pdf_documento.py`) | feito; atualizar a cada mudança grande |
+| BPMN 2.0 da regra de negócio | `docs/bpmn/` (visão geral + 5 detalhes, `scripts/gerar_bpmn_visoes.py`) e o completo em `docs/bpmn_processo.bpmn` + `.png` | feito, com troca/payback e Eco-Coach |
 | Slides (PDF ou PPTX) | não existe ainda | **pendente** |
 | Machine Learning **ou** integração com IA de terceiros, com base de dados tratada | tem os dois: K-Means/CTGAN/Random Forest (`scripts/`, `models/`) e RAG com Gemini (`src/rag*.py`) | feito |
 | Limpeza, análise e transformação dos dados (Pandas), persistência em SQL, visualização explicativa | `scripts/tratar_dados_*.py`, `src/banco.py`, `notebooks/eda.ipynb`, `docs/graficos/` | feito |
 | Backend e frontend | FastAPI (`src/main.py`) + Flutter (`app_gerenciamento_energetico/`) + terminal (`src/app_terminal.py`) | feito |
 | Banco de dados | PostgreSQL 15 + pgvector (`docker-compose.yml`) | feito |
-| Infraestrutura automatizada com Terraform, local ou nuvem | `infra/local/` (Docker, testado) e `infra/oracle/` (pronto, sem conta) | feito; descrever no documento |
+| Infraestrutura automatizada com Terraform, local ou nuvem | `infra/local/` (Docker, testado) e `infra/oracle/` (pronto, sem conta); nuvem pelo Render + Neon (`render.yaml`) | feito e descrito no documento |
 | Arquivos de prompts usados no vibecoding | `prompts/registros_vibecoding.md` e `skills/` | **vazio**: registrar os prompts e as skills usadas |
 | Código estruturado com boas práticas e agentic coding | `CLAUDE.md`, `skills/`, testes em `tests/` e `test/` | feito; citar na apresentação |
-| Governança e ética: viabilidade, limitações, viés, confiabilidade, uso responsável | seção 12 do `README.md`, "Limitações conhecidas" do `CLAUDE.md` | parcial: consolidar no documento de processo |
+| Governança e ética: viabilidade, limitações, viés, confiabilidade, uso responsável | seção 8 do documento de processo, seção 12 do `README.md`, "Limitações conhecidas" do `CLAUDE.md` | feito |
 | Vídeo da demonstração como backup da live demo | não existe ainda | **pendente** |
 
 ## O que o documento de processo precisa conter
 
 Ao preencher `docs/documento_processo.md`, cubra, nesta ordem, o que a banca avalia:
 
-1. **Problema e proposta de valor**: conta de luz alta, pouca compreensão de kWh, dados oficiais dispersos; ganho para o usuário (custo por aparelho, payback da troca) e viabilidade (custo zero: dados públicos, Gemini gratuito, Docker local ou Oracle Always Free). A TCS pergunta ROI ou redução de tempo operacional: responder com números do próprio app.
-2. **Etapas desenvolvidas**: aquisição dos dados (Inmetro PBE, ANEEL, ANP), limpeza por script, carga no PostgreSQL, regras de cálculo, API, app, ML, RAG, Terraform, versionamento. Referenciar os arquivos.
+1. **Problema e proposta de valor**: conta de luz alta, pouca compreensão de kWh, dados oficiais dispersos; ganho para o usuário (custo por aparelho, payback da troca) e viabilidade (custo zero: dados públicos, Gemini gratuito, Docker local ou Render + Neon grátis). A TCS pergunta ROI ou redução de tempo operacional: responder com números do próprio app.
+2. **Etapas desenvolvidas**: aquisição dos dados (Inmetro PBE, ANEEL), limpeza por script, carga no PostgreSQL, regras de cálculo, API, app, ML, RAG, Terraform, versionamento. Referenciar os arquivos.
 3. **BPMN 2.0** atualizado com busca -> uso -> tarifa -> cálculo -> casa -> perfil -> sugestões/comparação -> Eco-Coach, mais o treino de ML offline.
 4. **Justificativa técnica**: por que SQL parametrizado sem ORM, por que K-Means (não supervisionado, sem rótulo real), por que CTGAN para ampliar a seed, por que RAG em vez de fine-tuning (fontes oficiais mutáveis, citáveis, auditáveis, custo zero), por que embeddings do Gemini (antes locais: não cabiam nos 512 MB do Render grátis), por que Gemini (Hugging Face sem crédito), por que Flutter e FastAPI.
-5. **Ética, viés, confiabilidade e segurança**: consumo de laboratório vs real; valores imputados e corrigidos na limpeza (marcados em `origem_dado`); premissas do grupo sem fonte; residências sintéticas; distorção de moradores do CTGAN; alucinação do LLM mitigada por regras, citações e aviso; envio de dados ao Google (só números, nada pessoal, termos do plano gratuito); histórico `consultas` sem dados pessoais; segredos fora do git; LGPD (nenhum dado pessoal coletado).
-6. **Métricas de sucesso e lições aprendidas**: SDV ~85%, K-Means ~73%, MAE da geladeira 3,88 kWh/mês, testes automatizados, caso de referência R$ 31,68.
+5. **Ética, viés, confiabilidade e segurança**: consumo de laboratório vs real; valores imputados e corrigidos na limpeza (marcados em `origem_dado`); premissas do grupo sem fonte; residências sintéticas; distorção de moradores do CTGAN; alucinação do LLM mitigada por regras, citações e aviso; envio de dados ao Google (só números, nada pessoal, termos do plano gratuito); histórico `consultas` sem dados pessoais; segredos fora do git; LGPD (o cadastro opcional fica só no aparelho; o que falta para gravá-lo no banco).
+6. **Métricas de sucesso e lições aprendidas**: SDV ~85%, K-Means ~73%, MAE da geladeira 3,88 kWh/mês, 151 testes Python + 67 do app, caso de referência R$ 31,68.
 
 ## Roteiro da apresentação (20 min, divisão sugerida pelo guia)
 

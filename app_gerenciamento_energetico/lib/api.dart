@@ -392,7 +392,19 @@ class Api {
         ),
       );
     }
-    final body = jsonDecode(utf8.decode(response.bodyBytes));
+    // erro 500 da API vem em texto puro e o Render responde com uma pagina HTML enquanto acorda:
+    // sem isso, a pessoa via "FormatException" (ou nada, nas telas que so tratam ApiError)
+    final dynamic body;
+    try {
+      body = jsonDecode(utf8.decode(response.bodyBytes));
+    } on FormatException {
+      throw ApiError(
+        tr(
+          'O Iamp está com um problema agora. Tente de novo em instantes.',
+          'Iamp is having a problem right now. Try again in a moment.',
+        ),
+      );
+    }
     if (response.statusCode >= 400) {
       final detail = body is Map ? body['detail'] : null;
       if (detail is String) throw ApiError(detail);
@@ -527,11 +539,16 @@ class EvaluatedSwap {
   final double monthlySavings;
   final double? paybackMonths;
 
+  /// Resultado do aparelho atual (o mesmo objeto que vai para "Minha casa"). A troca so vale para o
+  /// Eco-Coach enquanto esse aparelho estiver na casa. null = vale sempre. Nao vai para a API.
+  final Result? current;
+
   const EvaluatedSwap({
     required this.appliance,
     required this.alternative,
     required this.monthlySavings,
     this.paybackMonths,
+    this.current,
   });
 
   Map<String, dynamic> toApi() => {

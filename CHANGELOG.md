@@ -6,6 +6,20 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Eco-Coach mais curto, a pedido do professor: o plano tem no máximo ~120 palavras (1 frase de diagnóstico
+  e 3 ações curtas) e as dicas por aparelho ~80 (1 frase e 3 dicas). Antes eram ~250 e ~180. Avisos e
+  mensagem de espera também mais curtos.
+- Documentação atualizada para a versão atual (README, documento do processo e PDF, CLAUDE.md, skills e o
+  README do app, que ainda era o modelo padrão do Flutter).
+- Correção: "Ver modelos que gastam menos" dava erro quando o tempo de uso era 0 h 0 min (ou 0 ciclos). Agora
+  explica que, com esse uso, o aparelho não gasta energia.
+- Correção: quando a API respondia com erro em texto (ou o servidor ainda estava acordando), o app mostrava
+  "FormatException" ou não mostrava nada. Agora aparece "O Iamp está com um problema agora. Tente de novo em
+  instantes."
+- Correção: o Eco-Coach continuava recebendo trocas de aparelhos que já tinham saído da casa (removidos ou já
+  trocados) e podia recomendar uma troca feita. Agora só entram as trocas de aparelhos que estão na casa.
+- Correção: o modelo reserva do Gemini (`gemini-3.5-flash-lite`) recusava o pedido e nunca entrava quando o
+  principal estava sobrecarregado. Agora ele é chamado de novo sem a opção que recusava.
 - Correção de dados do ar-condicionado: 185 modelos tinham consumo cerca de 20 vezes menor que o real (o
   cadastro do Inmetro trazia, no campo do consumo anual, o kWh/mês de 1 hora por dia) e o app mostrava perto de
   R$ 1 por mês. A limpeza agora confere capacidade, potência e consumo entre si e refaz o que não combina
@@ -87,6 +101,7 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 - Removido o cálculo de gás de cozinha (app, API, banco, scripts, dados e testes): o projeto foca só em
   energia elétrica. **Mudança que quebra a API:** `GET /fogoes`, `GET /gas/precos` e
   `POST /calcular/gas` não existem mais.
+
 ## App 1.2.0+5 / API 0.3.0
 
 - Gás de cozinha: fogões do Inmetro, preço do GLP por estado (ANP) e tela "Gás de cozinha" no app
