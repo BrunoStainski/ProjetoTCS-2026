@@ -403,6 +403,8 @@ def keep_voltage_versions(catalog):
     potencia (ex.: Cardal Ducha 5 Luxo, 5500 W em 127 V e 7600 W em 220 V) e o catalogo ficava com a de 127 V
     em 77 de 84 modelos. Agora cada tensao vira uma linha, com "220 V" no detalhe, para a pessoa escolher a do
     aparelho dela. Quando o consumo e igual nas duas, fica uma linha so e a tensao fica vazia (vale para as duas).
+    Modelo vendido numa tensao so guarda essa tensao (e mostra no detalhe): a troca nao sugere a quem tem 127 V
+    uma maquina que so existe em 220 V.
     """
     key = ["categoria", "marca", "modelo"]
     versions = catalog.drop_duplicates(subset=key + ["tensao"], keep="first")
@@ -411,7 +413,13 @@ def keep_voltage_versions(catalog):
     split = versions[differs].copy()
     split["detalhe"] = [f"{d} · {v} V" if d else f"{v} V" for d, v in zip(split["detalhe"], split["tensao"])]
     single = catalog[~catalog.set_index(key).index.isin(split.set_index(key).index)]
-    single = single.drop_duplicates(subset=key, keep="first").assign(tensao="")
+    single = single.drop_duplicates(subset=key, keep="first")
+    volts_per_model = catalog[catalog["tensao"] != ""].groupby(key)["tensao"].nunique()
+    only_one = single.set_index(key).index.map(lambda k: volts_per_model.get(k, 0) == 1)
+    single = single.assign(tensao=single["tensao"].where(only_one, ""))
+    shown = single["tensao"] != ""
+    single.loc[shown, "detalhe"] = [f"{d} · {v} V" if d else f"{v} V"
+                                    for d, v in zip(single.loc[shown, "detalhe"], single.loc[shown, "tensao"])]
     return pd.concat([single, split]).sort_index()
 
 

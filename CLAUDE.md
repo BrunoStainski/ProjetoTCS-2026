@@ -60,7 +60,7 @@ e as das contas (`sessoes`/`casas -> usuarios`, `itens_casa -> casas`, com casca
 
 | Tabela | Conteúdo |
 |---|---|
-| `aparelhos` | Catálogo: categoria, marca, modelo, tipo, capacidade, kwh_mes (e por velocidade), kwh_ciclo, potencia_w, standby, `fluxo_lm` (lâmpadas), `origem_dado` |
+| `aparelhos` | Catálogo: categoria, marca, modelo, `tensao` (ver "Tensão"), tipo, capacidade, kwh_mes (e por velocidade), kwh_ciclo, potencia_w, standby, `fluxo_lm` (lâmpadas), `origem_dado` |
 | `distribuidoras` | 99 distribuidoras com UF (`fonte_uf` = de onde veio) |
 | `tarifas` | Tarifa B1 residencial convencional (TUSD+TE, R$/kWh) com vigência |
 | `vw_tarifa_vigente` | Tarifa válida hoje por distribuidora |
@@ -78,9 +78,12 @@ A tarifa da ANEEL não muda com a tensão e a maioria dos aparelhos gasta igual 
 a 1ª linha de cada marca + modelo e o chuveiro de 220 V sumia (potência mediana +24%). `keep_voltage_versions`
 (calculadora_residencial.py): quando a versão de outra tensão gasta diferente (`VOLTAGE_CONSUMPTION`), cada
 tensão vira uma linha com "· 220 V" no detalhe e a coluna `tensao` preenchida; consumo igual = uma linha, tensão
-vazia. Só chuveiro, micro-ondas e máquina de lavar têm `"tensao"` no SPECS. Sugestões: `_candidates` só aceita a
+vazia. Modelo vendido numa tensão só guarda a tensão e também mostra no detalhe. Só chuveiro, micro-ondas e
+máquina de lavar têm `"tensao"` no SPECS (testes em `test_calculadora.py`). Sugestões: `_candidates` só aceita a
 mesma tensão (ou vazia). Não há pergunta de tensão no app: a pessoa escolhe a versão escrita no aparelho.
-Recarregar o catálogo muda os ids: `contas.refresh_appliance_id` corrige o id dos itens das casas salvas pelo nome.
+Recarregar o catálogo muda os ids: `contas.refresh_appliance_id` corrige o id dos itens das casas salvas pelo nome
+(e pelo detalhe, quando o modelo tem as duas tensões); roda só ao ler as casas (`list_homes`), não ao gravar.
+`GET /marcas` conta modelos distintos (as duas tensões = 1).
 
 ## Regras de cálculo (`monthly_consumption_kwh`)
 
@@ -164,19 +167,19 @@ A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dock
 
 Para apresentar a estrangeiros, o app inteiro troca para o inglês no menu (☰), seção "Idioma · Language".
 Sempre abre em português; a escolha não é gravada.
-- App: `lib/idioma.dart` (`idioma` = ValueNotifier, `tr('pt', 'en')`, `changeLanguage`). Todo texto de tela é
+- App: `lib/idioma.dart` (`language` = ValueNotifier, `inEnglish`, `tr('pt', 'en')`, `changeLanguage`). Todo texto de tela é
   `tr('...', '...')`, com as duas versões lado a lado. `changeLanguage` marca todas as telas para reconstruir; o
-  menu também volta as abas para a 1ª tela (`restartTab`) e apaga perfil e plano (`casa.forgetApiTexts`),
+  menu também volta as abas para a 1ª tela (`restartTab`) e apaga perfil e plano (`home.forgetApiTexts`),
   porque eles vieram da API no outro idioma. `MaterialApp.locale` + `GlobalMaterialLocalizations`: textos do
   Flutter ("Voltar"/"Back") seguem o idioma. Nos testes, `pageBack()` só acha "Back": no `IampApp` em português,
   tocar em `find.byTooltip('Voltar')`. `reais`/`number`/`readNumber` seguem o idioma (inglês: "R$ 1,234.50"; quem
-  digita "0,85" continua certo). O `setUp` dos testes volta o idioma para `Idioma.pt`.
+  digita "0,85" continua certo). O `setUp` dos testes volta o idioma para `Language.pt`.
 - API: `Accept-Language` (o app manda `pt-BR` ou `en`) -> middleware `RequestLanguage` (main.py) guarda o
   idioma numa ContextVar (`src/idioma.py`). Texto montado com números: `tr(pt, en)` no lugar. Texto fixo
   (constantes, ESTIMABLE, TYPE_NAMES, nomes dos eletroportáteis, rag_agent.NAMES): `t(texto)` com o
   dicionário `src/traducoes.py` (chave = texto em português). `tests/test_idioma.py` falha se faltar tradução ou
   sobrar chave antiga. Sem cabeçalho = português (APK antigo e testes antigos iguais). Chaves (categoria,
-  perfil "Consciente", velocidade) não mudam: o app traduz o nome. `unidades()`/`medida()` trocam pol/cv/litros
+  perfil "Consciente", velocidade) não mudam: o app traduz o nome. `units()`/`measure()` trocam pol/cv/litros
   e os separadores ("7.500 BTU/h" -> "7,500 BTU/h").
 - Eco-Coach em inglês: a busca vetorial continua em português (documentos brasileiros); o prompt ganha
   `LANGUAGE_EN` (escrever em inglês, traduzir as dicas, manter [n]) e os números vão no formato americano.
@@ -259,7 +262,7 @@ lugar visível (app, web, Android, iOS).
   "Buscar" continua a busca por texto (o resultado substitui a lista). Sem tipo, não há lista de marcas.
 - Menu de acesso rápido (`telas/menu.dart`, `drawer` da casca): botão ☰ (tooltip "Menu") só na 1ª tela de
   cada aba (`AppPage` usa `Scaffold.maybeOf` + `isFirst`); itens Início, Calcular, Estimar, Minha casa,
-  Economizar. Itens são `ListTile` (texto quebra com fonte 2x; `NavigationDrawerDestination` estourava).
+  Economizar e a conta (criar/entrar ou "Minha conta"). Itens são `ListTile` (texto quebra com fonte 2x; `NavigationDrawerDestination` estourava).
 - Marca (`IampBrand`, comum.dart): `assets/icone/icone.png` com contorno amarelo esmaecido e o nome ao lado.
   Usa `cacheWidth` (nos testes a imagem vem como `ResizeImage`). O código dos colegas não passa pelo
   `dart format`: formatar só os arquivos que você mudou.
@@ -272,14 +275,15 @@ lugar visível (app, web, Android, iOS).
 - Padrões (`telas/comum.dart`): `AppPage` (ação principal no `footer`), `QuestionHeader`, `OptionCard`,
   `HighlightCard`, `InfoCard`, `PartBar` (barra + % escrito), `ErrorMessage`, `Loading`.
 - Ícone: `assets/icone/*.png` -> `dart run flutter_launcher_icons` (config no pubspec.yaml).
-- `api.dart`: modelos e chamadas da API. `casa.dart`: estado (Consulta, EscolhaTarifa, Casa com
-  ChangeNotifier global `casa`; só em memória, sem persistência). Remover item tem "Desfazer" (`reinsert`).
+- `api.dart`: modelos e chamadas da API. `casa.dart`: estado (`Query`, `TariffChoice`, `Home` e a lista `Homes`;
+  global `homes` e `home` = casa aberta). Sem conta fica só na memória; com conta, vai para a nuvem (ver
+  "Conta (opcional) e várias casas"). Remover item tem "Desfazer" (`reinsert`).
 - Minha casa: total por mês, cada item com R$, % da conta, quantidade (−/+) e botões visíveis ("Ver modelos
   que gastam menos", "Remover"); perfil K-Means mostrado em R$ por pessoa (tarifa média da casa).
 - Economizar (`eco_coach.dart`): só chama o /eco-coach quando a pessoa toca em "Montar meu plano"; o plano
-  fica em `casa.plan` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
+  fica em `home.plan` até a casa mudar (poupa o limite gratuito do Gemini). `texto_plano.dart` mostra o
   markdown do Gemini sem pacote extra (títulos em letras normais, listas, **negrito**, citações [n] em
-  amarelo). Trocas com payback de `comparar.dart` entram em `casa.swaps` (máx. 5) com o `Result` do aparelho
+  amarelo). Trocas com payback de `comparar.dart` entram em `home.registerSwap` (máx. 5) com o `Result` do aparelho
   atual: `home.swaps` só devolve as de aparelhos que ainda estão na casa (removido ou já trocado não vai para o
   Eco-Coach; "Desfazer" traz de volta). Timeout: 120 s. Resposta da API que não é JSON (500 em texto, página do
   Render acordando) vira `ApiError` com mensagem clara em `Api._clean`.
@@ -358,7 +362,9 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 - Conta (opcional) e várias casas, salvas na nuvem (12/11/2026):
   - API: `src/contas.py` + rotas em main.py; testes em `tests/test_contas.py`. Senha com scrypt da biblioteca padrão
     (sal por senha, `hmac.compare_digest`; sem dependência nova), sessão = token aleatório e o banco guarda só o
-    SHA-256 (30 dias, `POST /logout` apaga). Login errado tem a mesma mensagem e o mesmo tempo com ou sem e-mail.
+    SHA-256 (30 dias, `POST /logout` apaga). Login errado tem a mesma mensagem e o mesmo tempo com ou sem e-mail;
+    5 senhas erradas em 15 min para o mesmo e-mail -> 429 (`MAX_FAILURES`, memória do processo). E-mail repetido
+    ao mesmo tempo -> 409 (`IntegrityError`). Trocar o e-mail não pede a senha (só o token): melhoria pendente.
     Itens da casa: colunas para consulta (categoria, kWh, R$) + `dados` JSONB com a pergunta e o resultado no formato
     do app. Limites: 10 casas, 100 itens.
   - App: `casa.dart` tem `Homes` (lista + casa aberta, sempre ≥ 1) e `Home get home => homes.active`, então as telas
@@ -379,10 +385,16 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 - Escolhidos porque a Oracle (instituição) só libera o acesso em até 2 semanas e a apresentação é antes; os dois
   são grátis, sem cartão, com login pelo GitHub. `infra/oracle/` continua pronto como alternativa.
+- **No ar desde 12/11/2026: `https://iamp-api.onrender.com`** (Render: Blueprint "Iamp", serviço `iamp-api`, conta
+  do Matheus; Neon: projeto "Iamp", branch `production`, banco `neondb`). É o `API_URL` do APK.
 - `render.yaml` (Blueprint): serviço web Docker, plano free, região ohio (a mesma do projeto Neon "Iamp", AWS us-east-2),
   `healthCheckPath: /saude`, deploy a cada push na `main`. Segredos no painel: `DATABASE_URL` (Neon) e
   `GEMINI_API_KEY`. `Dockerfile` usa `${PORT:-8000}`; `config.py` troca `postgresql://` por
   `postgresql+psycopg2://` (o SQLAlchemy 2.1 usa o psycopg 3 nesse formato e o projeto usa o psycopg2).
+  `config.py` também tira espaço/Enter em volta das variáveis de ambiente (colar no painel trazia junto).
+- Chave do Gemini colada com texto sobrando (já veio com `API` no fim, do AI Studio) = base do Eco-Coach vazia e
+  /eco-coach 503. Log do Render: `nao consegui carregar a base do Eco-Coach: ...` (`LocalProtocolError` = caractere
+  inválido; 401 = chave errada). Corrigiu a chave no painel: "Save, rebuild, and deploy" recarrega a base.
 - Simulado em 11/11/2026 no Docker com banco vazio e `--memory=512m`: carga automática do catálogo e do RAG,
   /saude, /calcular, /marcas, /eco-coach ok; pico de 150 MB.
 - Render grátis dorme depois de 15 min sem uso (~1 min para acordar): o app chama `Api.wakeUp()` no `main`,
@@ -393,8 +405,9 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
 - Versão do app em `pubspec.yaml` (hoje `2.1.0+7`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0` e `v1.1.1` no GitHub. Tag `vX.Y.Z` +
-  Release no GitHub com o APK (nunca no git). Commit de versão: "Adiciona a versão X.Y.Z".
+  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1` e `v2.1.0` no GitHub. Tag `vX.Y.Z`
+  (no commit de merge da `main`: os PRs viram commit novo) + Release no GitHub com o APK (nunca no git).
+  Commit de versão: "Adiciona a versão: X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
   `terraform apply` + `docker compose up -d --build`; no Render o merge na `main` já publica) -> APK -> tag ->
   Release (o usuário faz; `gh` sem login).
@@ -407,7 +420,7 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
   Chave criada em 09/11/2026 (`C:\Users\mathe\keys\iamp.jks`, alias `iamp`, `CN=iamp, O=Projeto TCS 2026`;
   senha aleatória só no `key.properties`, não abrir). Conferir: `apksigner verify --print-certs` e
   `aapt dump badging` (build-tools 36.0.0 do SDK). Quem instalou o 1º APK (chave de teste) desinstala uma vez.
-- Celular: o `API_URL` fica gravado no APK. Com a API no Render o endereço é fixo. Com a API no PC, ele
+- Celular: o `API_URL` fica gravado no APK. Com a API no Render o endereço é fixo (`https://iamp-api.onrender.com`). Com a API no PC, ele
   aponta para o IP do PC na rede (`ipconfig`/Wi-Fi), que muda a cada rede (FIEP-CONV = 10.164.48.89;
   outra rede = outro IP) -> trocou de rede, gera o APK de novo.
   O firewall do Windows já libera o `com.docker.backend.exe`. Redes de instituição (ex.: FIEP-CONV) podem
@@ -428,10 +441,13 @@ amarelo usuário, azul Python, verde ML, roxo IA generativa; sem bpmn-js, o SVG 
 Mudou o processo? ajuste o script, rode-o e gere o PDF de novo. O diagrama completo do grupo fica no
 Anexo A (inteiro + 3 partes cortadas no marcador `<!-- BPMN_PARTES -->`). Em 12/11/2026 o documento foi
 atualizado para a versão atual (sem gás, embeddings do Gemini, Render + Neon, modo claro, inglês,
-cadastro/LGPD, Eco-Coach curto, 151 testes Python + 67 do app).
-Falta: registro de prompts (`prompts/registros_vibecoding.md` vazio), deck e vídeo.
-No app: salvar "Minha casa" entre sessões; publicar a API no Render (endereço fixo para o celular, sem
-gerar APK a cada rede); versão web para iPhone. (APK Android já funciona: Android SDK 36 ok.)
+cadastro/LGPD, Eco-Coach curto); depois, conta e várias casas, tensão 127/220 V e 24.228 aparelhos.
+Testes em 12/11/2026: 169 Python + 76 do app. Versão 2.1.0 (APK apontando para o Render, tag `v2.1.0`).
+Falta: Fase 2 do registro de prompts (`prompts/registros_vibecoding.md`; a Fase 1, Gemini, está escrita), slides
+em PDF em `docs/` (entrega até 48 h antes da apresentação), vídeo da demo e a Release `v2.1.0` com o APK e o
+vídeo. `docs/der.png` é de antes da coluna `tensao` (o `der.mmd` já tem; gerar pede o mermaid-cli).
+Trocar a chave do Gemini (apareceu num print em 12/11/2026) no AI Studio, no Render e no `.env`.
+No app (depois): manter o login ao fechar o app; versão web para iPhone.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
 Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Dicas

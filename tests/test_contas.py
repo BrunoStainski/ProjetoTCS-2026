@@ -191,3 +191,32 @@ def test_old_appliance_id_is_fixed_by_name(con):
     assert gone["consulta"]["aparelho"]["id"] == 0
     assert estimated["consulta"]["aparelho"]["id"] == 0
     assert same["consulta"]["aparelho"]["id"] == a["id"]
+
+
+@pytest.mark.banco
+def test_old_id_of_the_other_voltage_is_fixed(con):
+    """Mesmo nome nas versoes 127 V e 220 V: o id que hoje e da outra versao volta para a certa (pelo detalhe)."""
+    rows = banco.run(con, "SELECT id, categoria, marca, modelo, detalhe, tensao FROM aparelhos "
+                          "WHERE marca = 'CARDAL' AND modelo = 'DUCHA 5 LUXO' ORDER BY tensao").mappings().all()
+    if len(rows) != 2:
+        pytest.skip("Cardal Ducha 5 Luxo nao esta nas duas tensoes")
+    v127, v220 = rows
+    saved = {**{k: v220[k] for k in ("categoria", "marca", "modelo", "detalhe")}, "id": v127["id"]}
+    fixed = contas.refresh_appliance_id(con, {"consulta": {"aparelho": saved, "estimativa": None}})
+    assert fixed["consulta"]["aparelho"]["id"] == v220["id"]
+
+
+@pytest.mark.banco
+def test_too_many_wrong_passwords_wait(api_contas):
+    """5 senhas erradas seguidas: a 6a tentativa espera (429), mesmo com a senha certa."""
+    api, new_account = api_contas
+    email, _, _ = new_account()
+    try:
+        for _ in range(contas.MAX_FAILURES):
+            assert api.post("/login", json={"email": email, "senha": "errada-123"}).status_code == 401
+        r = api.post("/login", json={"email": email, "senha": "senha-forte-1"})
+        assert r.status_code == 429 and "15 minutos" in r.json()["detail"]
+    finally:
+        contas._failures.pop(email, None)
+    # depois da espera (aqui, zerada), a senha certa entra e zera a contagem
+    assert api.post("/login", json={"email": email, "senha": "senha-forte-1"}).status_code == 200
