@@ -11,20 +11,22 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 
 - `api.dart`: modelos (`Appliance`, `Resultado`...) e todas as chamadas HTTP. Nenhuma tela chama `http` direto. Erros de rede viram `ApiError` com mensagem em português.
 - `casa.dart`: estado da casa (`Home` com `ChangeNotifier`, instância global `casa`), `Query`, `TariffChoice`. Só em memória, sem persistência (limitação conhecida).
-- `tema.dart`: `Cores`, `Estilos`, `Spacing` e `iampTheme()`. **Não** use cor, tamanho de fonte ou espaçamento solto nas telas.
-- `telas/comum.dart`: `AppPage` (com `footer` para a ação principal), `HighlightCard`, `InfoCard`, `NoticeList`, `SectionTitle`, `ErrorMessage`, `TimeField`/`TimeControl`, `BotaoCasa`, `notifyAdded`. Reutilize antes de criar widget novo.
+- `tema.dart`: `AppColors` e `Palette` (escuro e claro), `Spacing`, a extensão `Iamp` (estilos de texto, cores com significado, raios, ícones, alvo de toque) e `iampTheme(light:)`. Nas telas: `final t = Iamp.de(context);`. **Não** use cor, tamanho de fonte ou espaçamento solto, nem `AppColors.*` direto (são as cores do modo escuro).
+- `telas/comum.dart`: `AppPage` (com `footer` para a ação principal), `QuestionHeader`, `OptionCard`, `HighlightCard`, `InfoCard`, `NoticeList`, `SectionTitle`, `PartBar`, `SideBySide`, `ErrorMessage`, `Loading`, `TimeField`/`TimeControl`, `notifyAdded`. Reutilize antes de criar widget novo.
 - Uma tela por arquivo em `telas/` (nome do arquivo em português e snake_case, como já está); classes, métodos e
   variáveis em inglês, PascalCase na classe (`SearchScreen`). Textos da tela continuam com `tr('pt', 'en')`.
 - Só o pacote `http` além do Flutter (e o `flutter_localizations`, que vem com o SDK); não acrescente dependências sem necessidade clara (ex.: o markdown do Eco-Coach é renderizado por `texto_plano.dart`, sem pacote).
 - `idioma.dart`: idioma do app (português nativo, inglês pelo menu). Ver "Idioma" abaixo.
 
-## Identidade visual (regra 60/30/10)
+## Identidade visual e acessibilidade
 
-- Fundo preto; amarelo `#FFD000` só na ação principal e no valor principal; branco para texto em três opacidades (100/80/60%).
-- Detalhes nunca em branco: ícones, bordas (`Cores.border`), divisórias (`Cores.divider`) e contornos são amarelos.
-- Verde `#3DDC84` só para economia ou resultado bom; vermelho `#FF5C5C` só para alerta ou erro. Payback: verde até 60 meses, amarelo acima, vermelho se não se paga.
-- Quatro tamanhos de texto (32/20/16/13) e dois pesos; valores com dígitos tabulares (`Estilos.valor`, `Estilos.number`). Grade de 8 (`Spacing`).
-- Ação principal fixa no rodapé (zona do polegar); toque mínimo de 48dp; valor principal em `HighlightCard`.
+Público: quem paga as contas de casa, incluindo pessoas mais velhas ou com pouca familiaridade com tecnologia.
+
+- Fundo preto, amarelo `#FFD000` na ação e no valor principal, verde só para economia, vermelho só para alerta. Texto branco em 100/90/80% (nada abaixo de 80%, para o contraste AA no preto).
+- Modo claro (`lightMode`, menu "Aparência"): o amarelo não tem contraste no branco, então fica só em preenchimento (`t.highlightFill` + `t.onFill`) e o destaque (`t.highlight`) vira âmbar `#7A5A00`. Preenchimento amarelo = `highlightFill`; ícone ou texto de destaque = `highlight`.
+- Texto: estilos da extensão `Iamp` (34/22/18/16, base 18, nada abaixo de 16), valores com dígitos tabulares (`t.number`). Grade de 4/8 (`Spacing`).
+- Respeite a fonte do sistema: com 150% ou mais (`largeFont`) o que ficaria lado a lado empilha (`SideBySide`). Nenhuma informação só por cor (payback tem a frase "Se paga rápido/Demora/Não se paga"); cartões clicáveis com `MergeSemantics`; botões de ícone com tooltip.
+- Uma decisão por tela; R$ como informação principal (kWh e fórmula como detalhe); ação principal fixa no rodapé (zona do polegar); toque mínimo de 48dp; valor principal em `HighlightCard`.
 
 ## Integração com a API
 
@@ -33,7 +35,7 @@ O app em `app_gerenciamento_energetico/lib/` é a interface do usuário. Ele nã
 - Respeite `GET /aparelhos/{id}/uso` (`horas`, `ciclos`, `velocidade`, `opcional`); em branco nas horas opcionais (TV, ar) vale o valor do Inmetro.
 - Mostre sempre `metodo` e `avisos` da resposta; o app nunca esconde que um valor é estimativa.
 - Campo novo da API deve ser opcional no `fromJson` (o app antigo precisa continuar funcionando e o novo precisa aceitar API antiga quando possível).
-- Timeout do `/eco-coach`: 90 s; o plano fica em `casa.plano` até a casa mudar (poupa o limite gratuito do Gemini).
+- Timeout geral de 75 s (`requestLimit`: o servidor grátis do Render pode estar dormindo) e de 120 s no `/eco-coach`; o plano fica em `casa.plan` até a casa mudar (poupa o limite gratuito do Gemini).
 
 ## Idioma (português e inglês)
 

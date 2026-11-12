@@ -2,7 +2,7 @@
 
 **Documentação do Projeto Integrador de IA Aplicada (TCS 2026)**
 
-Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 1.2.0 / API 0.3.0
+Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.0.0 / API 0.5.0
 
 Integrantes: Bruno Stainski, Gianluca Graciano, João Lucas D'Almas, Matheus Gusmão
 
@@ -19,7 +19,7 @@ Integrantes: Bruno Stainski, Gianluca Graciano, João Lucas D'Almas, Matheus Gus
 7. Infraestrutura e DevOps
 8. Governança, ética e uso responsável da IA
 9. Métricas e resultados
-10. Lições aprendidas e próximos passos
+10. Lições aprendidas
 11. Referências
 12. Anexo A: diagrama BPMN completo
 
@@ -53,8 +53,9 @@ O **iamp** cruza as duas bases e responde, em linguagem simples:
 4. **O que eu faço agora?** O **Eco-Coach** (RAG + LLM) monta um plano de ação com dicas de
    documentos oficiais, sempre citando a fonte.
 
-Também estima aparelhos fora do catálogo (geladeiras antigas, eletroportáteis) e o gasto com gás
-de cozinha (fogões do Inmetro e preço do GLP da ANP por estado).
+Também estima aparelhos antigos ou fora do catálogo (geladeiras, eletros grandes e eletroportáteis).
+O app funciona em português e em inglês, no modo escuro ou claro, e foi pensado para quem tem pouca
+familiaridade com tecnologia (texto grande, uma decisão por tela, leitor de tela).
 
 ### Valor e retorno (ROI)
 
@@ -89,8 +90,8 @@ payback do primeiro caso cai para cerca de 61 meses.
 - **programas sociais de troca de geladeiras e lâmpadas**, que precisam estimar o consumo do
   aparelho antigo, mesmo fora do catálogo.
 
-O custo de operação do protótipo é zero: dados públicos, infraestrutura em contêineres (local ou
-no plano gratuito da Oracle Cloud) e LLM no plano gratuito do Gemini. A seção 8 discute os limites
+O custo de operação do protótipo é zero: dados públicos, infraestrutura em contêineres (local, ou na
+nuvem nos planos gratuitos do Render e do Neon) e LLM no plano gratuito do Gemini. A seção 8 discute os limites
 dessa escolha.
 
 ---
@@ -189,22 +190,22 @@ números de consumo e trechos de documentos públicos, nenhum dado pessoal.
 ## 3. Arquitetura da solução
 
 ```
- Inmetro (PBE) + ANEEL + ANP          datasets/raw/
+ Inmetro (PBE) + ANEEL                datasets/raw/
         │  limpeza com Pandas          scripts/tratar_dados_*.py   (executar_pipeline.py roda todos)
         ▼
  CSVs limpos                           datasets/processed/
         │  carga e rastreabilidade     src/criar_banco.py
         ▼
- PostgreSQL 15 + pgvector  ◄──────────  scripts/carregar_rag.py   (documentos oficiais → vetores)
+ PostgreSQL 15 + pgvector  ◄──────────  scripts/carregar_rag.py   (documentos oficiais → vetores do Gemini)
         │
         ▼
- Regras de cálculo e equivalência      src/calculadora_residencial.py, estimativa.py, gas.py
+ Regras de cálculo e equivalência      src/calculadora_residencial.py, estimativa.py
  Serviços                              src/servico.py
  ML (K-Means, Random Forest)           src/ml_pipeline.py   (lê só números dos .pkl)
- RAG + LLM (Eco-Coach)                 src/rag.py, src/rag_agent.py   ──►  API do Gemini
+ RAG + LLM (Eco-Coach)                 src/rag.py, src/rag_agent.py   ──►  API do Gemini (vetores e texto)
         │
         ▼
- API REST FastAPI                      src/main.py       (Docker)
+ API REST FastAPI                      src/main.py       (Docker; local ou Render + Neon)
         │
         ▼
  App Flutter (Android, web)            app_gerenciamento_energetico/
@@ -215,14 +216,16 @@ números de consumo e trechos de documentos públicos, nenhum dado pessoal.
 | Tratamento de dados | Python 3.12, Pandas | Padrão de mercado para limpeza; um script por base, reexecutável |
 | Banco | PostgreSQL 15 + pgvector, SQLAlchemy Core | SQL explícito e parametrizado; a mesma base guarda o catálogo e os vetores do RAG |
 | ML | scikit-learn, SDV (CTGAN) | Treino offline; a API só carrega números, sem scikit-learn na imagem |
-| GenAI | fastembed (embeddings locais), Gemini via `google-genai` | Embeddings sem custo e sem enviar texto; LLM gratuito |
+| GenAI | Gemini via `google-genai`: embeddings (`gemini-embedding-001`, 768 dimensões) e texto | Plano gratuito; sem modelo local, a API usa ~150 MB e cabe nos 512 MB do Render grátis |
 | API | FastAPI + Uvicorn | Validação com Pydantic, documentação automática em `/docs` |
-| App | Flutter (Dart, pacote `http`) | Um código para Android e navegador |
-| Infra | Docker Compose, Terraform | Mesmo ambiente em qualquer máquina; infraestrutura declarada como código |
+| App | Flutter (Dart, pacote `http` + `flutter_localizations`) | Um código para Android e navegador; português e inglês |
+| Infra | Docker Compose, Terraform, Render + Neon | Mesmo ambiente em qualquer máquina; infraestrutura declarada como código; nuvem gratuita |
 
-**Principais endpoints:** `GET /aparelhos`, `GET /distribuidoras`, `POST /calcular`,
-`POST /classificar`, `POST /sugestoes`, `POST /comparar`, `POST /eco-coach`, além dos de
-estimativa fora do catálogo e de gás. A lista completa e o formato de cada um ficam em `/docs`.
+**Principais endpoints:** `GET /aparelhos`, `GET /marcas`, `GET /modelos`, `GET /distribuidoras`,
+`POST /calcular`, `POST /classificar`, `POST /sugestoes`, `POST /comparar`, `POST /eco-coach` e
+`POST /eco-coach/aparelho`, além dos de estimativa fora do catálogo. Com o cabeçalho
+`Accept-Language: en` os textos das respostas vêm em inglês. A lista completa e o formato de cada um
+ficam em `/docs`.
 
 ---
 
@@ -233,9 +236,7 @@ estimativa fora do catálogo e de gás. A lista completa e o formato de cada um 
 | Fonte | Conteúdo | Uso |
 |---|---|---|
 | Inmetro / PBE | Consumo de 24.155 modelos em 12 categorias (geladeira, TV, ar-condicionado, ventiladores, chuveiro, lâmpadas, micro-ondas, máquina de lavar, bomba) | Catálogo principal |
-| Inmetro / PBE | 1.259 fogões a gás (GLP) | Cálculo do gás de cozinha |
 | ANEEL | Tarifa B1 residencial convencional (TUSD + TE) de 99 distribuidoras, com vigência | Custo em R$ |
-| ANP (Anuário 2026, tab. 3.22) | Preço do GLP por UF e ano | Custo do gás |
 | Portaria Inmetro 20/2006 e tabela Inmetro 2001 (Queiroz et al., 2003) | Regra de consumo de geladeiras antigas | Estimativa fora do catálogo |
 | Inmetro (4 páginas) e cartilha Cemig 2025 | Dicas oficiais de economia | Base do RAG (45 trechos) |
 | Premissas do grupo | Horas de uso padrão, eletroportáteis (11 tipos), fator de desgaste | Sinalizadas no app como estimativa |
@@ -262,7 +263,8 @@ e como foram tratados:
 ### 4.3 Persistência e consultas SQL
 
 - **Esquema** em `src/banco.py`: `aparelhos`, `distribuidoras`, `tarifas`, `cargas`,
-  `consultas`, `portateis`, `fogoes`, `precos_glp`, `consultas_gas` e `trechos_rag` (pgvector).
+  `consultas`, `portateis` e `trechos_rag` (pgvector). O diagrama entidade-relacionamento está em
+  `docs/der.png` (fonte em `docs/der.mmd`).
 - A *view* `vw_tarifa_vigente` resolve, no SQL, qual tarifa vale hoje para cada distribuidora.
 - **Toda consulta é parametrizada**: o código nunca concatena texto do usuário no SQL.
 - O histórico (`consultas`) guarda só o aparelho, o uso e o resultado, sem nenhum dado pessoal,
@@ -350,7 +352,7 @@ kWh/mês). Sem informar a etiqueta, a faixa estimada contém o valor real. O cas
 
 ```
 documentos oficiais (Inmetro, Cemig) ─► limpeza ─► trechos de ~800 caracteres por seção
-   ─► embeddings locais (fastembed, MiniLM multilíngue, 384 dimensões) ─► pgvector
+   ─► embeddings do Gemini (gemini-embedding-001, 768 dimensões) ─► pgvector
 
 pedido do app (aparelhos da casa + trocas avaliadas)
    ─► Python calcula perfil, totais, maiores consumos e payback
@@ -367,11 +369,15 @@ pedido do app (aparelhos da casa + trocas avaliadas)
 4. não recomendar etiqueta ou Selo Procel para aparelho que não tem etiqueta;
 5. não dizer que mudar o horário reduz a conta (isso só vale na tarifa branca, e o cálculo usa a
    convencional);
-6. formato e tamanho definidos (diagnóstico + 3 a 5 ações, até ~250 palavras).
+6. formato e tamanho definidos: diagnóstico em uma frase + exatamente 3 ações curtas, até ~120
+   palavras no plano e ~80 nas dicas por aparelho. O limite era de ~250 e ~180 palavras e foi
+   reduzido depois da avaliação do professor, que achou o texto longo demais para o celular.
 
 Configuração: temperatura 0,3; `thinking_budget = 0` (o raciocínio interno do modelo consumia o
 limite de tokens e cortava o texto); modelo principal e modelo reserva
-(`gemini-3.5-flash` → `gemini-3.5-flash-lite`) caso o primeiro esteja sobrecarregado.
+(`gemini-3.5-flash` → `gemini-3.5-flash-lite`) caso o primeiro esteja sobrecarregado. Com o app
+em inglês, o prompt ganha uma instrução para escrever em inglês e traduzir as dicas, mantendo as
+citações; a busca continua em português, porque os documentos são brasileiros.
 
 #### Por que RAG e não fine-tuning
 
@@ -380,7 +386,7 @@ limite de tokens e cortava o texto); modelo principal e modelo reserva
 | Conhecimento que muda (nova etiqueta de geladeira em 2026, novas cartilhas) | Basta recarregar os documentos | Exige retreinar |
 | Rastreabilidade | Cada dica cita o documento e a seção | O modelo "absorve" o conteúdo; não dá para citar a origem |
 | Volume de dados | 45 trechos bastam para recuperar | 45 trechos são insuficientes para ajustar um LLM, e não há pares pergunta-resposta rotulados |
-| Custo | Embeddings locais na CPU + API gratuita | GPU para treino e hospedagem de modelo próprio |
+| Custo | Embeddings e texto pela API gratuita do Gemini | GPU para treino e hospedagem de modelo próprio |
 | Controle de alucinação | O modelo responde a partir do texto entregue no prompt | Sem âncora explícita na hora da resposta |
 
 #### Por que sem LangChain (e sem memória de agente)
@@ -398,6 +404,12 @@ por conta própria), aí um framework de agentes como o LangChain passa a se jus
 **Por que Gemini:** API com plano gratuito e boa qualidade em português. A alternativa avaliada
 (Hugging Face Inference) foi descartada porque a conta não tinha crédito gratuito (erro 402).
 
+**Por que os embeddings também são do Gemini:** no início eram gerados no próprio servidor
+(fastembed, modelo MiniLM multilíngue, 384 dimensões), sem enviar texto a terceiros. O modelo,
+porém, ocupava ~550 MB e a API não cabia nos 512 MB do Render gratuito. Com os embeddings do
+Gemini, a API caiu de ~750 MB para ~150 MB. O custo é enviar ao Google os trechos públicos e as
+perguntas de busca (nomes de aparelhos), nada do usuário.
+
 **Testes:** `tests/test_rag_agent.py` substitui o LLM por uma resposta fixa e verifica a montagem
 do prompt, a busca e a filtragem das citações sem depender da API externa.
 
@@ -407,16 +419,25 @@ do prompt, a busca e a filtragem das citações sem depender da API externa.
 
 ### 6.1 App Flutter
 
-Fluxo principal: **busca → uso → distribuidora → resultado → Minha casa → sugestões → comparar →
-Eco-Coach**, com atalhos para estimar aparelhos fora do catálogo e calcular o gás de cozinha.
+Fluxo principal, em 6 etapas com uma decisão por tela: **tipo de aparelho → marca e modelo → uso →
+estado → distribuidora → resultado**. Depois: **Minha casa → modelos que gastam menos → comparar
+(payback) → Economizar (Eco-Coach)**. Uma barra inferior com 3 abas (Calcular, Minha casa,
+Economizar) fica sempre visível, e há um atalho para estimar aparelhos fora do catálogo.
 
 Decisões de usabilidade:
 
 - **Busca agrupada por tipo de aparelho** (uma marca como "Brastemp" tem geladeiras, máquinas e
   micro-ondas), com a quantidade de modelos em cada seção.
 - **Ação principal no rodapé** (zona do polegar) e áreas de toque de no mínimo 48 dp.
-- **Identidade visual com regras fixas**: fundo preto, amarelo só para ação e valor principal,
-  verde para economia, vermelho para alerta; quatro tamanhos de texto e grade de 8 px.
+- **Identidade visual com regras fixas**: fundo preto, amarelo para ação e valor principal,
+  verde para economia, vermelho para alerta. Um **modo claro** opcional mantém o contraste AA (o
+  amarelo vira preenchimento e os detalhes passam a âmbar escuro).
+- **Acessibilidade** para quem tem pouca familiaridade com tecnologia: texto base de 18 (nada
+  abaixo de 16), respeito à fonte do sistema até 2x sem quebrar a tela, descrições para TalkBack e
+  VoiceOver, nenhuma informação só por cor e valores em reais como informação principal.
+- **Idioma**: o app inteiro troca para o inglês pelo menu, para apresentar a quem não fala
+  português; a API responde no mesmo idioma.
+- **Cadastro opcional** (nome e e-mail) que fica só na memória do aparelho e não vai para a API.
 - **Transparência**: cada resultado mostra o método do cálculo, a fonte do dado e os avisos
   (estimativa, valor sem impostos, dado imputado, texto gerado por IA).
 
@@ -427,13 +448,15 @@ Distribuição: APK Android assinado com a chave do projeto (Releases no GitHub)
 - **Separação de camadas:** regras de cálculo (`calculadora_residencial.py`), serviços
   (`servico.py`) e interface (API, terminal, app). As mesmas regras alimentam o app, a API e a
   geração dos dados de treino do ML.
-- **Testes automatizados:** 115 testes em Python, todos aprovados (cálculo, API, estimativa, gás, ML, RAG), dos
-  quais 45 usam o banco e são pulados quando ele não está no ar, e testes de widget no app
-  Flutter. O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
+- **Testes automatizados:** 151 testes em Python (cálculo, API, estimativa, idioma, ML, RAG), dos
+  quais 60 usam o banco e são pulados quando ele não está no ar, e 67 testes de widget no app
+  Flutter (fluxo completo com API falsa, contraste, tamanho de toque, fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
   R$ 31,68/mês) é conferido nos testes e na infraestrutura.
 - **Fluxo de Git:** branch por pessoa ou tarefa e merge na `main` por Pull Request.
 - **Versionamento semântico** do app e da API, com histórico em `CHANGELOG.md` e tags no GitHub.
-- **Código e mensagens em português**, com nomes de colunas em `snake_case`.
+- **Nomes no código em inglês** (classes, funções, variáveis); textos para o usuário, mensagens e
+  comentários em português. O contrato da API continua em português (chaves do JSON e parâmetros de
+  URL), para o app já instalado seguir funcionando. Colunas em `snake_case`.
 
 ### 6.3 Vibecoding e agentic coding
 
@@ -455,17 +478,17 @@ API, app, testes, Terraform e depuração. Práticas adotadas:
 ### 7.1 Contêineres
 
 - `Dockerfile` da API sobre `python:3.12-slim`. A imagem leva só o necessário: código, CSVs
-  processados, os `.pkl` em formato numérico e o modelo de embeddings (baixado no build, para a
-  API não depender de download na primeira busca).
-- `docker-compose.yml` sobe o PostgreSQL com pgvector (com *healthcheck*) e a API. Na primeira
-  subida, a API carrega os CSVs no banco sozinha.
+  processados, os `.pkl` em formato numérico, os documentos do RAG e o script que os carrega
+  (~530 MB; antes, com o modelo de embeddings local, 1,2 GB).
+- `docker-compose.yml` sobe o PostgreSQL com pgvector (com *healthcheck*) e a API. Com o banco
+  vazio, a API carrega sozinha os CSVs e a base do Eco-Coach.
 
 ### 7.2 Terraform
 
 | Pasta | Provider | Situação |
 |---|---|---|
 | `infra/local/` | `kreuzwerker/docker` | **Em uso e testado**: `apply` completo, `plan` sem mudanças na segunda execução, API respondendo |
-| `infra/oracle/` | `oracle/oci` | **Pronto e validado** (`terraform validate`); aguarda a conta na Oracle Cloud |
+| `infra/oracle/` | `oracle/oci` | **Pronto e validado** (`terraform validate`); alternativa à nuvem atual, aguarda a conta na Oracle Cloud |
 
 **Local (Docker).** Recria o compose como código, com estado, `plan` e `destroy`: rede, volume
 do banco, PostgreSQL (o Terraform espera ficar saudável), imagem da API (refeita só quando o
@@ -482,6 +505,22 @@ compose. Rodar `terraform apply` de novo publica a versão nova.
 **Segredos.** A senha do banco é gerada pelo Terraform (`random_password`). Senha e chave do
 Gemini ficam só no *state* e no `terraform.tfvars`, ambos fora do Git, e nunca nos metadados da
 VM.
+
+### 7.3 Nuvem: Render (API) + Neon (banco)
+
+A Oracle libera o acesso pela instituição em até duas semanas, depois da data da apresentação. Por
+isso a publicação passou para dois serviços gratuitos, sem cartão e com login pelo GitHub:
+
+| Serviço | Papel | Plano gratuito |
+|---|---|---|
+| Render | Roda a API a partir do `Dockerfile`, com endereço HTTPS fixo; publica de novo a cada merge na `main` | 512 MB de memória (a API usa ~150 MB) |
+| Neon | PostgreSQL com pgvector, na mesma região da API (AWS us-east-1) | 1 GB (o banco usa ~20 MB) |
+
+A configuração está em `render.yaml` (Blueprint); os segredos (`DATABASE_URL` e `GEMINI_API_KEY`)
+ficam só no painel do Render. O servidor gratuito dorme depois de 15 minutos sem uso e leva cerca
+de 1 minuto para acordar: o app chama a API assim que abre e avisa quando a espera passa de 8 s.
+A publicação foi simulada no Docker com banco vazio e limite de 512 MB (carga automática, cálculo
+e Eco-Coach funcionando, pico de 150 MB).
 
 ---
 
@@ -529,10 +568,15 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 ### 8.4 Privacidade e LGPD
 
-- O iamp **não coleta dados pessoais**: não há login, nome, endereço ou documento. O histórico
-  guarda só aparelho, uso e resultado.
-- Para o Gemini vão apenas números de consumo e trechos de documentos públicos. Os embeddings são
-  gerados localmente, sem enviar texto a terceiros.
+- O servidor do iamp **não recebe dados pessoais**: não há login, endereço ou documento. O
+  histórico guarda só aparelho, uso e resultado.
+- O **cadastro opcional** (nome e e-mail) fica só na memória do aparelho e não é enviado à API (há
+  teste que confere isso). Nome e e-mail são dados pessoais, e a LGPD vale mesmo num projeto de
+  curso. Antes de gravar o cadastro no banco faltam: consentimento registrado e aviso de
+  privacidade, senha com *hash* (argon2 ou bcrypt), HTTPS, rotas para ver, corrigir e apagar os
+  dados, e não enviar dado pessoal ao Gemini.
+- Para o Gemini vão apenas números de consumo, trechos de documentos públicos e as perguntas da
+  busca vetorial (nomes de aparelhos).
 - No plano gratuito da API do Gemini, o Google pode usar o conteúdo enviado para melhorar seus
   produtos. Por isso nada pessoal é enviado. Em produção, o recomendado é o plano pago, com
   termos de uso de dados mais restritos.
@@ -546,14 +590,14 @@ ao lado do plano e mostra as fontes para o usuário conferir.
   `.env.example` (arquivo de modelo, versionado) e chegou a ser preparada para commit. A revisão
   antes do *push* barrou o arquivo. A lição virou regra: o `.env.example` só tem campos vazios, e
   qualquer chave exposta em canal não seguro deve ser trocada.
-- **Limitações assumidas do protótipo:** a API não tem autenticação nem HTTPS, e o CORS está
-  aberto. Para produção: domínio com TLS (proxy reverso), CORS restrito, limite de requisições e
+- **Limitações assumidas do protótipo:** a API não tem autenticação, o CORS está aberto e, fora
+  do Render (que entrega HTTPS), roda em HTTP. Para produção: domínio com TLS (proxy reverso), CORS restrito, limite de requisições e
   *state* do Terraform num backend remoto com controle de acesso.
 
 ### 8.6 Viabilidade
 
 - **Custo:** zero no protótipo. O ponto frágil é depender de planos gratuitos (limite de uso do
-  Gemini, capacidade da Oracle), que podem mudar sem aviso.
+  Gemini, servidor do Render que dorme sem uso), que podem mudar sem aviso.
 - **Manutenção dos dados:** o Inmetro e a ANEEL atualizam as bases. O pipeline é reexecutável
   (`executar_pipeline.py` → recarga automática do banco), mas a atualização ainda é manual.
 - **Uso responsável:** o iamp é uma ferramenta de apoio à decisão. Ele não substitui a conta de
@@ -567,12 +611,12 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 | Item | Resultado |
 |---|---|
-| Catálogo | 24.155 aparelhos em 12 categorias + 1.259 fogões; 99 distribuidoras com tarifa vigente |
+| Catálogo | 24.155 aparelhos em 12 categorias; 99 distribuidoras com tarifa vigente |
 | Qualidade do CTGAN (SDV) | cerca de 85% |
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |
 | Base do RAG | 5 documentos, 45 trechos com origem registrada |
-| Testes Python | 115 aprovados (70 sem banco + 45 com banco), em 10/11/2026 |
+| Testes | Python: 151 (91 sem banco + 60 com banco), aprovados em 11/11/2026; app: 67 testes de widget, aprovados em 12/11/2026 |
 | Exemplo de ROI | Geladeira de 2005 → modelo atual de 415 L: economia de R$ 32,66/mês, payback de 7,7 anos a R$ 3.000 |
 | Exemplo de referência | Chuveiro 5.500 W, 15 min/dia, Copel: 41,25 kWh = R$ 31,68/mês (conferido via API) |
 
@@ -587,9 +631,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 ---
 
-## 10. Lições aprendidas e próximos passos
-
-### Lições
+## 10. Lições aprendidas
 
 - **Dado oficial não é dado limpo.** Vírgulas deslocadas, duas metodologias misturadas e volumes
   impossíveis mudavam o resultado (a economia das trocas de geladeira estava exagerada). A
@@ -604,13 +646,11 @@ ao lado do plano e mostra as fontes para o usuário conferir.
   que vai em cada commit.
 - **Contexto escrito acelera o time:** manter o `CLAUDE.md` atualizado serviu tanto para o agente
   de código quanto para as pessoas do grupo.
-
-### Próximos passos
-
-- Salvar "Minha casa" entre sessões no app.
-- Publicar a API na Oracle Cloud (Terraform pronto) para o app funcionar fora da rede local.
-- Validar as estimativas com contas de luz reais (piloto).
-- Ampliar a base do RAG com documentos de outras regiões e distribuidoras.
+- **A nuvem gratuita muda a arquitetura:** o limite de 512 MB do Render obrigou a trocar os
+  embeddings locais pelos do Gemini, uma troca entre memória e privacidade que precisou ser
+  documentada.
+- **Ouvir o usuário:** o texto do Eco-Coach foi encurtado depois que o professor achou o plano
+  longo demais para ler no celular.
 
 ---
 
@@ -619,14 +659,13 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 - Inmetro. Programa Brasileiro de Etiquetagem (PBE): tabelas de consumo de energia por categoria.
 - Inmetro. Portaria nº 20/2006: requisitos de avaliação da conformidade para refrigeradores.
 - ANEEL. Tarifas homologadas das distribuidoras de energia elétrica (subgrupo B1 residencial).
-- ANP. Anuário Estatístico 2026, tabela 3.22: preço do GLP ao consumidor por UF.
 - Queiroz, G. et al. (2003). Tabela Inmetro de refrigeradores de 2001. ACEEE Summer Study.
 - Cemig. Cartilha de eficiência energética, 2025.
 - Brasil. Lei nº 9.991/2000: investimentos em pesquisa e desenvolvimento e em eficiência
   energética pelas concessionárias.
 - Xu, L. et al. (2019). Modeling Tabular Data using Conditional GAN (CTGAN). NeurIPS.
 - Synthetic Data Vault (SDV), versão 2.1.
-- Reimers, N.; Gurevych, I. Sentence-BERT; modelo `paraphrase-multilingual-MiniLM-L12-v2`.
+- Google. Gemini API: modelo de embeddings `gemini-embedding-001` e modelos de texto Gemini.
 
 ---
 

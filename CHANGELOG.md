@@ -6,6 +6,11 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Eco-Coach mais curto, a pedido do professor: o plano tem no máximo ~120 palavras (1 frase de diagnóstico
+  e 3 ações curtas) e as dicas por aparelho ~80 (1 frase e 3 dicas). Antes eram ~250 e ~180. Avisos e
+  mensagem de espera também mais curtos.
+- Documentação atualizada para a versão atual (README, documento do processo e PDF, CLAUDE.md, skills e o
+  README do app, que ainda era o modelo padrão do Flutter).
 - Modo claro: no menu (☰), seção "Aparência" com "Escuro" e "Claro". O app abre no escuro (a identidade do
   Iamp) e a escolha não fica gravada. No claro, o amarelo fica só nos preenchimentos (botões, aba escolhida) e
   os detalhes usam um âmbar escuro, para manter o contraste AA no fundo branco.
@@ -78,6 +83,7 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 - Removido o cálculo de gás de cozinha (app, API, banco, scripts, dados e testes): o projeto foca só em
   energia elétrica. **Mudança que quebra a API:** `GET /fogoes`, `GET /gas/precos` e
   `POST /calcular/gas` não existem mais.
+
 ## App 1.2.0+5 / API 0.3.0
 
 - Gás de cozinha: fogões do Inmetro, preço do GLP por estado (ANP) e tela "Gás de cozinha" no app
