@@ -6,6 +6,15 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Correção de dados do ar-condicionado: 185 modelos tinham consumo cerca de 20 vezes menor que o real (o
+  cadastro do Inmetro trazia, no campo do consumo anual, o kWh/mês de 1 hora por dia) e o app mostrava perto de
+  R$ 1 por mês. A limpeza agora confere capacidade, potência e consumo entre si e refaz o que não combina
+  (ex.: GREE GWH09QB-D3NNB4C, 9.000 BTU/h: de 1,4 para 52 kWh/mês). Os modelos corrigidos mostram o aviso de
+  consumo completado na limpeza e não entram nas sugestões de troca.
+- Correção de dados do ventilador de teto: 41 modelos com consumo impossível (até 65 kWh/mês para 1 hora por
+  dia, um motor de 2.000 W) agora usam a potência do próprio ensaio do Inmetro ou ficam sem aquela velocidade.
+  O catálogo passou de 24.155 para 24.148 aparelhos (7 cadastros sem nenhum número aproveitável saíram).
+
 - Modo claro: no menu (☰), seção "Aparência" com "Escuro" e "Claro". O app abre no escuro (a identidade do
   Iamp) e a escolha não fica gravada. No claro, o amarelo fica só nos preenchimentos (botões, aba escolhida) e
   os detalhes usam um âmbar escuro, para manter o contraste AA no fundo branco.

@@ -232,7 +232,7 @@ estimativa fora do catálogo e de gás. A lista completa e o formato de cada um 
 
 | Fonte | Conteúdo | Uso |
 |---|---|---|
-| Inmetro / PBE | Consumo de 24.155 modelos em 12 categorias (geladeira, TV, ar-condicionado, ventiladores, chuveiro, lâmpadas, micro-ondas, máquina de lavar, bomba) | Catálogo principal |
+| Inmetro / PBE | Consumo de 24.148 modelos em 12 categorias (geladeira, TV, ar-condicionado, ventiladores, chuveiro, lâmpadas, micro-ondas, máquina de lavar, bomba) | Catálogo principal |
 | Inmetro / PBE | 1.259 fogões a gás (GLP) | Cálculo do gás de cozinha |
 | ANEEL | Tarifa B1 residencial convencional (TUSD + TE) de 99 distribuidoras, com vigência | Custo em R$ |
 | ANP (Anuário 2026, tab. 3.22) | Preço do GLP por UF e ano | Custo do gás |
@@ -567,7 +567,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 | Item | Resultado |
 |---|---|
-| Catálogo | 24.155 aparelhos em 12 categorias + 1.259 fogões; 99 distribuidoras com tarifa vigente |
+| Catálogo | 24.148 aparelhos em 12 categorias + 1.259 fogões; 99 distribuidoras com tarifa vigente |
 | Qualidade do CTGAN (SDV) | cerca de 85% |
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |

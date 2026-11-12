@@ -67,7 +67,7 @@ FK (`tarifas -> distribuidoras`); as demais ligações são lógicas (tracejadas
 | `cargas` | Rastreabilidade: arquivo e linhas de cada carga |
 | `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais) |
 
-Números atuais: 24.155 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
+Números atuais: 24.148 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
 ventilador de mesa/teto, chuveiro, lâmpadas LED/fluorescente/vapor de sódio, micro-ondas,
 máquina de lavar, bomba). Fora do escopo: aparelhos a gás, fornos comerciais, aquecedor solar.
 
@@ -409,8 +409,16 @@ PENDENTE: tirar o gás do `docs/documento_processo`.
 - O Inmetro tem erros de digitação no consumo (ex.: 28,0 vs 2,8 kWh). Nas TVs, 77 consumos com a
   vírgula deslocada (10x acima/abaixo do esperado pelo tamanho da tela) são corrigidos na limpeza
   (`consumo_imputado`, motivo em `correcao_consumo`) e o stand-by > 10 W é apagado
-  (`standby_suspeito`). Nas outras categorias, as sugestões filtram os casos extremos, mas o
-  cálculo do aparelho escolhido usa o valor como veio.
+  (`standby_suspeito`). No ar-condicionado, capacidade, potência e consumo anual são conferidos entre si
+  (faixas medidas nos dados: 20–110 kWh/ano por 1.000 BTU/h, capacidade/potência 2–8, 5.000–80.000 BTU/h):
+  95 consumos refeitos pela potência × horas típicas da rotação (~772 h fixa, ~414 h inverter), 13 potências
+  pelo consumo, 4 capacidades corrigidas (ex.: GREE GWH09QB-D3NNB4C: 17 kWh/ano no cadastro -> 52 kWh/mês);
+  a média da marca usada para completar só usa valores conferidos. No ventilador de teto, consumo acima de
+  8 kWh/mês (1 h/dia = 266 W) é refeito pela vazão/eficiência do ensaio (motor de 10 a 200 W) ou apagado
+  (45 velocidades em 41 modelos; havia até 65 kWh). Tudo marcado em `consumo_imputado` + `correcao_consumo`;
+  `tests/test_limpeza.py` impede a volta. Nas outras categorias, as sugestões filtram os casos extremos, mas o
+  cálculo do aparelho escolhido usa o valor como veio. Continuam sem correção: velocidades fora de ordem
+  (baixa > alta) no ventilador de mesa e diâmetros errados no de teto.
 - Payback simples (sem juros, sem revenda do antigo, sem reajuste de tarifa) e com preço digitado.
 - Ar-condicionado e TV perguntam as horas (opcional; em branco = kWh/mês do Inmetro). O ar usa a
   potência a 35 °C em carga total, que é um teto (o compressor não fica ligado o tempo todo). A TV

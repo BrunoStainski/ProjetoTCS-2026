@@ -215,7 +215,7 @@ O resultado esperado é parecido com:
 
 ```
 Banco criado: postgresql+psycopg2://admin:***@localhost:5434/banco_projeto
-  aparelhos:      24155
+  aparelhos:      24148
   distribuidoras: 99
 ```
 
