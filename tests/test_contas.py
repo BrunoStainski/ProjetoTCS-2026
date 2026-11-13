@@ -220,3 +220,21 @@ def test_too_many_wrong_passwords_wait(api_contas):
         contas._failures.pop(email, None)
     # depois da espera (aqui, zerada), a senha certa entra e zera a contagem
     assert api.post("/login", json={"email": email, "senha": "senha-forte-1"}).status_code == 200
+
+
+def test_password_with_invalid_unicode_does_not_break(client):
+    """Senha com um caractere Unicode invalido (um surrogate escapado no JSON) dava erro 500 no cadastro e no login."""
+    password = "abc" + chr(0xD800) + "defgh"
+    assert contas.check_password(password, contas.hash_password(password))
+    bs = chr(92)
+    body = ('{"email": "ninguem-unicode@exemplo.com", "senha": "abc' + bs + 'ud800defgh"}').encode()
+    r = client.post("/login", content=body, headers={"Content-Type": "application/json"})
+    assert r.status_code == 422  # o validador recusa; antes a resposta de erro quebrava (500)
+
+
+def test_validation_error_does_not_echo_the_password(client):
+    """O 422 nao devolve o que foi enviado (antes uma senha longa demais voltava inteira na resposta)."""
+    secret = "segredo-" + "x" * 200
+    r = client.post("/login", json={"email": "a@exemplo.com", "senha": secret})
+    assert r.status_code == 422
+    assert "segredo-" not in r.text and r.json()["detail"][0]["msg"]

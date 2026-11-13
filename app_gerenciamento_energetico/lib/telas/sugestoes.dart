@@ -29,9 +29,21 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     _suggestions = _search();
   }
 
-  Future<Suggestions> _search() => widget.query.estimated
-      ? Api.estimatedSuggestions(widget.current!, widget.query.toApi())
-      : Api.suggestions(widget.query.appliance.id, widget.query.toApi());
+  Future<Suggestions> _search() async {
+    if (widget.query.estimated) return Api.estimatedSuggestions(widget.current!, widget.query.toApi());
+    // casa salva cujo modelo saiu do catalogo (a API devolve o item com id 0): sem ele nao ha com o que comparar
+    if (widget.query.appliance.id <= 0) {
+      throw ApiError(
+        tr(
+          'Este modelo não está mais no catálogo do Inmetro, então não dá para comparar. Calcule de novo '
+              'escolhendo o modelo para ver os que gastam menos.',
+          'This model is no longer in Inmetro\'s catalog, so it cannot be compared. Calculate again choosing '
+              'the model to see the ones that use less.',
+        ),
+      );
+    }
+    return Api.suggestions(widget.query.appliance.id, widget.query.toApi());
+  }
 
   @override
   Widget build(BuildContext context) {

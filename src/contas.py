@@ -107,9 +107,14 @@ def create_tables(con):
 
 # Senha e token ------------------------------------------------------------------------------
 
+def _bytes(password):
+    # "surrogatepass": um caractere Unicode invalido (da para mandar escapado no JSON) nao derruba a rota com 500
+    return password.encode("utf-8", "surrogatepass")
+
+
 def hash_password(password):
     salt = secrets.token_bytes(16)
-    digest = hashlib.scrypt(password.encode(), salt=salt, **_SCRYPT)
+    digest = hashlib.scrypt(_bytes(password), salt=salt, **_SCRYPT)
     return f"scrypt${_SCRYPT['n']}${_SCRYPT['r']}${_SCRYPT['p']}${salt.hex()}${digest.hex()}"
 
 
@@ -117,7 +122,7 @@ def check_password(password, stored):
     try:
         _, n, r, p, salt, digest = stored.split("$")
         expected = bytes.fromhex(digest)
-        got = hashlib.scrypt(password.encode(), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p),
+        got = hashlib.scrypt(_bytes(password), salt=bytes.fromhex(salt), n=int(n), r=int(r), p=int(p),
                              dklen=len(expected))
     except (ValueError, TypeError):
         return False
@@ -349,6 +354,9 @@ def save_home(con, user_id, home_id, name, residents, last_tariff, items):
     name = _clean_name(name, "o nome da casa", "the home name")
     if len(items) > MAX_ITEMS:
         raise AccountError(tr(f"limite de {MAX_ITEMS} itens por casa", f"limit of {MAX_ITEMS} items per home"))
+    # a ultima tarifa e um JSON livre do app (~200 caracteres): sem limite, qualquer um gravaria megabytes no banco
+    if last_tariff is not None and len(json.dumps(last_tariff, ensure_ascii=False)) > MAX_ITEM_DATA:
+        raise AccountError(tr("ultima tarifa grande demais", "last rate too large"))
     rows = []
     for position, item in enumerate(items):
         data = json.dumps(item["dados"], ensure_ascii=False)

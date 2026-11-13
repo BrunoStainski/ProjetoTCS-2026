@@ -21,6 +21,7 @@ import 'package:app_gerenciamento_energetico/telas/distribuidora.dart';
 import 'package:app_gerenciamento_energetico/telas/estimar.dart';
 import 'package:app_gerenciamento_energetico/telas/minha_casa.dart';
 import 'package:app_gerenciamento_energetico/telas/resultado.dart';
+import 'package:app_gerenciamento_energetico/telas/sugestoes.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 import 'package:app_gerenciamento_energetico/telas/uso.dart';
 
@@ -135,6 +136,7 @@ class CloudFake {
   bool hasAccount = false;
   bool deleted = false;
   bool expired = false;
+  bool homesFail = false; // GET /casas cai (internet instavel logo depois do login)
   int saves = 0;
   int _tokens = 0;
   int _nextHome = 100;
@@ -173,7 +175,9 @@ class CloudFake {
         homes.clear();
         return http.Response('', 204);
       }
-      if (path == '/casas' && r.method == 'GET') return json(homes);
+      if (path == '/casas' && r.method == 'GET') {
+        return homesFail ? http.Response('erro', 500) : json(homes);
+      }
       if (path == '/casas' && r.method == 'POST') {
         final h = {'id': _nextHome++, 'nome': body['nome'], 'moradores': body['moradores'], 'itens': [], 'atualizado_em': ''};
         homes.add(h);
@@ -501,6 +505,32 @@ void main() {
       expect(home.name, 'Minha casa'); // continua na casa que estava montando
       expect(homes.list.first.items.single.result.category, 'geladeira'); // item lido do JSON da nuvem
       expect(cloud.homes.length, 2); // a casa local subiu
+    });
+
+    testWidgets('entrou mas as casas da nuvem não vieram: sai da conta sem apagar as casas do celular', (tester) async {
+      final cloud = CloudFake()
+        ..addAccount()
+        ..homesFail = true;
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      Object? error;
+      await http.runWithClient(() async {
+        // o erro e guardado aqui: o finish() espera por um Future que nao falha
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1').catchError((Object e) => error = e));
+      }, () => cloud.client);
+      expect(error, isA<ApiError>());
+      expect(account.value, isNull);
+      expect(Api.token, isNull);
+      expect(home.items.single.result.category, 'chuveiro'); // a casa montada antes de entrar continua
+    });
+
+    testWidgets('item salvo cujo modelo saiu do catálogo (id 0): explica em vez de pedir o aparelho 0', (tester) async {
+      final requests = <Uri>[];
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: SuggestionScreen(query: query('refrigerador', id: 0))));
+        await tester.pumpAndSettle();
+      }, () => apiFake(requests: requests));
+      expect(find.textContaining('não está mais no catálogo'), findsOneWidget);
+      expect(requests.where((u) => u.path == '/sugestoes'), isEmpty);
     });
 
     testWidgets('com conta, mudar a casa grava na nuvem (uma vez só, depois de uma pausa)', (tester) async {

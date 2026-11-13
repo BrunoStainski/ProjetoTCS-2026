@@ -17,6 +17,16 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 - Banco da nuvem: a API recarregava o catálogo só quando aparecia coluna nova. Mudança de conteúdo (limpeza
   refeita, tensão de cada modelo) não chegava ao Neon. Agora cada carga grava em `cargas` uma impressão digital
   dos CSVs e do código que monta o catálogo (`catalogo:<hash>`), e a API recarrega na subida quando ela muda.
+- App: ao entrar na conta, se a busca das casas da nuvem falhava (internet instável logo depois do login), o app
+  apagava as casas montadas antes de entrar. Agora sai da conta e mantém as casas do celular.
+- API: tarifa digitada acima de R$ 10/kWh ou mais de 300 ciclos por mês são recusados (422). Antes um número
+  absurdo deixava o custo vazio (null) e o app quebrava ao ler. O app já limitava a tarifa a 10.
+- API: limites de tamanho no que vai para o Gemini (até 200 aparelhos, categoria até 40 letras, nomes das trocas
+  até 120) e na última tarifa salva na casa, para um pedido gigante não gastar a cota gratuita nem encher o banco.
+- API: o erro 422 (dado inválido) não devolve mais o valor enviado. Antes uma senha longa demais voltava inteira
+  na resposta, e um caractere Unicode inválido escapado no JSON quebrava a resposta com erro 500 (em qualquer rota).
+- App: item salvo cujo modelo saiu do catálogo (volta com id 0) explicava "aparelho 0 nao existe" ao pedir modelos
+  que gastam menos; agora diz que o modelo não está mais no catálogo e pede para calcular de novo.
 - Testes novos: separação por tensão, sugestão só da mesma tensão, id da outra tensão e limite de senha errada.
 
 ## App 2.1.0+7 / API 0.6.0

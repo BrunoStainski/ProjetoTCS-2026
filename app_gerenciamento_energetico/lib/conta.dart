@@ -73,7 +73,8 @@ Future<void> logIn(String email, String password) async {
   try {
     cloud = [for (final j in await Api.savedHomes()) Home.fromCloud(j)];
   } catch (_) {
-    _endLocal();
+    // entrou, mas nao trouxe as casas (internet caiu no meio): sai da conta sem apagar as casas do celular
+    _endSession();
     rethrow;
   }
   for (final h in cloud) {
@@ -117,12 +118,18 @@ Future<void> removeHome(Home h) async {
   homes.remove(h);
 }
 
+/// Sai da conta e volta para uma casa vazia (sair, apagar a conta, sessao vencida).
 void _endLocal() {
+  _endSession();
+  homes.reset();
+}
+
+/// Sai da conta e deixa as casas do celular como estao.
+void _endSession() {
   _timer?.cancel();
   Api.token = null;
   account.value = null;
   syncState.value = SyncState.saved;
-  homes.reset();
 }
 
 bool _pending(Home h) => h.cloudId == null || _savedVersion[h] != h.version;
