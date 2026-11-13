@@ -1,5 +1,6 @@
-// Conta: criar (nome, e-mail, senha e o aceite do aviso de privacidade) ou entrar (e-mail e senha).
-// Opcional: o app inteiro funciona sem conta. Com conta, as casas ficam salvas na nuvem (conta.dart).
+// Conta: criar (nome, e-mail, senha e o aceite do Termo de Consentimento, telas/termo.dart) ou entrar (e-mail e senha).
+// Opcional: o app inteiro funciona sem conta ("Continuar sem cadastro" avisa que nada fica salvo). Com conta, as
+// casas ficam salvas na nuvem e o login fica guardado no celular (conta.dart).
 // Quem ja entrou ve os dados, corrige o nome/e-mail, sai da conta ou apaga a conta (com confirmacao).
 
 import 'package:flutter/material.dart';
@@ -9,8 +10,9 @@ import '../conta.dart';
 import '../idioma.dart';
 import '../tema.dart';
 import 'comum.dart';
+import 'termo.dart';
 
-/// Texto do aviso de privacidade (o cadastro so e criado depois de a pessoa aceitar).
+/// Resumo do Termo de Consentimento, mostrado junto do aceite (o termo inteiro abre em ConsentTermScreen).
 String privacyNotice() => tr(
   'O Iamp guarda no servidor: seu nome, seu e-mail, a senha protegida (embaralhada, ninguém consegue ler) '
       'e as suas casas com os aparelhos calculados. Serve só para você ver as suas casas em qualquer celular.\n\n'
@@ -18,14 +20,14 @@ String privacyNotice() => tr(
       'IA (Gemini, do Google) recebe só os números de consumo, nunca o seu nome ou e-mail. O servidor fica nos '
       'Estados Unidos (Render e Neon).\n\n'
       'Você pode corrigir os dados ou apagar a conta, com tudo o que ela guarda, quando quiser, em "Minha conta". '
-      'Projeto acadêmico do bootcamp TCS 2026.',
+      'O acesso fica guardado neste celular por até 30 dias. Projeto acadêmico do bootcamp TCS 2026.',
   'Iamp stores on its server: your name, your email, your protected password (scrambled, nobody can read it) '
       'and your homes with the calculated appliances. It is only used so you can see your homes on any phone.\n\n'
       'We do not ask for your address or electricity bill, and we do not sell or share your data. The AI '
       'assistant (Google Gemini) receives only consumption numbers, never your name or email. The server is in '
       'the United States (Render and Neon).\n\n'
       'You can correct your data or delete your account, with everything it stores, at any time in "My account". '
-      'Academic project of the TCS 2026 bootcamp.',
+      'Access stays saved on this phone for up to 30 days. Academic project of the TCS 2026 bootcamp.',
 );
 
 class SignUpScreen extends StatefulWidget {
@@ -89,7 +91,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   )
                 : null);
       _acceptError = creating && !_accepted
-          ? tr('Para criar a conta, aceite o aviso de privacidade.', 'To create an account, accept the privacy notice.')
+          ? tr('Para criar a conta, aceite o Termo de Consentimento.', 'To create an account, accept the Consent Term.')
           : null;
       _error = null;
     });
@@ -128,6 +130,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
         tr('Conta criada. Suas casas ficam salvas.', 'Account created. Your homes are saved.'),
       );
     }
+  }
+
+  /// Segue sem conta, depois de avisar que as casas nao ficam salvas.
+  Future<void> _continueWithout() async {
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr('Continuar sem cadastro?', 'Continue without an account?')),
+        content: Text(withoutAccountNotice()),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Voltar', 'Go back'))),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(tr('Continuar sem cadastro', 'Continue without an account')),
+          ),
+        ],
+      ),
+    );
+    if (sure == true && mounted) Navigator.pop(context);
   }
 
   Future<void> _logOut() async {
@@ -228,6 +249,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       'An account is optional. With it, your homes are saved and show up on any phone.',
                     ),
             ),
+            if (!registered) ...[
+              _WithoutAccount(onTap: _busy ? null : _continueWithout),
+              const SizedBox(height: Spacing.g),
+            ],
             if (creating || registered) ...[
               TextField(
                 controller: _name,
@@ -287,10 +312,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ],
             if (registered) ...[
               const SizedBox(height: Spacing.g),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                title: Text(tr('Aviso de privacidade', 'Privacy notice')),
-                children: [Text(privacyNotice())],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => openConsentTerm(context),
+                  icon: const Icon(Icons.description_outlined),
+                  label: Text(tr('Ler o Termo de Consentimento', 'Read the Consent Term')),
+                ),
               ),
             ],
             if (_busy) ...[const SizedBox(height: Spacing.g), const Center(child: CircularProgressIndicator())],
@@ -302,7 +330,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 }
 
-/// Aviso de privacidade antes de criar a conta: o que fica guardado, onde e como apagar, com o aceite.
+/// Termo de Consentimento antes de criar a conta: resumo, botao para o termo completo e o aceite (nao vem marcado).
 class _PrivacyNotice extends StatelessWidget {
   final bool accepted;
   final String? error;
@@ -329,18 +357,25 @@ class _PrivacyNotice extends StatelessWidget {
               children: [
                 Icon(Icons.lock_outline, color: t.highlight),
                 const SizedBox(width: Spacing.pm),
-                Expanded(child: Text(tr('Aviso de privacidade', 'Privacy notice'), style: t.strong)),
+                Expanded(child: Text(tr('Termo de Consentimento', 'Consent Term'), style: t.strong)),
               ],
             ),
             const SizedBox(height: Spacing.p),
             Text(privacyNotice(), style: t.secondary),
-            const SizedBox(height: Spacing.p),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: () => openConsentTerm(context),
+                icon: const Icon(Icons.description_outlined),
+                label: Text(tr('Ler o termo completo', 'Read the full term')),
+              ),
+            ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               value: accepted,
               onChanged: (v) => onChanged(v ?? false),
-              title: Text(tr('Li e aceito o aviso de privacidade', 'I have read and accept the privacy notice')),
+              title: Text(tr('Li e concordo com o Termo de Consentimento', 'I have read and agree to the Consent Term')),
             ),
             if (error != null) Text(error!, style: t.secondary.copyWith(color: t.alert)),
           ],
@@ -353,3 +388,56 @@ class _PrivacyNotice extends StatelessWidget {
 /// Atalho para as telas: abre a conta (entrar/criar ou "Minha conta").
 void openAccount(BuildContext context, {bool logIn = false}) =>
     Navigator.push(context, MaterialPageRoute(builder: (_) => SignUpScreen(logIn: logIn)));
+
+void openConsentTerm(BuildContext context) =>
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ConsentTermScreen()));
+
+/// O que acontece sem conta (no "Continuar sem cadastro" e nas boas-vindas).
+String withoutAccountNotice() => tr(
+  'Sem cadastro, as suas casas e os seus cálculos ficam só neste celular e não são salvos: eles são apagados '
+      'quando você fecha o app. Você pode criar a conta depois, a qualquer momento, e levar a casa junto.',
+  'Without an account, your homes and calculations stay only on this phone and are not saved: they are erased '
+      'when you close the app. You can create an account later, at any time, and take the home with you.',
+);
+
+/// Atalho para quem nao quer conta: avisa que nada fica salvo e segue para o app.
+class _WithoutAccount extends StatelessWidget {
+  final VoidCallback? onTap;
+
+  const _WithoutAccount({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Iamp.de(context);
+    return Material(
+      color: t.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(t.radius), side: BorderSide(color: t.border)),
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.m),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline, color: t.highlight),
+                const SizedBox(width: Spacing.pm),
+                Expanded(
+                  child: Text(
+                    tr(
+                      'Prefere não criar conta? Dá para usar o Iamp sem cadastro, mas nada fica salvo.',
+                      'Rather not create an account? You can use Iamp without one, but nothing is saved.',
+                    ),
+                    style: t.secondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.p),
+            OutlinedButton(onPressed: onTap, child: Text(tr('Continuar sem cadastro', 'Continue without an account'))),
+          ],
+        ),
+      ),
+    );
+  }
+}

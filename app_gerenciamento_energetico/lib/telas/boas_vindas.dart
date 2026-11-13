@@ -34,23 +34,39 @@ class WelcomeScreen extends StatelessWidget {
       child: Scaffold(
         body: SafeArea(
           child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(Spacing.g),
-              child: ValueListenableBuilder<Account?>(
-                valueListenable: account,
-                builder: (context, registered, _) => Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const IampBrand(size: 120, nameSize: 56),
-                    if (registered != null) ...[
-                      const SizedBox(height: Spacing.g),
-                      Text(
-                        tr('Olá, ${registered.firstName}!', 'Hello, ${registered.firstName}!'),
-                        style: t.question,
-                        textAlign: TextAlign.center,
-                      ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.g),
+                child: ValueListenableBuilder<Account?>(
+                  valueListenable: account,
+                  builder: (context, registered, _) => Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const IampBrand(size: 120, nameSize: 56),
+                      if (registered != null) ...[
+                        const SizedBox(height: Spacing.g),
+                        Text(
+                          tr(
+                            'Olá, ${registered.firstName}!',
+                            'Hello, ${registered.firstName}!',
+                          ),
+                          style: t.question,
+                          textAlign: TextAlign.center,
+                        ),
+                      ] else ...[
+                        // sem conta, o app funciona igual, mas a pessoa precisa saber que nada fica salvo
+                        const SizedBox(height: Spacing.g),
+                        Text(
+                          tr(
+                            'Sem conta, as suas casas não ficam salvas ao fechar o app.',
+                            'Without an account, your homes are not saved when you close the app.',
+                          ),
+                          style: t.secondary,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -69,7 +85,12 @@ class WelcomeScreen extends StatelessWidget {
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: t.maxWidth),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(Spacing.m, Spacing.pm, Spacing.m, Spacing.m),
+                  padding: const EdgeInsets.fromLTRB(
+                    Spacing.m,
+                    Spacing.pm,
+                    Spacing.m,
+                    Spacing.m,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,14 +104,28 @@ class WelcomeScreen extends StatelessWidget {
                       // conta opcional (salva as casas na nuvem): quem nao quiser segue direto pelo botao de cima
                       ValueListenableBuilder<Account?>(
                         valueListenable: account,
-                        builder: (context, registered, _) => OutlinedButton.icon(
-                          onPressed: () =>
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
-                          icon: Icon(registered == null ? Icons.person_add_alt : Icons.person_outline),
-                          label: Text(
-                            registered == null ? tr('Entrar ou criar conta', 'Log in or sign up') : tr('Minha conta', 'My account'),
-                          ),
-                        ),
+                        builder: (context, registered, _) =>
+                            OutlinedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SignUpScreen(),
+                                ),
+                              ),
+                              icon: Icon(
+                                registered == null
+                                    ? Icons.person_add_alt
+                                    : Icons.person_outline,
+                              ),
+                              label: Text(
+                                registered == null
+                                    ? tr(
+                                        'Entrar ou criar conta',
+                                        'Log in or sign up',
+                                      )
+                                    : tr('Minha conta', 'My account'),
+                              ),
+                            ),
                       ),
                     ],
                   ),

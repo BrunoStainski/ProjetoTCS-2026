@@ -28,8 +28,8 @@ ML: scripts/gerar_seed.py -> seed_residencias.csv -> scripts/treinar_ctgan.py ->
 
 Python 3.12 (o mesmo do Dockerfile; não usar 3.14), Pandas, SQLAlchemy **Core** com SQL
 parametrizado (não há ORM; `banco.py` troca `?` por parâmetros nomeados), psycopg2,
-FastAPI + Uvicorn, PostgreSQL 15 com pgvector (imagem `pgvector/pgvector:pg15`), Docker Compose, Flutter (Dart, só o pacote `http`
-+ `flutter_localizations`, que vem com o SDK).
+FastAPI + Uvicorn, PostgreSQL 15 com pgvector (imagem `pgvector/pgvector:pg15`), Docker Compose, Flutter (Dart, pacotes `http`,
+`flutter_secure_storage` (login guardado; plugin: no Windows o APK exige o Modo de desenvolvedor) + `flutter_localizations`).
 
 ## Como rodar
 
@@ -378,11 +378,17 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
     `name`, `cloudId` e `version` (sobe a cada mudança que vai para a nuvem; perfil e plano não contam).
     `conta.dart`: `signUp`/`logIn`/`logOut`/`deleteAccount`/`removeHome` e gravação automática (`saveDelay` 600 ms,
     uma gravação para vários toques; `syncState`). Entrar junta as casas da nuvem com as que a pessoa montou antes.
-    Token só na memória (`Api.token`): fechar o app sai da conta. 401 sai da conta sem travar.
+    Login guardado: o token fica cifrado no celular (`flutter_secure_storage`, chave `iamp_token`; `allowBackup="false"`
+    no manifest) e `restoreSession()` (chamado no `main`) confere com `GET /conta` e junta as casas da nuvem
+    (`_mergeCloudHomes`, o mesmo do login). 401 apaga o token; sem internet o token fica para a próxima abertura.
+    Testes: `FlutterSecureStorage.setMockInitialValues` no `setUp`; `CloudFake.offline`/`expired`.
   - Telas: `telas/cadastro.dart` (`SignUpScreen`: criar / entrar / "Minha conta" com sair e apagar) e
     `telas/casas.dart` (`HomesScreen`, `HomeSwitcher` no topo de Minha casa). Testes com `CloudFake` e `finish()`
     (o tempo do teste é falso: `tester.runAsync` sai da zona do `http.runWithClient`).
-  - LGPD: aviso de privacidade antes de criar (o que guarda, para quê, servidor nos EUA, Gemini só recebe números);
+  - LGPD: Termo de Consentimento (`telas/termo.dart`, `consentTerm()`: 10 itens dos art. 8, 9, 18 e 33) com resumo e
+    aceite no cadastro e o termo completo em `ConsentTermScreen`; mudou o texto, mude `contas.PRIVACY_VERSION`.
+    "Continuar sem cadastro" (topo do cadastro) confirma com `withoutAccountNotice()`; as boas-vindas avisam também.
+    Antes era um aviso de privacidade curto antes de criar (o que guarda, para quê, servidor nos EUA, Gemini só recebe números);
     sem o aceite a API responde 422 e grava data + versão do aviso (`PRIVACY_VERSION`). Corrigir (`PATCH /conta`),
     ver (`GET /conta/dados`) e apagar tudo (`DELETE /conta`, cascata). `consultas` continua anônima (sem ligação
     com a conta). HTTPS vem do Render.
@@ -453,7 +459,7 @@ Falta: Fase 2 do registro de prompts (`prompts/registros_vibecoding.md`; a Fase 
 em PDF em `docs/` (entrega até 48 h antes da apresentação), vídeo da demo e a Release `v2.1.0` com o APK e o
 vídeo. `docs/der.png` é de antes da coluna `tensao` (o `der.mmd` já tem; gerar pede o mermaid-cli).
 Trocar a chave do Gemini (apareceu num print em 12/11/2026) no AI Studio, no Render e no `.env`.
-No app (depois): manter o login ao fechar o app; versão web para iPhone.
+No app (depois): versão web para iPhone.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
 Eco-Coach) / offline (limpeza, carga e 4 ramos paralelos: seed→CTGAN→K-Means, Random Forest, RAG, EDA). Dicas

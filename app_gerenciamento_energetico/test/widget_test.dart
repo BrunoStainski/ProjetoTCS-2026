@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -22,6 +23,7 @@ import 'package:app_gerenciamento_energetico/telas/estimar.dart';
 import 'package:app_gerenciamento_energetico/telas/minha_casa.dart';
 import 'package:app_gerenciamento_energetico/telas/resultado.dart';
 import 'package:app_gerenciamento_energetico/telas/sugestoes.dart';
+import 'package:app_gerenciamento_energetico/telas/termo.dart';
 import 'package:app_gerenciamento_energetico/telas/texto_plano.dart';
 import 'package:app_gerenciamento_energetico/telas/uso.dart';
 
@@ -137,6 +139,7 @@ class CloudFake {
   bool deleted = false;
   bool expired = false;
   bool homesFail = false; // GET /casas cai (internet instavel logo depois do login)
+  bool offline = false; // nenhuma chamada da conta responde (sem internet)
   int saves = 0;
   int _tokens = 0;
   int _nextHome = 100;
@@ -169,7 +172,9 @@ class CloudFake {
     }
     if (path == '/logout') return http.Response('', 204);
     if (path.startsWith('/conta') || path.startsWith('/casas')) {
+      if (offline) throw http.ClientException('sem internet');
       if (expired || auth == null) return json({'detail': 'entre na sua conta de novo'}, 401);
+      if (path == '/conta' && r.method == 'GET') return json(_session()['conta']);
       if (path == '/conta' && r.method == 'DELETE') {
         deleted = true;
         homes.clear();
@@ -203,6 +208,7 @@ class CloudFake {
 
 void main() {
   setUp(() {
+    FlutterSecureStorage.setMockInitialValues({}); // login guardado no celular: cada teste comeca sem nenhum
     lightMode.value = false;
     account.value = null;
     Api.token = null;
@@ -452,7 +458,8 @@ void main() {
         await tester.tap(find.text('Entrar ou criar conta'));
         await tester.pumpAndSettle();
         expect(find.byType(SignUpScreen), findsOneWidget);
-        expect(find.textContaining('O Iamp guarda no servidor'), findsOneWidget); // aviso antes de criar
+        expect(find.textContaining('O Iamp guarda no servidor'), findsOneWidget); // resumo do termo antes de criar
+        expect(find.text('Continuar sem cadastro'), findsOneWidget); // quem nao quer conta segue sem ela
 
         // nada preenchido: nao chama a API
         await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
@@ -460,7 +467,7 @@ void main() {
         expect(find.text('Digite o seu nome.'), findsOneWidget);
         expect(find.textContaining('Digite um e-mail válido'), findsOneWidget);
         expect(find.textContaining('A senha precisa ter pelo menos 8'), findsOneWidget);
-        expect(find.text('Para criar a conta, aceite o aviso de privacidade.'), findsOneWidget);
+        expect(find.text('Para criar a conta, aceite o Termo de Consentimento.'), findsOneWidget);
 
         await tester.enterText(field('Nome'), 'Maria Silva');
         await tester.enterText(field('E-mail'), 'maria@exemplo.com');
@@ -469,8 +476,8 @@ void main() {
         await tester.pumpAndSettle();
         expect(cloud.signUps, isEmpty); // ainda falta aceitar o aviso
 
-        await tester.ensureVisible(find.text('Li e aceito o aviso de privacidade'));
-        await tester.tap(find.text('Li e aceito o aviso de privacidade'));
+        await tester.ensureVisible(find.text('Li e concordo com o Termo de Consentimento'));
+        await tester.tap(find.text('Li e concordo com o Termo de Consentimento'));
         await tester.tap(find.widgetWithText(FilledButton, 'Criar conta'));
         await tester.pumpAndSettle();
       }, () => cloud.client);
@@ -595,6 +602,103 @@ void main() {
       expect(account.value, isNull);
     });
 
+    Future<String?> savedToken() => const FlutterSecureStorage().read(key: 'iamp_token');
+
+    testWidgets('login guardado: entrar guarda o token, abrir o app de novo volta para a conta, sair apaga', (tester) async {
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa da praia', 'geladeira')]);
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+      }, () => cloud.client);
+      expect(await savedToken(), 'token-1');
+
+      // fecha o app: memoria vazia, o token continua no celular
+      Api.token = null;
+      account.value = null;
+      homes.reset();
+      await http.runWithClient(() async {
+        await finish(tester, restoreSession());
+      }, () => cloud.client);
+      expect(account.value!.name, 'Maria Silva');
+      expect(Api.token, 'token-1');
+      expect([for (final h in homes.list) h.name], ['Casa da praia']);
+      expect(cloud.requests.where((r) => r.startsWith('GET /conta ') && r.endsWith('Bearer token-1')), hasLength(1));
+
+      await http.runWithClient(() async {
+        await finish(tester, logOut());
+      }, () => cloud.client);
+      expect(await savedToken(), isNull);
+      expect(account.value, isNull);
+    });
+
+    testWidgets('ao abrir: token vencido é apagado; sem internet o token fica para a próxima vez', (tester) async {
+      final cloud = CloudFake()
+        ..addAccount()
+        ..expired = true;
+      FlutterSecureStorage.setMockInitialValues({'iamp_token': 'token-velho'});
+      await http.runWithClient(() async {
+        await finish(tester, restoreSession());
+      }, () => cloud.client);
+      expect(account.value, isNull);
+      expect(Api.token, isNull);
+      expect(await savedToken(), isNull);
+
+      final offline = CloudFake()
+        ..addAccount()
+        ..offline = true;
+      FlutterSecureStorage.setMockInitialValues({'iamp_token': 'token-bom'});
+      await http.runWithClient(() async {
+        await finish(tester, restoreSession());
+      }, () => offline.client);
+      expect(account.value, isNull);
+      expect(Api.token, isNull);
+      expect(await savedToken(), 'token-bom');
+    });
+
+    testWidgets('continuar sem cadastro avisa que nada fica salvo e volta para o app', (tester) async {
+      phoneScreen(tester, tall: true);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Sem conta, as suas casas não ficam salvas'), findsOneWidget); // nas boas-vindas
+        await tester.tap(find.text('Entrar ou criar conta'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Continuar sem cadastro'));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('não são salvos'), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, 'Voltar'));
+        await tester.pumpAndSettle();
+        expect(find.byType(SignUpScreen), findsOneWidget); // voltou para o cadastro
+
+        await tester.tap(find.text('Continuar sem cadastro'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(FilledButton, 'Continuar sem cadastro'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(find.byType(SignUpScreen), findsNothing);
+      expect(account.value, isNull);
+    });
+
+    testWidgets('termo de consentimento completo abre do cadastro e cabe com fonte 2x', (tester) async {
+      phoneScreen(tester, fontScale: 2);
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const SignUpScreen()));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Ler o termo completo'),
+        300,
+        scrollable: find.descendant(of: find.byType(SignUpScreen), matching: find.byType(Scrollable)).first,
+      );
+      // com fonte 2x o botao fica embaixo do rodape fixo: aciona o proprio botao
+      final button = find.ancestor(of: find.text('Ler o termo completo'), matching: find.byWidgetPredicate((w) => w is TextButton));
+      tester.widget<TextButton>(button.first).onPressed!();
+      await tester.pumpAndSettle();
+      expect(find.byType(ConsentTermScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final allText = consentTerm().map((s) => '${s.$1} ${s.$2}').join(' ');
+      for (final must in ['Estados Unidos', 'art. 33', 'Gemini', 'apaga', '30 dias', 'Sem cadastro']) {
+        expect(allText, contains(must), reason: must);
+      }
+    });
+
     testWidgets('conta e boas-vindas cabem na tela com a fonte do sistema em 2x', (tester) async {
       phoneScreen(tester, fontScale: 2);
       await http.runWithClient(() async {
@@ -604,13 +708,13 @@ void main() {
         await tester.tap(find.text('Entrar ou criar conta'));
         await tester.pumpAndSettle();
         await tester.scrollUntilVisible(
-          find.text('Li e aceito o aviso de privacidade'),
+          find.text('Li e concordo com o Termo de Consentimento'),
           300,
           scrollable: find.descendant(of: find.byType(SignUpScreen), matching: find.byType(Scrollable)).first,
         );
       }, apiFake);
       expect(tester.takeException(), isNull);
-      expect(find.text('Li e aceito o aviso de privacidade'), findsOneWidget);
+      expect(find.text('Li e concordo com o Termo de Consentimento'), findsOneWidget);
     });
 
     test('casa vira JSON e volta igual (o que vai para a nuvem)', () {
