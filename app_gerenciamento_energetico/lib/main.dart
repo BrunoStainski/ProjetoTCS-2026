@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'api.dart';
+import 'conta.dart';
 import 'idioma.dart';
 import 'tema.dart';
 import 'telas/boas_vindas.dart';
 import 'telas/inicio.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized(); // o login guardado e lido antes do runApp terminar
   Api.wakeUp(); // servidor na nuvem pode estar dormindo: acorda enquanto a pessoa ve as boas-vindas
+  restoreSession(); // login guardado no celular: volta para a conta e traz as casas (sem travar a abertura)
   runApp(const IampApp());
 }
 

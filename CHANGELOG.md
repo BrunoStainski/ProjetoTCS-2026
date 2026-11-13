@@ -6,6 +6,17 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Continua logado: o app guarda o acesso da conta no celular, cifrado (`flutter_secure_storage`, Android
+  Keystore), por até 30 dias. Ao abrir, confere na API e traz as casas; acesso vencido é apagado e, sem internet,
+  tenta de novo na próxima vez. Sair ou apagar a conta apaga o acesso do celular. O backup automático do Android
+  foi desligado (ele quebrava o acesso cifrado ao restaurar). Gerar o APK no Windows agora exige o Modo de
+  desenvolvedor ligado (o pacote é um plugin).
+- Termo de Consentimento (LGPD) no cadastro: quem cuida dos dados, quais dados, para que, com quem, dados fora do
+  Brasil (consentimento específico, art. 33), por quanto tempo, direitos, segurança e o uso sem cadastro. O resumo
+  fica junto do aceite ("Li e concordo com o Termo de Consentimento", que não vem marcado), o termo completo abre
+  numa tela própria e também em "Minha conta". Versão do termo no servidor: 2026-11-13.
+- Continuar sem cadastro: o cadastro mostra a opção logo no topo, com o aviso de que sem conta as casas ficam só
+  no celular e são apagadas ao fechar o app; as boas-vindas avisam o mesmo para quem está sem conta.
 - Ar-condicionado: o app pergunta em quantos dias do mês a pessoa liga (opcional; em branco = 30). Antes a conta
   usava sempre 30 dias e exagerava o gasto de quem liga só no calor ou em alguns dias da semana. Os dias multiplicam
   a potência × horas ou, sem horas, reescalam o kWh/mês do Inmetro (× dias / 30). Vale no catálogo, na estimativa

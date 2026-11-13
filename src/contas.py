@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError
 import banco
 from idioma import tr
 
-PRIVACY_VERSION = "2026-11-12"
+PRIVACY_VERSION = "2026-11-13"  # Termo de Consentimento do app (telas/termo.dart); mudou o texto, mude aqui
 SESSION_DAYS = 30
 MIN_PASSWORD = 8
 MAX_PASSWORD = 128

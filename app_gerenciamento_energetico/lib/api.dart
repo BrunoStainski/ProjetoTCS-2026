@@ -369,7 +369,7 @@ class Api {
     if (token != null) 'Authorization': 'Bearer $token',
   };
 
-  /// Token da conta (POST /contas ou /login). So na memoria: fechar o app sai da conta.
+  /// Token da conta (POST /contas ou /login). conta.dart tambem guarda no celular (cifrado) para continuar logado.
   static String? token;
 
   /// Acorda o servidor assim que o app abre (enquanto a pessoa ainda esta nas boas-vindas).
@@ -469,6 +469,9 @@ class Api {
       await _post('/login', {'email': email, 'senha': password});
 
   static Future<void> logOut() async => _post('/logout', const {});
+
+  /// Dados da conta do token (ao abrir o app, confere se o login guardado ainda vale).
+  static Future<Map<String, dynamic>> myAccount() async => await _get('/conta');
 
   static Future<Map<String, dynamic>> updateAccount({String? name, String? email}) async =>
       await _patch('/conta', {'nome': ?name, 'email': ?email});
