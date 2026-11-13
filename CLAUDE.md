@@ -430,8 +430,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (hoje `2.2.0+8`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1`, `v2.1.0` e `v2.2.0` no GitHub. Tag `vX.Y.Z`
+- Versão do app em `pubspec.yaml` (hoje `2.2.1+9`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1`, `v2.1.0` e `v2.2.1` no GitHub. Tag `vX.Y.Z`
   (no commit de merge da `main`: os PRs viram commit novo) + Release no GitHub com o APK (nunca no git).
   Commit de versão: "Adiciona a versão: X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:
@@ -472,7 +472,8 @@ Testes em 12/11/2026: 169 Python + 76 do app. Versão 2.1.0 (APK apontando para 
 Falta: Fase 2 do registro de prompts (`prompts/registros_vibecoding.md`; a Fase 1, Gemini, está escrita), slides
 em PDF em `docs/` (entrega até 48 h antes da apresentação), vídeo da demo e a Release `v2.1.0` com o APK e o
 vídeo. `docs/der.png` é de antes da coluna `tensao` (o `der.mmd` já tem; gerar pede o mermaid-cli).
-Trocar a chave do Gemini (apareceu num print em 12/11/2026) no AI Studio, no Render e no `.env`.
+Depois da apresentação (decisão de 13/11/2026): trocar a chave do Gemini, que apareceu num print em 12/11/2026
+(AI Studio: criar nova e apagar a antiga; depois Render, `.env` e `infra/local/terraform.tfvars`).
 No app (depois): versão web para iPhone.
 BPMN: fonte editável em `docs/bpmn_processo.bpmn` (Camunda Modeler ou demo.bpmn.io) e imagem exportada em
 `docs/bpmn_processo.png`. Atualizado em 10/11/2026: pools app / backend (lanes cálculo, troca e payback, K-Means,
