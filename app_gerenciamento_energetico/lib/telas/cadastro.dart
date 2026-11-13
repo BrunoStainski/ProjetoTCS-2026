@@ -80,8 +80,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _emailError = validEmail(_email.text)
           ? null
           : tr('Digite um e-mail válido, como nome@exemplo.com.', 'Enter a valid email, like name@example.com.');
+      // "Minha conta": trocar o e-mail pede a senha atual (o servidor confere; quem so tem o celular nao troca)
       _passwordError = registered
-          ? null
+          ? (_emailChanged && _password.text.isEmpty
+                ? tr('Para trocar o e-mail, digite a sua senha atual.', 'To change the email, enter your current password.')
+                : null)
           : _logIn
           ? (_password.text.isEmpty ? tr('Digite a sua senha.', 'Enter your password.') : null)
           : (_password.text.length < minPassword
@@ -110,6 +113,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
+  /// "Minha conta": o e-mail digitado e outro (maiusculas nao contam: o servidor guarda em minusculas).
+  bool get _emailChanged {
+    final a = account.value;
+    return a != null && _email.text.trim().toLowerCase() != a.email;
+  }
+
   void _submit() {
     final registered = account.value != null;
     if (_busy || !_valid(registered: registered)) return;
@@ -118,7 +127,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _run(
         () => updateAccount(
           name: _name.text.trim() == a.name ? null : _name.text,
-          email: _email.text.trim().toLowerCase() == a.email ? null : _email.text,
+          email: _emailChanged ? _email.text : null,
+          currentPassword: _emailChanged ? _password.text : null,
         ),
         tr('Dados atualizados.', 'Details updated.'),
       );
@@ -275,16 +285,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 errorText: _emailError,
               ),
             ),
-            if (!registered) ...[
+            ...[
               const SizedBox(height: Spacing.m),
               TextField(
                 controller: _password,
                 obscureText: !_showPassword,
                 textInputAction: TextInputAction.done,
-                autofillHints: [_logIn ? AutofillHints.password : AutofillHints.newPassword],
+                autofillHints: [_logIn || registered ? AutofillHints.password : AutofillHints.newPassword],
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
-                  labelText: tr('Senha', 'Password'),
+                  labelText: registered
+                      ? tr('Senha atual (só para trocar o e-mail)', 'Current password (only to change the email)')
+                      : tr('Senha', 'Password'),
                   helperText: creating
                       ? tr('Pelo menos $minPassword letras ou números.', 'At least $minPassword letters or numbers.')
                       : null,

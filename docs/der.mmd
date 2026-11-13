@@ -13,7 +13,7 @@ erDiagram
     casas ||--o{ itens_casa : "tem (FK casa_id, cascata)"
 
     aparelhos {
-        serial id PK
+        bigint id PK "fixo: hash do nome"
         text categoria "UK com marca, modelo e tensao"
         text marca
         text modelo
@@ -83,6 +83,8 @@ erDiagram
         float tarifa_kwh
         text origem_tarifa "ANEEL ou manual"
         float custo_mes
+        float dias_mes "ar-condicionado"
+        text detalhe "separa 127 V e 220 V"
     }
 
     portateis {

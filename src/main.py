@@ -13,11 +13,12 @@ erros, plano do Eco-Coach) vem em ingles; sem ele, em portugues (ver idioma.py).
 
 import os
 import time
+from collections import deque
 from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal, Optional, Union
 
-from fastapi import Depends, FastAPI, HTTPException, Path, Query, Response
+from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -59,6 +60,7 @@ JSON_NAMES = {
     "created_at": "criado_em",
     "criterion": "criterio",
     "current": "atual",
+    "current_password": "senha_atual",
     "daily_hours": "horas_dia",
     "data": "dados",
     "data_source": "fonte_dados",
@@ -225,6 +227,8 @@ async def life_cycle(app):
             print("banco vazio ou desatualizado, carregando os dados...", flush=True)
             load_data(con)
         contas.create_tables(con)  # IF NOT EXISTS: as contas sobrevivem a recarga do catalogo
+        con.exec_driver_sql(banco.HISTORY_MIGRATION)  # colunas novas do historico (dias_mes, detalhe)
+        con.commit()
         rag_empty = not rag.base_loaded(con)
     finally:
         con.close()
@@ -275,8 +279,49 @@ app.add_middleware(RequestLanguage)
 async def invalid_input(request, error):
     """422 sem devolver o valor enviado. O padrao do FastAPI ecoa a entrada: uma senha longa demais voltava inteira
     na resposta, e um caractere Unicode invalido (um surrogate escapado no JSON) quebrava a resposta com erro 500."""
-    errors = [{k: v for k, v in e.items() if k not in ("input", "ctx", "url")} for e in error.errors()]
+    errors = [{**{k: v for k, v in e.items() if k not in ("input", "ctx", "url")}, "msg": _validation_message(e)}
+              for e in error.errors()]
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
+
+# Mensagens do Pydantic vem em ingles: em portugues, os tipos mais comuns ganham o texto traduzido (o app mostra
+# a primeira mensagem). O nome do campo vai na frente, no nome do JSON ("senha", "tarifa_manual").
+_VALIDATION_PT = {
+    "missing": "campo obrigatório",
+    "string_too_long": "texto longo demais (máximo de {max_length} caracteres)",
+    "string_too_short": "texto curto demais (mínimo de {min_length} caracteres)",
+    "too_long": "lista longa demais (máximo de {max_length} itens)",
+    "too_short": "lista curta demais (mínimo de {min_length} itens)",
+    "less_than_equal": "precisa ser no máximo {le}",
+    "less_than": "precisa ser menor que {lt}",
+    "greater_than_equal": "precisa ser pelo menos {ge}",
+    "greater_than": "precisa ser maior que {gt}",
+    "int_parsing": "precisa ser um número inteiro",
+    "int_from_float": "precisa ser um número inteiro",
+    "float_parsing": "precisa ser um número",
+    "bool_parsing": "precisa ser verdadeiro ou falso",
+    "string_type": "precisa ser um texto",
+    "string_unicode": "texto com caractere inválido",
+    "literal_error": "valor não aceito (opções: {expected})",
+    "json_invalid": "o corpo do pedido não é um JSON válido",
+}
+
+
+def _validation_message(e):
+    field = next((str(part) for part in reversed(e.get("loc", ())) if isinstance(part, str) and part != "body"), "")
+    if idioma.in_english():
+        message = e.get("msg", "")
+    elif e.get("type") == "value_error":
+        message = str(e.get("msg", "")).removeprefix("Value error, ")  # mensagem nossa, ja em portugues
+    else:
+        template = _VALIDATION_PT.get(e.get("type"))
+        try:
+            # numeros do jeito brasileiro: 10.0 -> "10", 0.5 -> "0,5"
+            ctx = {k: f"{v:g}".replace(".", ",") if isinstance(v, float) else v for k, v in e.get("ctx", {}).items()}
+            message = template.format(**ctx) if template else e.get("msg", "")
+        except (KeyError, IndexError):
+            message = e.get("msg", "")
+    return f"{field}: {message}" if field and e.get("type") != "value_error" else message
 
 
 app.add_middleware(
@@ -557,7 +602,7 @@ def connection():
     try:
         con = banco.connect()
     except ConnectionError as error:
-        raise HTTPException(status_code=503, detail=idioma.tr("banco de dados indisponivel", "database unavailable")) from error
+        raise HTTPException(status_code=503, detail=idioma.tr("banco de dados indisponível", "database unavailable")) from error
     try:
         yield con
     finally:
@@ -567,7 +612,7 @@ def connection():
 def service_error(error):
     message = str(error)
     not_found = any(chunk in message for chunk in
-                    ("nao existe", "sem tarifa vigente", "does not exist", "has no current tariff"))
+                    ("não existe", "sem tarifa vigente", "does not exist", "has no current tariff"))
     return HTTPException(status_code=404 if not_found else 422, detail=message)
 
 
@@ -657,7 +702,7 @@ def calculate_old_refrigerator(payload: OldRefrigeratorInput, con=Depends(connec
         return servico.calculate_estimated(con, consumption, brand=payload.brand, model=payload.model,
                                          register=payload.save_query, **payload.tariff())
     except FileNotFoundError as error:
-        raise HTTPException(status_code=503, detail=idioma.tr("modelo de estimativa indisponivel",
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de estimativa indisponível",
                                                               "estimation model unavailable")) from error
     except ValueError as error:
         raise service_error(error) from error
@@ -746,13 +791,36 @@ def classify(payload: ClassificationInput):
     try:
         return ml_pipeline.classify_residence(payload.model_dump(by_alias=True))
     except FileNotFoundError as error:
-        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponivel",
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponível",
                                                               "profile model unavailable")) from error
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 # Eco-Coach (RAG + LLM) -------------------------------------------------------------------
+
+# Cada plano gasta a cota gratuita do Gemini, que e de todos: limite por endereco (IP). Folgado de proposito:
+# numa apresentacao a plateia inteira pode estar na mesma rede (o mesmo IP). Fica na memoria do processo.
+ECO_COACH_LIMIT = 30
+ECO_COACH_WINDOW_S = 10 * 60
+_eco_calls = {}
+
+
+def eco_coach_quota(request: Request):
+    forwarded = request.headers.get("x-forwarded-for", "")  # o Render passa o IP de quem chamou aqui
+    ip = forwarded.split(",")[0].strip() or (request.client.host if request.client else "?")
+    now = time.monotonic()
+    if len(_eco_calls) > 10_000:  # endereco que parou de chamar nao fica na memoria para sempre
+        for old in [k for k, calls in _eco_calls.items() if not calls or now - calls[-1] > ECO_COACH_WINDOW_S]:
+            del _eco_calls[old]
+    calls = _eco_calls.setdefault(ip, deque())
+    while calls and now - calls[0] > ECO_COACH_WINDOW_S:
+        calls.popleft()
+    if len(calls) >= ECO_COACH_LIMIT:
+        raise HTTPException(status_code=429, detail=idioma.tr(
+            "Muitos pedidos ao Eco-Coach seguidos. Espere alguns minutos e tente de novo.",
+            "Too many Eco-Coach requests in a row. Wait a few minutes and try again."))
+    calls.append(now)
 
 class ItemEco(ConsumptionItem):
     monthly_cost: Optional[float] = Field(None, ge=0, description="R$/mes do aparelho (custo_mes de POST /calcular).")
@@ -802,7 +870,7 @@ class EcoCoach(ApiModel):
 
 
 @app.post("/eco-coach", response_model=EcoCoach, tags=["Eco-Coach (RAG)"])
-def eco_coach(payload: EcoCoachInput, con=Depends(connection)):
+def eco_coach(payload: EcoCoachInput, quota=Depends(eco_coach_quota), con=Depends(connection)):
     """Plano de acao em linguagem simples, com dicas oficiais citadas. Os numeros sao calculados
     pelo iamp; o LLM (Gemini) so escreve. Pode levar alguns segundos."""
     data = payload.model_dump(by_alias=True)  # rag_agent le as chaves do JSON (em portugues)
@@ -811,10 +879,10 @@ def eco_coach(payload: EcoCoachInput, con=Depends(connection)):
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except FileNotFoundError as error:
-        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponivel",
+        raise HTTPException(status_code=503, detail=idioma.tr("modelo de perfil indisponível",
                                                               "profile model unavailable")) from error
     except (LookupError, RuntimeError) as error:
-        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponivel: {error}",
+        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponível: {error}",
                                                               f"Eco-Coach unavailable: {error}")) from error
 
 
@@ -834,14 +902,14 @@ class ApplianceTips(ApiModel):
 
 
 @app.post("/eco-coach/aparelho", response_model=ApplianceTips, tags=["Eco-Coach (RAG)"])
-def eco_coach_appliance(payload: TipsInput, con=Depends(connection)):
+def eco_coach_appliance(payload: TipsInput, quota=Depends(eco_coach_quota), con=Depends(connection)):
     """Dicas personalizadas para gastar menos com um aparelho (usado nos eletroportateis)."""
     try:
         return rag_agent.generate_appliance_tips(con, payload.model_dump(by_alias=True))
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     except (LookupError, RuntimeError) as error:
-        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponivel: {error}",
+        raise HTTPException(status_code=503, detail=idioma.tr(f"Eco-Coach indisponível: {error}",
                                                               f"Eco-Coach unavailable: {error}")) from error
 
 
@@ -893,6 +961,8 @@ class Session(ApiModel):
 class AccountChange(ApiModel):
     name: Optional[str] = Field(None, max_length=80)
     email: Optional[str] = Field(None, max_length=254)
+    current_password: Optional[str] = Field(None, max_length=contas.MAX_PASSWORD,
+                                            description="Obrigatoria para trocar o e-mail (403 se errada).")
 
 
 class HomeItem(ApiModel):
@@ -965,7 +1035,7 @@ def get_account(user_id=Depends(current_user), con=Depends(connection)):
 def change_account(payload: AccountChange, user_id=Depends(current_user), con=Depends(connection)):
     """Corrige nome e/ou e-mail."""
     try:
-        return contas.update_account(con, user_id, payload.name, payload.email)
+        return contas.update_account(con, user_id, payload.name, payload.email, payload.current_password)
     except contas.AccountError as error:
         raise account_error(error) from error
 

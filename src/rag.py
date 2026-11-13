@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS trechos_rag (
 def _client():
     key = config._ENV.get("GEMINI_API_KEY")
     if not key:
-        raise RuntimeError("GEMINI_API_KEY nao configurada no .env")
+        raise RuntimeError("GEMINI_API_KEY não configurada no .env")
     from google import genai  # import aqui: so quando precisa
     return genai.Client(api_key=key)
 

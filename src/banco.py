@@ -32,7 +32,7 @@ CREATE TABLE portateis (
 );
 
 CREATE TABLE aparelhos (
-    id              SERIAL PRIMARY KEY,
+    id              BIGINT PRIMARY KEY,  -- fixo: hash do nome (criar_banco.stable_id), nao muda na recarga
     categoria       TEXT NOT NULL,
     marca           TEXT NOT NULL,
     modelo          TEXT NOT NULL,
@@ -110,8 +110,20 @@ CREATE TABLE IF NOT EXISTS consultas (
     metodo        TEXT NOT NULL,
     tarifa_kwh    DOUBLE PRECISION NOT NULL,
     origem_tarifa TEXT NOT NULL,
-    custo_mes     DOUBLE PRECISION NOT NULL
+    custo_mes     DOUBLE PRECISION NOT NULL,
+    dias_mes      DOUBLE PRECISION,   -- dias de uso no mes (ar-condicionado); vazio = 30
+    detalhe       TEXT                -- ex.: "7600 W · 220 V": separa as versoes de tensao do mesmo modelo
 );
+""" + """
+-- bancos criados antes dessas colunas (o CREATE TABLE IF NOT EXISTS nao mexe numa tabela que ja existe)
+ALTER TABLE consultas ADD COLUMN IF NOT EXISTS dias_mes DOUBLE PRECISION;
+ALTER TABLE consultas ADD COLUMN IF NOT EXISTS detalhe TEXT;
+"""
+
+# Roda a cada subida da API: o historico ganha as colunas novas mesmo sem recarregar o catalogo.
+HISTORY_MIGRATION = """
+ALTER TABLE IF EXISTS consultas ADD COLUMN IF NOT EXISTS dias_mes DOUBLE PRECISION;
+ALTER TABLE IF EXISTS consultas ADD COLUMN IF NOT EXISTS detalhe TEXT;
 """
 
 _engine = None
@@ -189,17 +201,18 @@ def distributors_with_tariff(con):
     )
 
 
-def register_query(con, r, daily_hours=None, monthly_cycles=None, speed=None):
+def register_query(con, r, daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None):
     run(
         con,
         """
         INSERT INTO consultas (categoria, marca, modelo, uf, distribuidora, horas_dia, ciclos_mes,
-                               velocidade, kwh_mes, metodo, tarifa_kwh, origem_tarifa, custo_mes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               velocidade, kwh_mes, metodo, tarifa_kwh, origem_tarifa, custo_mes,
+                               dias_mes, detalhe)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (r["categoria"], r["marca"], r["modelo"], r["uf"],
          None if r["distribuidora"] == "-" else r["distribuidora"],
          daily_hours, monthly_cycles, speed, r["kwh_mes"], r["metodo"],
-         r["tarifa_kwh"], r["origem_tarifa"], r["custo_mes"]),
+         r["tarifa_kwh"], r["origem_tarifa"], r["custo_mes"], days_per_month, r.get("detalhe") or None),
     )
     con.commit()

@@ -15,6 +15,7 @@ import 'package:app_gerenciamento_energetico/navegacao.dart';
 import 'package:app_gerenciamento_energetico/tema.dart';
 import 'package:app_gerenciamento_energetico/telas/busca.dart';
 import 'package:app_gerenciamento_energetico/telas/cadastro.dart';
+import 'package:app_gerenciamento_energetico/telas/casas.dart';
 import 'package:app_gerenciamento_energetico/telas/comparar.dart';
 import 'package:app_gerenciamento_energetico/telas/comum.dart';
 import 'package:app_gerenciamento_energetico/telas/dicas.dart';
@@ -141,18 +142,22 @@ class CloudFake {
   bool expired = false;
   bool homesFail = false; // GET /casas cai (internet instavel logo depois do login)
   bool offline = false; // nenhuma chamada da conta responde (sem internet)
+  String? refuseSaves; // PUT /casas responde 422 com este motivo (ex.: limite do servidor)
+  String email = 'maria@exemplo.com';
+  final patches = <Map<String, dynamic>>[];
   int saves = 0;
   int _tokens = 0;
   int _nextHome = 100;
 
-  void addAccount({List<Map<String, dynamic>> homes = const []}) {
+  void addAccount({List<Map<String, dynamic>> homes = const [], String? email}) {
     hasAccount = true;
+    if (email != null) this.email = email;
     this.homes.addAll(homes);
   }
 
   Map<String, dynamic> _session() => {
     'token': 'token-${++_tokens}',
-    'conta': {'id': 1, 'nome': 'Maria Silva', 'email': 'maria@exemplo.com'},
+    'conta': {'id': 1, 'nome': 'Maria Silva', 'email': email},
   };
 
   late final MockClient client = MockClient((r) async {
@@ -176,6 +181,11 @@ class CloudFake {
       if (offline) throw http.ClientException('sem internet');
       if (expired || auth == null) return json({'detail': 'entre na sua conta de novo'}, 401);
       if (path == '/conta' && r.method == 'GET') return json(_session()['conta']);
+      if (path == '/conta' && r.method == 'PATCH') {
+        patches.add(Map<String, dynamic>.from(body));
+        if (body['email'] != null) email = body['email'];
+        return json(_session()['conta']);
+      }
       if (path == '/conta' && r.method == 'DELETE') {
         deleted = true;
         homes.clear();
@@ -193,6 +203,7 @@ class CloudFake {
       final i = homes.indexWhere((h) => h['id'] == id);
       if (i < 0) return json({'detail': 'casa nao existe'}, 404);
       if (r.method == 'PUT') {
+        if (refuseSaves != null) return json({'detail': refuseSaves}, 422);
         saves++;
         homes[i] = {...body, 'id': id, 'atualizado_em': ''};
         return json(homes[i]);
@@ -213,6 +224,7 @@ void main() {
     lightMode.value = false;
     account.value = null;
     Api.token = null;
+    resetAccountState();
     homes.reset();
     currentTab.value = AppTab.calculate;
     language.value = Language.pt; // o app sempre abre em portugues
@@ -601,6 +613,144 @@ void main() {
         await finish(tester, Future<void>.value());
       }, () => cloud.client);
       expect(account.value, isNull);
+    });
+
+    testWidgets('limites do servidor: no máximo 10 casas e 100 aparelhos por casa', (tester) async {
+      phoneScreen(tester, tall: true);
+      for (var i = homes.list.length; i < maxHomes; i++) {
+        homes.add('Casa $i');
+      }
+      await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: const HomesScreen()));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Nova casa'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing); // nem pergunta o nome
+      expect(find.textContaining('Você já tem 10 casas'), findsOneWidget);
+      expect(homes.list, hasLength(maxHomes));
+
+      final h = Home();
+      for (var i = 0; i < maxItemsPerHome; i++) {
+        h.add(query('lampada_led', id: i + 1), result('lampada_led', 1, 0.8));
+      }
+      expect(h.full, isTrue);
+    });
+
+    testWidgets('casa cheia: o resultado avisa em vez de adicionar', (tester) async {
+      phoneScreen(tester, tall: true);
+      for (var i = 0; i < maxItemsPerHome; i++) {
+        home.add(query('lampada_led', id: i + 1), result('lampada_led', 1, 0.8));
+      }
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: ResultScreen(query: query('refrigerador', id: 2))));
+        await tester.pumpAndSettle();
+        await tester.tap(find.textContaining('Adicionar'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(home.items, hasLength(maxItemsPerHome));
+      expect(find.textContaining('o máximo de uma casa'), findsOneWidget);
+    });
+
+    testWidgets('servidor recusou a gravação: a tela diz o motivo (não só "confira a internet")', (tester) async {
+      final cloud = CloudFake()..addAccount();
+      cloud.refuseSaves = 'limite de 100 itens por casa';
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+        await finish(tester, saveNow());
+      }, () => cloud.client);
+      expect(syncState.value, SyncState.failed);
+      expect(syncError.value, 'limite de 100 itens por casa');
+    });
+
+    testWidgets('sessão vencida com mudança não salva: a casa fica e vai para a conta ao entrar de novo', (tester) async {
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa da praia', 'geladeira')]);
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        cloud.expired = true;
+        home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68)); // mudanca que nao vai conseguir salvar
+        await finish(tester, saveNow());
+      }, () => cloud.client);
+      expect(account.value, isNull);
+      expect(sessionEnded.value, isTrue);
+      expect(home.items, hasLength(2)); // nada se perdeu no celular
+
+      cloud.expired = false;
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+      }, () => cloud.client);
+      expect(sessionEnded.value, isFalse);
+      expect(homes.list, hasLength(1)); // a versao do celular substituiu a da nuvem (sem casa repetida)
+      expect((cloud.homes.single['itens'] as List), hasLength(2));
+    });
+
+    testWidgets('outra pessoa entra no mesmo celular: as casas da conta anterior não vão para a dela', (tester) async {
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa da Maria', 'geladeira')]);
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        cloud.expired = true;
+        home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+        await finish(tester, saveNow()); // a sessao da Maria vence: as casas dela ficam no celular
+      }, () => cloud.client);
+      final other = CloudFake()..addAccount(email: 'joao@exemplo.com');
+      await http.runWithClient(() async {
+        await finish(tester, logIn('joao@exemplo.com', 'senha-forte-1'));
+      }, () => other.client);
+      expect(account.value!.email, 'joao@exemplo.com');
+      expect(other.homes.where((h) => h['nome'] == 'Casa da Maria'), isEmpty);
+    });
+
+    testWidgets('casa apagada enquanto era criada na nuvem não volta depois', (tester) async {
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa', 'geladeira')]);
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        final beach = homes.add('Praia'); // nova: ainda sem id na nuvem
+        final saving = saveNow(); // comeca a criar no servidor...
+        homes.remove(beach); // ...e a pessoa apaga antes de terminar
+        await finish(tester, saving);
+      }, () => cloud.client);
+      expect(cloud.homes.map((h) => h['nome']), ['Casa']);
+    });
+
+    testWidgets('entrar na mão espera a restauração do login que começou ao abrir o app', (tester) async {
+      final cloud = CloudFake()..addAccount(homes: [savedHome(1, 'Casa da praia', 'geladeira')]);
+      FlutterSecureStorage.setMockInitialValues({'iamp_token': 'token-guardado'});
+      await http.runWithClient(() async {
+        final restoring = restoreSession();
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1')); // logo depois de abrir
+        await finish(tester, restoring);
+      }, () => cloud.client);
+      expect([for (final h in homes.list) h.name], ['Casa da praia']); // uma vez so, sem casa repetida
+    });
+
+    testWidgets('trocar o e-mail em "Minha conta" pede a senha atual', (tester) async {
+      phoneScreen(tester, tall: true);
+      final cloud = CloudFake()..addAccount();
+      await http.runWithClient(() async {
+        await finish(tester, logIn('maria@exemplo.com', 'senha-forte-1'));
+        // "Minha conta" aberta por cima de outra tela (salvar fecha a tela, como no app)
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: iampTheme(),
+            home: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen())),
+                child: const Text('abrir'),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('abrir'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.widgetWithText(TextField, 'E-mail'), 'maria.nova@exemplo.com');
+        await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
+        await tester.pumpAndSettle();
+        expect(find.text('Para trocar o e-mail, digite a sua senha atual.'), findsOneWidget);
+        expect(cloud.patches, isEmpty);
+        await tester.enterText(find.widgetWithText(TextField, 'Senha atual (só para trocar o e-mail)'), 'senha-forte-1');
+        await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
+        await tester.pumpAndSettle();
+      }, () => cloud.client);
+      expect(cloud.patches.single, {'email': 'maria.nova@exemplo.com', 'senha_atual': 'senha-forte-1'});
     });
 
     Future<String?> savedToken() => const FlutterSecureStorage().read(key: 'iamp_token');
@@ -1202,6 +1352,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(home.items, hasLength(2));
       expect(home.byCost.first.result.category, 'chuveiro');
+    });
+
+    testWidgets('"Desfazer" devolve o aparelho para a casa de onde ele saiu, mesmo depois de trocar de casa', (tester) async {
+      tallScreen(tester);
+      await fullHome(tester);
+      final first = home;
+      await tester.tap(find.text('Remover').first);
+      await tester.pumpAndSettle();
+      final other = homes.add('Casa da praia'); // a pessoa troca de casa antes de tocar em "Desfazer"
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Desfazer'));
+      await tester.pumpAndSettle();
+      expect(first.items, hasLength(2));
+      expect(other.items, isEmpty);
     });
   });
 

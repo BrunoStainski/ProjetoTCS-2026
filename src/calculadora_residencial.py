@@ -187,13 +187,13 @@ MIN_SAVINGS = 0.05
 SUSPECT_FRACTION = 0.4
 
 CONVERTED_ORIGIN = "convertido da metodologia antiga do Inmetro"
-CONVERTED_NOTICE = ("Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
-                    "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.")
+CONVERTED_NOTICE = ("Este modelo só tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
+                    "convertido para a regra atual para comparar com os modelos novos, então é aproximado.")
 
 DEFAULT_NOTICE = ("Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifária e iluminação "
                 "pública. O uso real muda o resultado.")
 # Com a tarifa da conta de luz, os impostos e a bandeira ja podem estar no valor digitado.
-USER_TARIFF_NOTICE = ("Calculado com a tarifa que voce informou. O uso real muda o resultado.")
+USER_TARIFF_NOTICE = ("Calculado com a tarifa que você informou. O uso real muda o resultado.")
 
 # Cada spec diz quais colunas do CSV limpo viram cada campo do catalogo.
 # "capacidade": (coluna, unidade) aparece na tela, ex.: "490 L".
@@ -437,7 +437,7 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
     if appliance["categoria"] not in ASK_DAYS:
         days_per_month = None
     if days_per_month is not None and not 1 <= days_per_month <= 31:
-        raise ValueError(tr("dias de uso por mes precisa estar entre 1 e 31",
+        raise ValueError(tr("os dias de uso no mês precisam estar entre 1 e 31",
                             "days of use per month must be between 1 and 31"))
     days = DAYS_PER_MONTH if days_per_month is None else days_per_month
     given = tr("informado", "entered")
@@ -494,9 +494,9 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
     if pd.notna(appliance["kwh_ciclo"]):
         cycles = monthly_cycles if monthly_cycles is not None else assumption.get("ciclos_mes")
         if cycles is None:
-            raise ValueError(tr("informe quantos ciclos por mes", "enter how many cycles per month"))
+            raise ValueError(tr("informe quantos ciclos por mês", "enter how many cycles per month"))
         if cycles < 0:
-            raise ValueError(tr("ciclos por mes nao pode ser negativo", "cycles per month cannot be negative"))
+            raise ValueError(tr("ciclos por mês não pode ser negativo", "cycles per month cannot be negative"))
         origin = given if monthly_cycles is not None else tr("estimativa do grupo", "group estimate")
         return {"kwh_mes": float(appliance["kwh_ciclo"]) * cycles,
                 "metodo": tr(f"{appliance['kwh_ciclo']:g} kWh por ciclo x {cycles:g} ciclos por mês ({origin})",
@@ -529,12 +529,12 @@ def build_result(appliance, consumption, tariff_kwh, distributor, tariff_origin,
     monthly_cost = consumption["kwh_mes"] * tariff_kwh
     notices = [t(USER_TARIFF_NOTICE if user_tariff else DEFAULT_NOTICE)]
     if consumption.get("premissa"):
-        notices.append(tr("O tempo de uso e uma estimativa do grupo. Informe o seu para um valor mais preciso.",
+        notices.append(tr("O tempo de uso é uma estimativa do grupo. Informe o seu para um valor mais preciso.",
                          "The time of use is an estimate made by our team. Enter yours for a more accurate value."))
     if appliance.get("origem_dado") == CONVERTED_ORIGIN:
         notices.append(t(CONVERTED_NOTICE))
     elif appliance.get("origem_dado") not in (None, "informado"):
-        notices.append(tr("O consumo deste modelo foi completado na limpeza dos dados (nao veio do Inmetro).",
+        notices.append(tr("O consumo deste modelo foi completado na limpeza dos dados (não veio do Inmetro).",
                          "This model's consumption was filled in during data cleaning (it did not come from Inmetro)."))
     detail = appliance.get("detalhe")
     return {

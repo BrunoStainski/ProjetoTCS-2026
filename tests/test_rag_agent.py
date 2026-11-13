@@ -173,7 +173,7 @@ def test_api_eco_coach_llm_offline_returns_503(api, base_rag, monkeypatch):
         raise RuntimeError("LLM indisponivel")
     monkeypatch.setattr(rag_agent, "call_llm", outside)
     r = api.post("/eco-coach", json=HOME)
-    assert r.status_code == 503 and "indisponivel" in r.json()["detail"]
+    assert r.status_code == 503 and "indisponível" in r.json()["detail"]
 
 
 @pytest.mark.banco

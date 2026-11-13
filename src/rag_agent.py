@@ -164,7 +164,7 @@ def call_llm(prompt):
     """Gemini com modelos de reserva. Devolve (texto, modelo usado)."""
     key = config._ENV.get("GEMINI_API_KEY")
     if not key:
-        raise RuntimeError(idioma.tr("GEMINI_API_KEY nao configurada no .env", "GEMINI_API_KEY is not set in .env"))
+        raise RuntimeError(idioma.tr("GEMINI_API_KEY não configurada no .env", "GEMINI_API_KEY is not set in .env"))
     from google import genai
     from google.genai import types
     client = genai.Client(api_key=key)
@@ -193,7 +193,7 @@ def call_llm(prompt):
                 if code == 400:
                     continue
             break  # proximo modelo
-    raise RuntimeError(idioma.tr("LLM indisponivel (", "LLM unavailable (") + "; ".join(errors) + ")")
+    raise RuntimeError(idioma.tr("LLM indisponível (", "LLM unavailable (") + "; ".join(errors) + ")")
 
 
 def search_appliance_sources(con, name):
@@ -244,7 +244,7 @@ def _cited_sources(text, sources):
 
 def generate_appliance_tips(con, appliance):
     if appliance["kwh_mes"] < 0 or appliance["custo_mes"] < 0:
-        raise ValueError(idioma.tr("consumo e custo nao podem ser negativos", "consumption and cost cannot be negative"))
+        raise ValueError(idioma.tr("consumo e custo não podem ser negativos", "consumption and cost cannot be negative"))
     name = NAMES.get(appliance["categoria"], appliance["nome"])
     sources = search_appliance_sources(con, name) if rag.base_loaded(con) else []
     if not sources:
@@ -266,20 +266,6 @@ def generate_plan(con, inventory, swaps=None):
     if not sources:
         raise LookupError(_base_empty())
     text, model = call_llm(build_prompt(inventory, profile, top_consumers, total_cost, sources, swaps or []))
-    # aceita [2], [5, 6] e [5][6]
-    numbers = (n for group in re.findall(r"\[(\d+(?:\s*,\s*\d+)*)\]", text) for n in group.split(","))
-    cited = sorted({int(n) for n in numbers if 1 <= int(n) <= len(sources)})
-
-    def page(f):
-        p = f.get("pagina")
-        return int(p) if p is not None and p == p else None  # p == p descarta NaN
-
-    def section(f):
-        # paginas HTML do Inmetro nao tem secao: o pandas devolve NaN, e NaN nao e texto
-        # (a resposta da API quebrava com erro 500 quando o LLM citava uma dessas fontes)
-        s = f.get("secao")
-        return s if isinstance(s, str) and s.strip() else None
-
     return {
         "perfil": profile["perfil"],
         "kwh_total": profile["kwh_total"],
@@ -287,10 +273,7 @@ def generate_plan(con, inventory, swaps=None):
         # o nome em portugues serve para a busca e o prompt; na resposta vai no idioma do app
         "maiores_consumos": [{**m, "nome": idioma.t(m["nome"])} for m in top_consumers[:3]],
         "plano": text,
-        "fontes": [{"n": n, "documento": sources[n - 1]["documento"], "orgao": sources[n - 1]["orgao"],
-                    "url": sources[n - 1]["url"], "secao": section(sources[n - 1]),
-                    "pagina": page(sources[n - 1])}
-                   for n in cited],
+        "fontes": _cited_sources(text, sources),  # aceita [2], [5, 6] e [5][6]; secao NaN vira null
         "modelo": model,
         "aviso": idioma.t(ECO_NOTICE),
     }

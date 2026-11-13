@@ -137,18 +137,18 @@ EN = {
         "The sodium vapor catalog does not include brightness (lumens), so an equivalent lamp cannot be found.",
     "Ainda não sugerimos trocas para este tipo de aparelho.":
         "We do not suggest replacements for this type of appliance yet.",
-    "Este modelo so tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
-    "convertido para a regra atual para comparar com os modelos novos, entao e aproximado.":
+    "Este modelo só tem o consumo medido pela regra antiga do Inmetro (anterior a 2021); o valor foi "
+    "convertido para a regra atual para comparar com os modelos novos, então é aproximado.":
         "This model only has its consumption measured under Inmetro's old rule (before 2021); the value was "
         "converted to the current rule to compare with new models, so it is approximate.",
     "Estimativa sem impostos (ICMS, PIS/COFINS), bandeira tarifária e iluminação "
     "pública. O uso real muda o resultado.":
         "Estimate without taxes (ICMS, PIS/COFINS), tariff flag surcharges and the public lighting fee. "
         "Real use changes the result.",
-    "Calculado com a tarifa que voce informou. O uso real muda o resultado.":
+    "Calculado com a tarifa que você informou. O uso real muda o resultado.":
         "Calculated with the rate you entered. Real use changes the result.",
     # estimativa.py
-    "Gasto aproximado: o modelo nao esta no catalogo do Inmetro, entao o consumo foi estimado "
+    "Gasto aproximado: o modelo não está no catálogo do Inmetro, então o consumo foi estimado "
     "pelo tipo, volume e ano de compra. O valor real pode estar em qualquer ponto da faixa.":
         "Approximate cost: the model is not in Inmetro's catalog, so the consumption was estimated "
         "from the type, volume and year of purchase. The real value can be anywhere in the range.",
@@ -156,7 +156,7 @@ EN = {
     "pelo desgaste da idade.":
         "Consumption from the appliance's label, converted to the current test method and adjusted "
         "for wear with age.",
-    "A potencia usada e a tipica da categoria (estimativa do grupo). Informe a da etiqueta "
+    "A potência usada é a típica da categoria (estimativa do grupo). Informe a da etiqueta "
     "do aparelho para um valor mais preciso.":
         "The power used is the typical one for this category (our team's estimate). Enter the one on "
         "the appliance's label for a more accurate value.",
@@ -166,8 +166,8 @@ EN = {
     "freezer vertical": "upright freezer",
     "freezer horizontal": "chest freezer",
     # ml_pipeline.py
-    "Perfil estimado por um modelo treinado com residencias sinteticas; "
-    "serve como referencia, nao como avaliacao oficial.":
+    "Perfil estimado por um modelo treinado com residências sintéticas; "
+    "serve como referência, não como avaliação oficial.":
         "Profile estimated by a model trained on synthetic homes; it is a reference, not an official assessment.",
     # rag_agent.py
     "Dicas do Inmetro e da Cemig; valores do iamp, sem impostos e bandeira.":

@@ -218,3 +218,25 @@ def test_catalog_fingerprint_changes_with_the_content(tmp_path):
     assert catalog_fingerprint([a, b]) == first  # Windows (CRLF) e Linux (LF) dao a mesma impressao
     a.write_bytes(b"marca,modelo\nX,2\n")
     assert catalog_fingerprint([a, b]) != first
+
+
+def test_appliance_id_is_stable_and_depends_on_the_exact_name():
+    """Ids fixos: o mesmo aparelho tem o mesmo id em toda recarga (antes era SERIAL e mudava)."""
+    from criar_banco import stable_id
+    a = stable_id("chuveiro", "CARDAL", "DUCHA 5 LUXO", "220")
+    assert a == stable_id("chuveiro", "CARDAL", "DUCHA 5 LUXO", "220")
+    assert a != stable_id("chuveiro", "CARDAL", "DUCHA 5 LUXO", "127")  # outra tensao, outro aparelho
+    assert stable_id("ar_condicionado", "Agratto", "X", "") != stable_id("ar_condicionado", "AGRATTO", "X", "")
+    assert 0 < a < 2 ** 53  # cabe no numero do JavaScript (app na web)
+
+
+def test_small_appliance_days_between_1_and_31():
+    """0 dias nao e uso: eletroportatil segue a mesma regra do ar-condicionado (1 a 31)."""
+    import pytest
+    import estimativa
+    default = {"categoria": "air_fryer", "nome": "Air fryer", "potencia_w": 1500, "horas_dia": 0.5, "dias_mes": 20,
+               "fonte": "teste"}
+    with pytest.raises(ValueError):
+        estimativa.resistive_consumption(default, days_per_month=0)
+    r = estimativa.resistive_consumption(default, days_per_month=10)
+    assert r["dias_mes"] == 10 and r["kwh_mes"] == 1500 / 1000 * 0.5 * 10

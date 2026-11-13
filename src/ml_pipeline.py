@@ -26,8 +26,8 @@ import numpy as np
 from idioma import t, tr
 
 MODEL = Path(__file__).resolve().parents[1] / "models" / "kmeans.pkl"
-ML_NOTICE = ("Perfil estimado por um modelo treinado com residencias sinteticas; "
-            "serve como referencia, nao como avaliacao oficial.")
+ML_NOTICE = ("Perfil estimado por um modelo treinado com residências sintéticas; "
+            "serve como referência, não como avaliação oficial.")
 
 
 @lru_cache(maxsize=1)
@@ -52,7 +52,7 @@ def residence_variables(inventory):
     for item in items:
         kwh = float(item["kwh_mes"])
         if kwh < 0:
-            raise ValueError(tr("kwh_mes nao pode ser negativo", "kwh_mes cannot be negative"))
+            raise ValueError(tr("o consumo (kwh_mes) não pode ser negativo", "kwh_mes cannot be negative"))
         by_category[item["categoria"]] = by_category.get(item["categoria"], 0.0) + kwh
     total = sum(by_category.values())
     if total <= 0:
