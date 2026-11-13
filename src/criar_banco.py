@@ -11,6 +11,7 @@ A tabela consultas (historico do app) e mantida.
 """
 
 import argparse
+import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -18,7 +19,9 @@ import pandas as pd
 import config
 import banco
 from banco import SCHEMA
-from calculadora_residencial import load_catalog, normalize
+import calculadora_residencial
+import tarifas_aneel
+from calculadora_residencial import SPECS, load_catalog, normalize
 from tarifas_aneel import read_residential_tariffs
 
 QUERIES_SQL = Path(__file__).resolve().parent / "consultas_exemplo.sql"
@@ -28,6 +31,24 @@ APPLIANCE_COLUMNS = [
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta", "kwh_ciclo",
     "potencia_w", "standby_kwh_mes", "fluxo_lm", "origem_dado", "arquivo_origem", "busca",
 ]
+
+
+def catalog_files():
+    """Tudo o que decide o conteudo das tabelas de dados: os CSVs carregados e o codigo que monta o catalogo."""
+    data = [config.DATA / s["arquivo"] for s in SPECS] + [SMALL_APPLIANCES_CSV, config.TARIFFS_CSV, config.DISTRIBUTORS_CSV]
+    code = [Path(__file__), Path(calculadora_residencial.__file__), Path(tarifas_aneel.__file__),
+            config.ROOT / "models" / "refrigerador.pkl"]  # conversao das geladeiras da metodologia antiga
+    return [p for p in data + code if p.exists()]
+
+
+def catalog_fingerprint(files=None):
+    """Impressao digital do catalogo, gravada em `cargas` a cada carga. A API compara na subida e recarrega o banco
+    quando um CSV ou a regra de montagem mudou. Antes so recarregava com coluna nova: mudar o conteudo (limpeza
+    refeita, tensao de cada modelo) nao chegava ao banco da nuvem."""
+    digest = hashlib.sha256()
+    for path in sorted(files if files is not None else catalog_files(), key=lambda p: p.name):
+        digest.update(path.name.encode() + b"|" + path.read_bytes().replace(b"\r\n", b"\n"))
+    return "catalogo:" + digest.hexdigest()[:16]
 
 
 def _uf_valid(value):
@@ -40,6 +61,7 @@ def load_appliances(con):
     catalog[APPLIANCE_COLUMNS].to_sql("aparelhos", con, if_exists="append", index=False)
     for file, lines in catalog["arquivo_origem"].value_counts().sort_index().items():
         banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (file, int(lines)))
+    banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (catalog_fingerprint(), len(catalog)))
     return len(catalog)
 
 

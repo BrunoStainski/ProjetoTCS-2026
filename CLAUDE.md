@@ -194,7 +194,11 @@ GLP da ANP, `src/gas.py`, tela do app, endpoints e tabelas) saiu do projeto. `ba
 tabela `fogoes` ainda existir.
 
 `database_loaded()` compara as colunas de `aparelhos` com `APPLIANCE_COLUMNS` (criar_banco.py): ao
-adicionar coluna no catálogo, atualize SCHEMA + APPLIANCE_COLUMNS e o banco recarrega sozinho.
+adicionar coluna no catálogo, atualize SCHEMA + APPLIANCE_COLUMNS e o banco recarrega sozinho. Também compara a
+impressão do catálogo (`criar_banco.catalog_fingerprint`: hash dos CSVs carregados, de criar_banco.py,
+calculadora_residencial.py, tarifas_aneel.py e do refrigerador.pkl, gravado em `cargas` como `catalogo:<hash>`):
+mudou o conteúdo sem coluna nova (limpeza refeita, regra de tensão), recarrega na subida. Antes isso não chegava ao
+Neon (12/11/2026: a tensão dos modelos de uma tensão só ficou de fora até esta correção).
 
 ## Sugestão de troca (`servico.suggest_alternatives` e `servico.compare`)
 

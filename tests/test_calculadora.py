@@ -175,3 +175,17 @@ def test_model_sold_in_one_voltage_keeps_it_and_other_categories_have_none():
     ))
     assert list(catalog["tensao"]) == ["220", ""]
     assert list(catalog["detalhe"]) == ["16 kg · 220 V", "375 L"]
+
+
+def test_catalog_fingerprint_changes_with_the_content(tmp_path):
+    """A API recarrega o banco quando a impressao muda: CSV refeito ou regra de montagem nova."""
+    from criar_banco import catalog_fingerprint
+    a, b = tmp_path / "a.csv", tmp_path / "b.csv"
+    a.write_bytes(b"marca,modelo\r\nX,1\r\n")
+    b.write_bytes(b"x")
+    first = catalog_fingerprint([a, b])
+    assert first == catalog_fingerprint([b, a])  # a ordem da lista nao importa
+    a.write_bytes(b"marca,modelo\nX,1\n")
+    assert catalog_fingerprint([a, b]) == first  # Windows (CRLF) e Linux (LF) dao a mesma impressao
+    a.write_bytes(b"marca,modelo\nX,2\n")
+    assert catalog_fingerprint([a, b]) != first
