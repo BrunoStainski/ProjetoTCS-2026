@@ -4,6 +4,18 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## Próxima versão (ainda sem número)
+
+- Tensão: modelo vendido numa tensão só também guarda a tensão e mostra no detalhe ("12 kg · 220 V"). Antes ele
+  ficava como "vale para as duas" e a troca podia sugerir a quem tem 127 V uma máquina que só existe em 220 V.
+- Casas salvas: com as versões 127 V e 220 V do mesmo modelo, o id salvo também é conferido pelo detalhe; antes,
+  depois de recarregar o catálogo, o chuveiro de 220 V podia voltar como o de 127 V. A conferência agora só roda ao
+  ler as casas (antes rodava também a cada gravação, com 1 a 2 consultas por item).
+- Lista de marcas: as versões 127 V e 220 V do mesmo modelo contam como um modelo.
+- Login: 5 senhas erradas em 15 minutos para o mesmo e-mail fazem esperar (429), contra chute de senha. Duas
+  contas criadas ao mesmo tempo com o mesmo e-mail dão 409 (antes, erro 500).
+- Testes novos: separação por tensão, sugestão só da mesma tensão, id da outra tensão e limite de senha errada.
+
 ## App 2.1.0+7 / API 0.6.0
 
 - Tensão 127 V × 220 V: o catálogo guardava só a primeira versão de cada modelo e o chuveiro de 220 V sumia

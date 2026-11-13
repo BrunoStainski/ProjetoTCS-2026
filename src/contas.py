@@ -22,7 +22,10 @@ import hmac
 import json
 import re
 import secrets
+import time
 from datetime import datetime, timedelta, timezone
+
+from sqlalchemy.exc import IntegrityError
 
 import banco
 from idioma import tr
@@ -33,6 +36,11 @@ MIN_PASSWORD = 8
 MAX_PASSWORD = 128
 MAX_HOMES = 10
 MAX_ITEMS = 100
+# Contra chute de senha: 5 senhas erradas em 15 min para o mesmo e-mail -> espera (429). Fica na memoria do
+# processo (o Render roda um so); reiniciar a API zera a contagem.
+MAX_FAILURES = 5
+FAILURE_WINDOW_S = 15 * 60
+_failures = {}
 MAX_ITEM_DATA = 20_000  # caracteres do JSON de cada item (o resultado de um calculo tem ~2 mil)
 
 # scrypt: parametros recomendados pelo OWASP (n=2^17 pede 128 MB; 2^14 cabe nos 512 MB do Render)
@@ -170,15 +178,19 @@ def sign_up(con, name, email, password, accepted_privacy):
                               "you must accept the privacy notice to create an account"))
     name, email = _clean_name(name), _clean_email(email)
     _check_new_password(password)
-    exists = banco.run(con, "SELECT 1 FROM usuarios WHERE email = ?", (email,)).first()
-    if exists:
-        raise AccountError(tr("ja existe uma conta com esse e-mail", "an account with this e-mail already exists"), 409)
-    user_id = banco.run(
-        con,
-        "INSERT INTO usuarios (nome, email, senha_hash, consentimento_em, versao_aviso) "
-        "VALUES (?, ?, ?, now(), ?) RETURNING id",
-        (name, email, hash_password(password), PRIVACY_VERSION),
-    ).scalar_one()
+    in_use = AccountError(tr("ja existe uma conta com esse e-mail", "an account with this e-mail already exists"), 409)
+    if banco.run(con, "SELECT 1 FROM usuarios WHERE email = ?", (email,)).first():
+        raise in_use
+    try:
+        user_id = banco.run(
+            con,
+            "INSERT INTO usuarios (nome, email, senha_hash, consentimento_em, versao_aviso) "
+            "VALUES (?, ?, ?, now(), ?) RETURNING id",
+            (name, email, hash_password(password), PRIVACY_VERSION),
+        ).scalar_one()
+    except IntegrityError:  # duas contas com o mesmo e-mail ao mesmo tempo: 409, e nao erro 500
+        con.rollback()
+        raise in_use from None
     token = _new_session(con, user_id)
     con.commit()
     return token, _account(con, user_id)
@@ -191,12 +203,18 @@ def log_in(con, email, password):
         email = _clean_email(email)
     except AccountError:
         raise wrong from None
+    now = time.monotonic()
+    recent = [moment for moment in _failures.get(email, []) if now - moment < FAILURE_WINDOW_S]
+    if len(recent) >= MAX_FAILURES:
+        raise AccountError(tr("muitas tentativas com a senha errada: espere 15 minutos e tente de novo",
+                              "too many attempts with a wrong password: wait 15 minutes and try again"), 429)
     row = banco.run(con, "SELECT id, senha_hash FROM usuarios WHERE email = ?", (email,)).first()
     if row is None:
         hash_password(password or "")  # gasta o mesmo tempo: o tempo de resposta nao revela o e-mail
+    if row is None or not check_password(password or "", row.senha_hash):
+        _failures[email] = [*recent, now]
         raise wrong
-    if not check_password(password or "", row.senha_hash):
-        raise wrong
+    _failures.pop(email, None)
     token = _new_session(con, row.id)
     con.commit()
     return token, _account(con, row.id)
@@ -254,7 +272,7 @@ def _json(value):
     return json.loads(value)
 
 
-def _home(con, user_id, home_id):
+def _home(con, user_id, home_id, refresh_ids=False):
     df = banco.query(con, "SELECT id, nome, moradores, ultima_tarifa, atualizado_em FROM casas "
                           "WHERE id = ? AND usuario_id = ?", (home_id, user_id))
     if df.empty:
@@ -267,7 +285,8 @@ def _home(con, user_id, home_id):
         "id": int(row["id"]), "nome": row["nome"], "moradores": int(row["moradores"]),
         "ultima_tarifa": _json(row["ultima_tarifa"]), "atualizado_em": row["atualizado_em"].isoformat(),
         "itens": [{"quantidade": int(i["quantidade"]), "categoria": i["categoria"], "kwh_mes": float(i["kwh_mes"]),
-                   "custo_mes": float(i["custo_mes"]), "dados": refresh_appliance_id(con, _json(i["dados"]))}
+                   "custo_mes": float(i["custo_mes"]),
+                   "dados": refresh_appliance_id(con, _json(i["dados"])) if refresh_ids else _json(i["dados"])}
                   for _, i in items.iterrows()],
     }
 
@@ -276,7 +295,8 @@ def refresh_appliance_id(con, data):
     """Os ids do catalogo mudam quando os dados sao recarregados (ex.: coluna nova, limpeza refeita). Ao devolver
     um item salvo, confere se o id ainda aponta para o mesmo aparelho (categoria + marca + modelo); se nao, acha o
     aparelho pelo nome e corrige o id. Sumiu do catalogo: id 0 (o app mostra o item, sem sugestao de troca).
-    Item estimado (fora do catalogo) ja tem id 0 e fica como esta."""
+    Item estimado (fora do catalogo) ja tem id 0 e fica como esta. Modelo com as versoes 127 V e 220 V: o nome
+    nao basta, o detalhe ("7600 W · 220 V") tambem precisa bater (W, V, kg e L nao mudam com o idioma)."""
     query = data.get("consulta") if isinstance(data, dict) else None
     appliance = query.get("aparelho") if isinstance(query, dict) else None
     if not isinstance(appliance, dict) or query.get("estimativa") or not isinstance(appliance.get("id"), int):
@@ -284,14 +304,16 @@ def refresh_appliance_id(con, data):
     if appliance["id"] <= 0:
         return data
     key = (appliance.get("categoria"), appliance.get("marca"), appliance.get("modelo"))
-    row = banco.run(con, "SELECT categoria, marca, modelo FROM aparelhos WHERE id = ?", (appliance["id"],)).first()
-    if row is not None and tuple(row) == key:
+    detail = appliance.get("detalhe") or ""
+    row = banco.run(con, "SELECT categoria, marca, modelo, tensao, detalhe FROM aparelhos WHERE id = ?",
+                    (appliance["id"],)).first()
+    if row is not None and tuple(row[:3]) == key and (not row[3] or row[4] == detail):
         return data
     found = banco.run(
         con,
         "SELECT id FROM aparelhos WHERE categoria = ? AND marca = ? AND modelo = ? "
         "ORDER BY (detalhe = ?) DESC, id LIMIT 1",
-        (*key, appliance.get("detalhe") or ""),
+        (*key, detail),
     ).scalar()
     appliance["id"] = int(found) if found is not None else 0
     return data
@@ -299,7 +321,8 @@ def refresh_appliance_id(con, data):
 
 def list_homes(con, user_id):
     ids = banco.query(con, "SELECT id FROM casas WHERE usuario_id = ? ORDER BY id", (user_id,))["id"]
-    return [_home(con, user_id, int(i)) for i in ids]
+    # so aqui (casas lidas ao entrar e em GET /casas) os ids sao conferidos: o app acabou de mandar os de save_home
+    return [_home(con, user_id, int(i), refresh_ids=True) for i in ids]
 
 
 def _check_residents(residents):

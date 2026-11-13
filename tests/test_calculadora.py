@@ -132,3 +132,46 @@ def test_assumption_and_imputed_consumption_generate_notices():
 def test_normalize_removes_accent_and_symbols():
     assert normalize("  Geladeira BRASTEMP/Frost-Free ") == "geladeira brastemp frost free"
     assert normalize("Ação Ônibus") == "acao onibus"
+
+
+# Tensao (127 V x 220 V) --------------------------------------------------------------------------
+
+def _versions(*rows):
+    import pandas as pd
+    columns = ["categoria", "marca", "modelo", "tensao", "detalhe", "kwh_mes", "kwh_ciclo", "potencia_w", "standby_kwh_mes"]
+    return pd.DataFrame([dict(zip(columns, r)) for r in rows])
+
+
+def test_voltage_versions_that_use_different_power_are_both_kept():
+    from calculadora_residencial import keep_voltage_versions
+    nan = float("nan")
+    catalog = keep_voltage_versions(_versions(
+        ("chuveiro", "CARDAL", "DUCHA", "127", "5500 W", nan, nan, 5500, nan),
+        ("chuveiro", "CARDAL", "DUCHA", "220", "7600 W", nan, nan, 7600, nan),
+        ("chuveiro", "CARDAL", "DUCHA", "220", "7600 W", nan, nan, 7600, nan),  # linha repetida no Inmetro
+    ))
+    assert list(catalog["detalhe"]) == ["5500 W · 127 V", "7600 W · 220 V"]
+    assert list(catalog["tensao"]) == ["127", "220"]
+
+
+def test_same_consumption_in_both_voltages_is_one_row_for_both():
+    from calculadora_residencial import keep_voltage_versions
+    nan = float("nan")
+    catalog = keep_voltage_versions(_versions(
+        ("maquina_de_lavar", "LG", "WM", "127", "12 kg", nan, 0.2, nan, nan),
+        ("maquina_de_lavar", "LG", "WM", "220", "12 kg", nan, 0.2, nan, nan),
+    ))
+    assert len(catalog) == 1
+    assert catalog.iloc[0]["tensao"] == "" and catalog.iloc[0]["detalhe"] == "12 kg"
+
+
+def test_model_sold_in_one_voltage_keeps_it_and_other_categories_have_none():
+    from calculadora_residencial import keep_voltage_versions
+    nan = float("nan")
+    catalog = keep_voltage_versions(_versions(
+        ("maquina_de_lavar", "LG", "SO220", "220", "16 kg", nan, 0.3, nan, nan),
+        ("refrigerador", "CONSUL", "CRM", "", "375 L", 40, nan, nan, nan),
+        ("refrigerador", "CONSUL", "CRM", "", "375 L", 41, nan, nan, nan),  # sem tensao: fica a 1a, como antes
+    ))
+    assert list(catalog["tensao"]) == ["220", ""]
+    assert list(catalog["detalhe"]) == ["16 kg · 220 V", "375 L"]

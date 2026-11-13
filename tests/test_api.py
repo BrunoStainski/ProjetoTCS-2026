@@ -246,3 +246,19 @@ def test_classify(client):
 ])
 def test_classify_rejects_invalid_input(client, body):
     assert client.post("/classificar", json=body).status_code == 422
+
+
+@pytest.mark.banco
+def test_suggestions_keep_the_same_voltage(api, con, copel):
+    """Quem tem a maquina de 127 V nao recebe sugestao que so existe em 220 V."""
+    df = banco.query(con, "SELECT id FROM aparelhos WHERE categoria = 'maquina_de_lavar' AND tensao = '127' "
+                          "AND origem_dado = 'informado' ORDER BY kwh_ciclo DESC LIMIT 1")
+    if df.empty:
+        pytest.skip("nenhuma maquina de lavar de 127 V no catalogo")
+    r = api.post("/sugestoes", json={"aparelho_id": int(df.iloc[0]["id"]), "distribuidora_id": copel["id"],
+                                     "ciclos_mes": 12, "limite": 10})
+    assert r.status_code == 200
+    ids = [s["id"] for s in r.json()["sugestoes"]]
+    assert ids, "a maquina que mais gasta deveria ter sugestao"
+    volts = banco.query(con, f"SELECT DISTINCT tensao FROM aparelhos WHERE id IN ({', '.join('?' for _ in ids)})", ids)
+    assert set(volts["tensao"]) <= {"", "127"}

@@ -74,7 +74,7 @@ def list_brands(con, category):
     O catalogo do Inmetro mistura maiusculas e minusculas na mesma marca ("Agratto" e "AGRATTO"):
     agrupa sem diferenciar, para a marca aparecer uma vez so.
     """
-    sql = ("SELECT MIN(marca) AS marca, COUNT(*) AS modelos FROM aparelhos WHERE categoria = ? "
+    sql = ("SELECT MIN(marca) AS marca, COUNT(DISTINCT modelo) AS modelos FROM aparelhos WHERE categoria = ? "
            "GROUP BY UPPER(TRIM(marca)) ORDER BY UPPER(TRIM(marca))")
     return _records(banco.query(con, sql, (category,)))
 
