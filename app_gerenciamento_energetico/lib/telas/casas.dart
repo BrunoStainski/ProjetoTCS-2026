@@ -82,6 +82,15 @@ class _HomesScreenState extends State<HomesScreen> {
   String? _error;
 
   Future<void> _new() async {
+    if (homes.list.length >= maxHomes) {
+      setState(
+        () => _error = tr(
+          'Você já tem $maxHomes casas, o máximo. Apague uma para criar outra.',
+          'You already have $maxHomes homes, the most allowed. Delete one to create another.',
+        ),
+      );
+      return;
+    }
     final name = await askHomeName(context);
     if (name == null || !mounted) return;
     homes.add(name); // com conta, conta.dart cria no servidor
@@ -142,7 +151,7 @@ class _HomesScreenState extends State<HomesScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([homes, account, syncState]),
+      listenable: Listenable.merge([homes, account, syncState, syncError, sessionEnded]),
       builder: (context, _) => AppPage(
         title: tr('Minhas casas', 'My homes'),
         footer: FilledButton.icon(
@@ -240,6 +249,17 @@ class _WhereSaved extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // a sessao venceu com mudanca nao salva: as casas ficaram aqui e vao para a conta ao entrar de novo
+          if (sessionEnded.value) ...[
+            Text(
+              tr(
+                'Sua sessão terminou antes de salvar a última mudança. Entre de novo na sua conta para salvá-la.',
+                'Your session ended before the last change was saved. Log in to your account again to save it.',
+              ),
+              style: t.secondary.copyWith(color: t.alert),
+            ),
+            const SizedBox(height: Spacing.p),
+          ],
           Text(
             tr(
               'Sem conta, as casas ficam só neste aparelho e somem ao fechar o app.',
@@ -268,10 +288,9 @@ class _WhereSaved extends StatelessWidget {
       ),
       SyncState.failed => (
         Icons.cloud_off_outlined,
-        tr(
-          'Não consegui salvar agora. Confira a internet.',
-          'Could not save right now. Check your internet connection.',
-        ),
+        syncError.value == null
+            ? tr('Não consegui salvar agora. Confira a internet.', 'Could not save right now. Check your internet connection.')
+            : tr('Não consegui salvar: ${syncError.value}', 'Could not save: ${syncError.value}'),
       ),
     };
     return Column(

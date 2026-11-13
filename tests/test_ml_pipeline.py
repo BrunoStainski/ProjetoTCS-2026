@@ -26,7 +26,7 @@ def test_complete_response_with_right_totals():
     assert r["kwh_por_morador"] == pytest.approx(40.5)
     assert r["fracoes"]["frac_chuveiro"] == pytest.approx(82.5 / 121.5, abs=1e-3)
     assert r["fracoes"]["frac_ar"] == 0
-    assert "sinteticas" in r["aviso"]
+    assert "sintéticas" in r["aviso"]
 
 
 def test_items_of_same_category_are_summed():

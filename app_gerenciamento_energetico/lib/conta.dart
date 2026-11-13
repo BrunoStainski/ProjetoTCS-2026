@@ -37,6 +37,13 @@ enum SyncState { saving, saved, failed }
 /// Situacao da gravacao das casas na nuvem (a tela de casas mostra "Salvo" ou "Não consegui salvar").
 final syncState = ValueNotifier<SyncState>(SyncState.saved);
 
+/// Por que a ultima gravacao falhou (mensagem da API; null = sem internet ou nada a dizer).
+final syncError = ValueNotifier<String?>(null);
+
+/// A sessao terminou com mudancas ainda nao salvas: as casas continuam no celular e a tela pede para entrar
+/// de novo (entrando na mesma conta, a versao do celular e a que fica).
+final sessionEnded = ValueNotifier<bool>(false);
+
 final _emailFormat = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 bool validEmail(String text) => _emailFormat.hasMatch(text.trim());
@@ -51,6 +58,12 @@ final _savedVersion = Expando<int>();
 Timer? _timer;
 bool _saving = false;
 bool _listening = false;
+
+/// E-mail da conta dona das casas que estao na memoria (null = casas montadas sem conta).
+String? _owner;
+
+/// Restauracao do login ao abrir o app: entrar na mao espera ela terminar (senao as duas juntam as casas).
+Future<void>? _restoring;
 
 const _tokenKey = 'iamp_token';
 const _storage = FlutterSecureStorage();
@@ -71,6 +84,7 @@ Future<void> _forgetToken() async {
 void _start(Map<String, dynamic> session) {
   Api.token = session['token'];
   account.value = Account.fromJson(session['conta']);
+  sessionEnded.value = false;
   unawaited(_keepToken(Api.token!));
   if (!_listening) {
     homes.addListener(_scheduleSave);
@@ -80,7 +94,9 @@ void _start(Map<String, dynamic> session) {
 
 /// Abre o app: com login guardado no celular, confere o token na API e traz as casas da nuvem.
 /// Token vencido ou conta apagada: apaga o token. Sem internet: fica sem conta agora e tenta ao abrir de novo.
-Future<void> restoreSession() async {
+Future<void> restoreSession() => _restoring = _restore();
+
+Future<void> _restore() async {
   final String? token;
   try {
     token = await _storage.read(key: _tokenKey);
@@ -92,8 +108,9 @@ Future<void> restoreSession() async {
   Api.token = token;
   try {
     final data = await Api.myAccount();
+    final previousOwner = _owner;
     _start({'token': token, 'conta': data});
-    await _mergeCloudHomes();
+    await _mergeCloudHomes(previousOwner);
   } on SessionExpired {
     _endSession();
   } catch (_) {
@@ -106,18 +123,22 @@ Future<void> restoreSession() async {
 
 /// Cria a conta e leva para ela as casas que a pessoa ja montou no app.
 Future<void> signUp(String name, String email, String password) async {
+  await _restoring;
   _start(await Api.signUp(name.trim(), email.trim(), password));
   for (final h in homes.list) {
     h.cloudId = null;
   }
+  _owner = account.value!.email;
   await saveNow();
 }
 
 /// Entra na conta: traz as casas da nuvem e junta as que a pessoa montou antes de entrar (sem perder nada).
 Future<void> logIn(String email, String password) async {
+  await _restoring;
+  final previousOwner = _owner;
   _start(await Api.logIn(email.trim(), password));
   try {
-    await _mergeCloudHomes();
+    await _mergeCloudHomes(previousOwner);
   } catch (_) {
     // entrou, mas nao trouxe as casas (internet caiu no meio): sai da conta sem apagar as casas do celular
     _endSession();
@@ -125,17 +146,27 @@ Future<void> logIn(String email, String password) async {
   }
 }
 
-/// Traz as casas da nuvem e junta as que a pessoa montou no celular antes de entrar (sem perder nada).
-Future<void> _mergeCloudHomes() async {
+/// Traz as casas da nuvem e junta as do celular (sem perder nada):
+/// - casa montada sem conta: vai para a conta como casa nova;
+/// - casa da mesma conta que ficou no celular (a sessao venceu com mudanca nao salva): a versao do celular vence;
+/// - casa de outra conta (outra pessoa usou este celular): fica fora, os dados eram da outra conta.
+Future<void> _mergeCloudHomes(String? previousOwner) async {
   final cloud = [for (final j in await Api.savedHomes()) Home.fromCloud(j)];
   for (final h in cloud) {
     _savedVersion[h] = h.version;
   }
-  final local = [
-    for (final h in homes.list)
-      if (!h.isEmpty) h..cloudId = null,
-  ];
-  final open = local.contains(home) ? home : null;
+  final sameOwner = previousOwner != null && previousOwner == account.value?.email;
+  final local = <Home>[];
+  for (final h in homes.list) {
+    if (h.cloudId == null) {
+      if (!h.isEmpty) local.add(h);
+      continue;
+    }
+    final i = cloud.indexWhere((c) => c.cloudId == h.cloudId);
+    if (sameOwner && i >= 0) cloud[i] = h; // _savedVersion dela continua o da ultima gravacao: manda o que mudou
+  }
+  _owner = account.value?.email;
+  final open = [...cloud, ...local].contains(home) ? home : null;
   final all = [...cloud, ...local];
   homes.replaceAll(all.isEmpty ? [Home()] : all, open: open);
   await saveNow();
@@ -150,11 +181,12 @@ Future<void> logOut() async {
   _endLocal();
 }
 
-/// Corrige nome e/ou e-mail no servidor.
-Future<void> updateAccount({String? name, String? email}) async {
+/// Corrige nome e/ou e-mail no servidor. Trocar o e-mail pede a senha atual (403 se errada).
+Future<void> updateAccount({String? name, String? email, String? currentPassword}) async {
   account.value = Account.fromJson(
-    await Api.updateAccount(name: name?.trim(), email: email?.trim()),
+    await Api.updateAccount(name: name?.trim(), email: email?.trim(), currentPassword: currentPassword),
   );
+  _owner = account.value!.email;
 }
 
 /// Apaga a conta e tudo o que ela guarda no servidor (casas e aparelhos). Nao tem volta.
@@ -171,9 +203,22 @@ Future<void> removeHome(Home h) async {
   homes.remove(h);
 }
 
-/// Sai da conta e volta para uma casa vazia (sair, apagar a conta, sessao vencida).
+/// Volta o estado da conta ao de um app recem-aberto (os testes chamam no setUp).
+@visibleForTesting
+void resetAccountState() {
+  _timer?.cancel();
+  _owner = null;
+  _restoring = null;
+  sessionEnded.value = false;
+  syncError.value = null;
+  syncState.value = SyncState.saved;
+}
+
+/// Sai da conta e volta para uma casa vazia (sair ou apagar a conta: os dados eram da conta).
 void _endLocal() {
   _endSession();
+  _owner = null;
+  sessionEnded.value = false;
   homes.reset();
 }
 
@@ -184,6 +229,7 @@ void _endSession() {
   Api.token = null;
   account.value = null;
   syncState.value = SyncState.saved;
+  syncError.value = null;
 }
 
 bool _pending(Home h) => h.cloudId == null || _savedVersion[h] != h.version;
@@ -203,16 +249,28 @@ Future<void> saveNow() async {
   try {
     for (final h in homes.list.where(_pending).toList()) {
       final version = h.version;
-      h.cloudId ??= (await Api.createHome(h.name, h.residents))['id'] as int;
+      if (h.cloudId == null) {
+        final id = (await Api.createHome(h.name, h.residents))['id'] as int;
+        if (!homes.list.contains(h)) {
+          await Api.deleteHome(id); // a pessoa apagou a casa enquanto ela era criada: nao deixa sobrar na nuvem
+          continue;
+        }
+        h.cloudId = id;
+      }
       await Api.saveHome(h.cloudId!, h.toCloud());
       _savedVersion[h] = version;
     }
     syncState.value = SyncState.saved;
+    syncError.value = null;
   } on SessionExpired {
-    _endLocal(); // conta apagada em outro aparelho ou sessao vencida
-  } on ApiError {
-    syncState.value = SyncState
-        .failed; // tenta de novo na proxima mudanca (ou no "Tentar de novo")
+    // sessao vencida ou conta apagada em outro aparelho: sai da conta, mas as casas (com a mudanca que nao foi
+    // salva) ficam no celular; entrando de novo na mesma conta, elas vao para a nuvem
+    _endSession();
+    sessionEnded.value = true;
+  } on ApiError catch (e) {
+    // tenta de novo na proxima mudanca (ou no "Tentar de novo"); a mensagem diz o motivo (ex.: limite de casas)
+    syncError.value = e is ConnectionProblem ? null : e.message;
+    syncState.value = SyncState.failed;
   } finally {
     _saving = false;
   }

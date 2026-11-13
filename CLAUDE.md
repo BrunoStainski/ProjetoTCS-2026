@@ -65,7 +65,7 @@ e as das contas (`sessoes`/`casas -> usuarios`, `itens_casa -> casas`, com casca
 | `tarifas` | Tarifa B1 residencial convencional (TUSD+TE, R$/kWh) com vigência |
 | `vw_tarifa_vigente` | Tarifa válida hoje por distribuidora |
 | `cargas` | Rastreabilidade: arquivo e linhas de cada carga |
-| `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais) |
+| `consultas` | Histórico de cálculos (preservado entre cargas, sem dados pessoais; `dias_mes` e `detalhe` via `banco.HISTORY_MIGRATION`, que a API roda a cada subida) |
 | `usuarios`, `sessoes`, `casas`, `itens_casa` | Contas e casas salvas na nuvem (`src/contas.py`, `CREATE IF NOT EXISTS`: não são apagadas na recarga) |
 
 Números atuais: 24.228 aparelhos em 12 categorias (geladeira, TV, ar-condicionado,
@@ -81,8 +81,10 @@ tensão vira uma linha com "· 220 V" no detalhe e a coluna `tensao` preenchida;
 vazia. Modelo vendido numa tensão só guarda a tensão e também mostra no detalhe. Só chuveiro, micro-ondas e
 máquina de lavar têm `"tensao"` no SPECS (testes em `test_calculadora.py`). Sugestões: `_candidates` só aceita a
 mesma tensão (ou vazia). Não há pergunta de tensão no app: a pessoa escolhe a versão escrita no aparelho.
-Recarregar o catálogo muda os ids: `contas.refresh_appliance_id` corrige o id dos itens das casas salvas pelo nome
-(e pelo detalhe, quando o modelo tem as duas tensões); roda só ao ler as casas (`list_homes`), não ao gravar.
+Ids do catálogo fixos desde 13/11/2026: `criar_banco.stable_id` = 48 bits do SHA-256 de categoria + marca + modelo +
+tensão, exatamente como no banco (`aparelhos.id` BIGINT; cabe no número do JavaScript). Antes eram SERIAL e mudavam
+a cada recarga. `load_appliances` recusa id repetido. `contas.refresh_appliance_id` continua corrigindo itens salvos
+com id antigo (pelo nome e pelo detalhe); roda só ao ler as casas (`list_homes`), não ao gravar.
 `GET /marcas` conta modelos distintos (as duas tensões = 1).
 
 ## Regras de cálculo (`monthly_consumption_kwh`)
@@ -121,7 +123,10 @@ Contas (tag "Contas", `Authorization: Bearer <token>`): `POST /contas` (nome, em
 `GET/POST /casas`, `PUT/DELETE /casas/{id}` (PUT grava a casa inteira e substitui os itens). 401 sem token,
 409 e-mail repetido, 404 casa de outra pessoa (igual a não existir).
 Os corpos de /calcular, /sugestoes e /comparar herdam de `UsageAndTariff` (main.py); os de estimativa, de `Tariff`.
-Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). Ids mudam ao recriar o banco.
+Erros: 404 (não existe), 422 (dado faltando), 503 (banco ou modelo indisponível). O 422 não devolve o valor
+enviado (`invalid_input`: não ecoa senha, nem quebra com Unicode inválido) e, em português, sai traduzido com o nome
+do campo (`_VALIDATION_PT`). Mensagens para a pessoa sempre com acento (chave de `traducoes.py` = texto acentuado).
+`/eco-coach` e `/eco-coach/aparelho`: 30 pedidos a cada 10 min por IP (`eco_coach_quota`, `X-Forwarded-For`).
 A imagem da API leva só `models/kmeans.pkl` e `models/refrigerador.pkl` (`.dockerignore` exclui o resto de `models/`).
 
 ## Estimativa fora do catálogo (`src/estimativa.py`, `scripts/treinar_refrigerador.py`)
@@ -372,11 +377,16 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
     (sal por senha, `hmac.compare_digest`; sem dependência nova), sessão = token aleatório e o banco guarda só o
     SHA-256 (30 dias, `POST /logout` apaga). Login errado tem a mesma mensagem e o mesmo tempo com ou sem e-mail;
     5 senhas erradas em 15 min para o mesmo e-mail -> 429 (`MAX_FAILURES`, memória do processo). E-mail repetido
-    ao mesmo tempo -> 409 (`IntegrityError`). Trocar o e-mail não pede a senha (só o token): melhoria pendente.
+    ao mesmo tempo -> 409 (`IntegrityError`). Trocar o e-mail pede a senha atual (`senha_atual`; 403 se errada,
+    porque 401 tiraria a pessoa da conta no app). Login limpa as sessões vencidas de todas as contas.
     Itens da casa: colunas para consulta (categoria, kWh, R$) + `dados` JSONB com a pergunta e o resultado no formato
     do app. Limites: 10 casas, 100 itens, 20 mil caracteres por item e na `ultima_tarifa`.
     App: falha ao trazer as casas logo depois do login sai da conta sem apagar as casas do celular (`_endSession`;
-    `_endLocal` = sair + casa vazia, usado em sair, apagar e sessão vencida).
+    `_endLocal` = sair + casa vazia, só em sair e apagar). Sessão vencida ao salvar: `_endSession` + `sessionEnded`
+    (a tela pede para entrar de novo); `_owner` = e-mail dono das casas na memória: na mesma conta a versão do celular
+    vence (`_mergeCloudHomes`), em outra conta as casas com `cloudId` ficam fora. `_restoring`: entrar espera a
+    restauração do login. Limites `maxHomes`/`maxItemsPerHome` (casa.dart) iguais ao servidor; `syncError` mostra o
+    motivo da recusa. Casa apagada durante o `createHome` é apagada na nuvem. Testes: `resetAccountState()` no setUp.
   - App: `casa.dart` tem `Homes` (lista + casa aberta, sempre ≥ 1) e `Home get home => homes.active`, então as telas
     usam `home` como antes; quem escuta mudanças escuta `homes` (repassa as de todas as casas). Cada `Home` tem
     `name`, `cloudId` e `version` (sobe a cada mudança que vai para a nuvem; perfil e plano não contam).
@@ -420,8 +430,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (hoje `2.1.0+7`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1` e `v2.1.0` no GitHub. Tag `vX.Y.Z`
+- Versão do app em `pubspec.yaml` (hoje `2.2.0+8`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1`, `v2.1.0` e `v2.2.0` no GitHub. Tag `vX.Y.Z`
   (no commit de merge da `main`: os PRs viram commit novo) + Release no GitHub com o APK (nunca no git).
   Commit de versão: "Adiciona a versão: X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:

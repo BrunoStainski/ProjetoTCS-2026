@@ -59,7 +59,7 @@ def test_new_label_is_not_converted(model):
 def test_fridge_before_2006_uses_2001_table(model):
     r = estimativa.estimated_refrigerator_consumption("1_porta", False, 300, 2001, reference_year=2026, model=model)
     assert "tabela Inmetro 2001" in r["metodo"]
-    assert any("vida util" in notice for notice in r["avisos"])
+    assert any("vida útil" in notice for notice in r["avisos"])
 
 
 def test_recent_fridge_uses_random_forest(model):

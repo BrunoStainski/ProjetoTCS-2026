@@ -745,8 +745,8 @@ class _EstimateScreenState extends State<EstimateScreen> {
         _Question(
           tr('Em quantos dias do mês você usa?', 'On how many days a month do you use it?'),
           fields: [_field(_days, tr('Dias de uso no mês', 'Days of use per month'), suffix: tr('dias', 'days'), whole: true)],
-          validate: () => _invalid(_days, minimum: -1, maximum: 31)
-              ? tr('Digite um número de dias entre 0 e 31.', 'Enter a number of days between 0 and 31.')
+          validate: () => _invalid(_days, minimum: 0, maximum: 31)
+              ? tr('Digite um número de dias entre 1 e 31.', 'Enter a number of days between 1 and 31.')
               : null,
         ),
       ],

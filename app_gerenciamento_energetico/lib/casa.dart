@@ -138,6 +138,10 @@ class ItemHome {
   double get yearlyCost => result.yearlyCost * quantity;
 }
 
+/// Limites do servidor (contas.MAX_HOMES e MAX_ITEMS): o app nao deixa passar, senao a casa nunca seria salva.
+const maxHomes = 10;
+const maxItemsPerHome = 100;
+
 class Home extends ChangeNotifier {
   final List<ItemHome> _items = [];
   int _nextId = 1;
@@ -215,6 +219,9 @@ class Home extends ChangeNotifier {
 
   List<ItemHome> get items => List.unmodifiable(_items);
   bool get isEmpty => _items.isEmpty;
+
+  /// Chegou ao limite de aparelhos (maxItemsPerHome): as telas avisam em vez de adicionar.
+  bool get full => _items.length >= maxItemsPerHome;
   int get totalAppliances => _items.fold(0, (summed, i) => summed + i.quantity);
   double get monthlyKwh => _items.fold(0.0, (summed, i) => summed + i.monthlyKwh);
   double get monthlyCost => _items.fold(0.0, (summed, i) => summed + i.monthlyCost);

@@ -240,3 +240,31 @@ def test_validation_error_does_not_echo_the_password(api):
     r = api.post("/login", json={"email": "a@exemplo.com", "senha": secret})
     assert r.status_code == 422
     assert "segredo-" not in r.text and r.json()["detail"][0]["msg"]
+
+
+@pytest.mark.banco
+def test_changing_the_email_asks_for_the_password(api_contas):
+    """Trocar o e-mail pede a senha atual (403 se errada ou faltando); trocar so o nome nao pede."""
+    api, new_account = api_contas
+    email, auth, _ = new_account()
+    new_email = "trocado-" + email
+    assert api.patch("/conta", headers=auth, json={"nome": "Maria Souza"}).status_code == 200
+    assert api.patch("/conta", headers=auth, json={"email": new_email}).status_code == 403
+    assert api.patch("/conta", headers=auth, json={"email": new_email, "senha_atual": "errada-123"}).status_code == 403
+    r = api.patch("/conta", headers=auth, json={"email": new_email, "senha_atual": "senha-forte-1"})
+    assert r.status_code == 200 and r.json()["email"] == new_email
+    # mesmo e-mail (so maiusculas diferentes) nao e troca: nao pede senha
+    assert api.patch("/conta", headers=auth, json={"email": new_email.upper()}).status_code == 200
+
+
+@pytest.mark.banco
+def test_login_clears_everyones_expired_sessions(api_contas, con):
+    """Sessao vencida de qualquer conta sai no proximo login (antes ficava para sempre em conta abandonada)."""
+    api, new_account = api_contas
+    _, auth_a, body_a = new_account()
+    banco.run(con, "UPDATE sessoes SET expira_em = now() - interval '1 day' WHERE usuario_id = ?",
+              (body_a["conta"]["id"],))
+    con.commit()
+    new_account()  # outra pessoa entra
+    left = banco.run(con, "SELECT COUNT(*) FROM sessoes WHERE usuario_id = ?", (body_a["conta"]["id"],)).scalar_one()
+    assert left == 0

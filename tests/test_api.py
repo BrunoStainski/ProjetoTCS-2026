@@ -194,7 +194,7 @@ def test_calculate_copel_reference_example(api, shower_5500, copel):
 def test_calculate_with_bill_tariff(api, shower_5500):
     res = calculate(api, aparelho_id=shower_5500, tarifa_manual=1.0, horas_dia=0.25).json()
     assert res["custo_mes"] == pytest.approx(41.25)
-    assert "usuario" in res["origem_tarifa"]
+    assert "usuário" in res["origem_tarifa"]
 
 
 @pytest.mark.banco
@@ -301,3 +301,52 @@ def test_absurd_tariff_or_cycles_are_refused(client):
     for body in [{"aparelho_id": 1, "tarifa_manual": 1e308, "horas_dia": 1},
                  {"aparelho_id": 1, "tarifa_manual": 0.8, "ciclos_mes": 1e308}]:
         assert client.post("/calcular", json=body).status_code == 422
+
+
+def test_validation_errors_in_portuguese_with_the_field(client):
+    """Erro de validacao vinha em ingles do Pydantic; em portugues, sai traduzido e com o nome do campo."""
+    r = client.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50})
+    assert r.status_code == 422
+    assert r.json()["detail"][0]["msg"] == "tarifa_manual: precisa ser no máximo 10"
+    r = client.post("/calcular", json={"tarifa_manual": 0.8})
+    assert any(d["msg"] == "aparelho_id: campo obrigatório" for d in r.json()["detail"])
+    r = client.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50}, headers={"Accept-Language": "en"})
+    assert r.json()["detail"][0]["msg"].startswith("tarifa_manual: Input should be less than or equal to 10")
+
+
+@pytest.mark.banco
+def test_ids_do_not_change_when_the_catalog_reloads(con):
+    """O id gravado e o calculado pelo nome: recarregar o catalogo nao muda os ids."""
+    from criar_banco import stable_id
+    rows = banco.run(con, "SELECT id, categoria, marca, modelo, tensao FROM aparelhos ORDER BY random() LIMIT 50").all()
+    assert all(r.id == stable_id(r.categoria, r.marca, r.modelo, r.tensao) for r in rows)
+
+
+@pytest.mark.banco
+def test_history_keeps_days_and_detail(con):
+    """O historico guarda os dias de uso do ar e o detalhe (que separa as versoes 127 V e 220 V)."""
+    con.exec_driver_sql(banco.HISTORY_MIGRATION)
+    con.commit()
+    r = {"categoria": "ar_condicionado", "marca": "TESTE-HISTORICO", "modelo": "X", "detalhe": "12000 BTU/h · 220 V",
+         "uf": "PR", "distribuidora": "-", "kwh_mes": 50.0, "metodo": "teste", "tarifa_kwh": 0.8,
+         "origem_tarifa": "teste", "custo_mes": 40.0}
+    try:
+        banco.register_query(con, r, daily_hours=8, days_per_month=12)
+        row = banco.run(con, "SELECT dias_mes, detalhe FROM consultas WHERE marca = 'TESTE-HISTORICO'").first()
+        assert row.dias_mes == 12 and row.detalhe == "12000 BTU/h · 220 V"
+    finally:
+        banco.run(con, "DELETE FROM consultas WHERE marca = 'TESTE-HISTORICO'")
+        con.commit()
+
+
+def test_eco_coach_limit_per_address(client, monkeypatch):
+    """Cada plano gasta a cota gratuita do Gemini: depois do limite, o mesmo endereco espera (429)."""
+    import main
+    monkeypatch.setattr(main, "ECO_COACH_LIMIT", 2)
+    monkeypatch.setattr(main, "_eco_calls", {})
+    headers = {"X-Forwarded-For": "203.0.113.7"}
+    invalid = {"moradores": 2, "itens": []}  # recusado na validacao: nao chama o Gemini, mas conta no limite
+    codes = [client.post("/eco-coach", json=invalid, headers=headers).status_code for _ in range(3)]
+    assert codes[:2] != [429, 429] and codes[2] == 429
+    other = client.post("/eco-coach", json=invalid, headers={"X-Forwarded-For": "198.51.100.9"}).status_code
+    assert other != 429  # outro endereco continua

@@ -38,6 +38,10 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 
   void _add(Result r) {
+    if (home.full) {
+      notifyAdded(ScaffoldMessenger.of(context), tr('"${home.name}" já tem $maxItemsPerHome aparelhos, o máximo de uma casa. Remova um ou crie outra casa.', '"${home.name}" already has $maxItemsPerHome appliances, the most a home can have. Remove one or create another home.'));
+      return;
+    }
     home.add(widget.query, r);
     setState(() => _added = true);
     notifyAdded(ScaffoldMessenger.of(context), tr('${r.name} foi para "${home.name}".', '${r.name} was added to "${home.name}".'));

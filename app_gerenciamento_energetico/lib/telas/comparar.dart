@@ -59,11 +59,12 @@ class _CompareScreenState extends State<CompareScreen> {
       _priceError = null;
       _calculatingPayback = true;
     });
+    final target = home; // se a pessoa trocar de casa enquanto a API responde, a troca continua nesta
     try {
       // o setState nao pode receber um Future: espera a resposta e so depois troca o estado
       final comparison = await _compare(price: price);
       // o Eco-Coach usa essa troca com os numeros calculados aqui (economia e payback)
-      home.registerSwap(
+      target.registerSwap(
         EvaluatedSwap(
           appliance: '${readable(comparison.current.category)} ${comparison.current.name}',
           alternative: comparison.rewritten.name,
@@ -94,6 +95,10 @@ class _CompareScreenState extends State<CompareScreen> {
       notices.showSnackBar(
         SnackBar(content: Text(tr('Trocado por ${c.rewritten.name}.', 'Replaced with ${c.rewritten.name}.')), duration: noticeDuration),
       );
+      return;
+    }
+    if (home.full) {
+      notifyAdded(notices, tr('"${home.name}" já tem $maxItemsPerHome aparelhos, o máximo de uma casa. Remova um ou crie outra casa.', '"${home.name}" already has $maxItemsPerHome appliances, the most a home can have. Remove one or create another home.'));
       return;
     }
     home.add(newQuery, c.rewritten);

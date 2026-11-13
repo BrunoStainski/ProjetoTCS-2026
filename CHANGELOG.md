@@ -6,6 +6,30 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+Correções da revisão completa do código (13/11/2026):
+- App: no máximo 10 casas e 100 aparelhos por casa, os mesmos limites do servidor. Antes o app deixava passar e a
+  casa a mais nunca era salva ("Não consegui salvar" para sempre). Quando a gravação falha por um motivo do
+  servidor, a tela mostra o motivo em vez de "confira a internet".
+- App: "Desfazer" devolve o aparelho para a casa de onde ele saiu, mesmo que a pessoa tenha trocado de casa; a
+  troca avaliada em "Vale a pena trocar?" também fica na casa certa.
+- App: sessão vencida com mudança não salva não apaga mais as casas do celular; a tela pede para entrar de novo e,
+  na mesma conta, a versão do celular é a que fica (sem casa repetida). Outra pessoa que entrar no mesmo celular
+  não recebe as casas da conta anterior.
+- App: entrar na conta logo ao abrir o app espera a restauração do login (antes as duas juntavam as casas).
+  Casa apagada enquanto era criada na nuvem é apagada lá também (antes voltava no próximo login).
+- Trocar o e-mail da conta pede a senha atual (403 se errada). Quem só tivesse o celular destravado não consegue
+  tomar a conta.
+- Mensagens em português com acento (payback, avisos, "Como calculamos", erros) e erros de validação em
+  português, com o nome do campo ("tarifa_manual: precisa ser no máximo 10"). Antes vinham do Pydantic em inglês.
+- Histórico de cálculos guarda os dias de uso do ar-condicionado e o detalhe (que separa as versões 127 V e 220 V).
+- Ids do catálogo fixos (hash do nome: categoria, marca, modelo e tensão). Antes mudavam a cada recarga.
+- Eco-Coach: no máximo 30 pedidos a cada 10 minutos por endereço (429), para ninguém esgotar a cota gratuita do
+  Gemini. Login limpa as sessões vencidas de todas as contas (antes só as da própria pessoa).
+- Eletroportáteis: dias de uso de 1 a 31, como o ar-condicionado (0 dias não é uso).
+- Limpeza: o plano do Eco-Coach usa a mesma função de citações das dicas; importações sem uso nos scripts.
+
+## App 2.2.0+8 / API 0.6.0
+
 - Continua logado: o app guarda o acesso da conta no celular, cifrado (`flutter_secure_storage`, Android
   Keystore), por até 30 dias. Ao abrir, confere na API e traz as casas; acesso vencido é apagado e, sem internet,
   tenta de novo na próxima vez. Sair ou apagar a conta apaga o acesso do celular. O backup automático do Android

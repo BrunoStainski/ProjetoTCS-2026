@@ -2,10 +2,8 @@
 # Notebook 1: Configuração do ambiente e carregamento do dataset
 
 # %%
-from pathlib import Path
 import pandas as pd
 from config import read_csv_inmetro, save_processed
-import numpy as np
 
 df = read_csv_inmetro("microondas.csv")
 

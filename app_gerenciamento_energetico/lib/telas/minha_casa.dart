@@ -47,7 +47,8 @@ class _MyHomeScreenState extends State<MyHomeScreen> {
 
   void _remove(ItemHome item) {
     final notices = ScaffoldMessenger.of(context);
-    final position = home.remove(item);
+    final from = home; // "Desfazer" devolve para esta casa, mesmo que a pessoa tenha trocado de casa
+    final position = from.remove(item);
     notices
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -55,7 +56,7 @@ class _MyHomeScreenState extends State<MyHomeScreen> {
           content: Text(tr('${item.result.name} saiu da sua casa.', '${item.result.name} was removed from your home.')),
           duration: noticeDuration,
           persist: false,
-          action: SnackBarAction(label: tr('Desfazer', 'Undo'), onPressed: () => home.reinsert(item, position)),
+          action: SnackBarAction(label: tr('Desfazer', 'Undo'), onPressed: () => from.reinsert(item, position)),
         ),
       );
   }

@@ -38,11 +38,11 @@ TYPES = {
     "freezer_horizontal": {"nome": "freezer horizontal", "tipo_inmetro": "Congelador Horizontal", "estrelas": 3, "so_congelador": True},
 }
 
-APPROXIMATE_NOTICE = ("Gasto aproximado: o modelo nao esta no catalogo do Inmetro, entao o consumo foi estimado "
+APPROXIMATE_NOTICE = ("Gasto aproximado: o modelo não está no catálogo do Inmetro, então o consumo foi estimado "
                     "pelo tipo, volume e ano de compra. O valor real pode estar em qualquer ponto da faixa.")
 LABEL_NOTICE = ("Consumo da etiqueta do aparelho, convertido para a metodologia de ensaio atual e ajustado "
                   "pelo desgaste da idade.")
-TYPICAL_POWER_NOTICE = ("A potencia usada e a tipica da categoria (estimativa do grupo). Informe a da etiqueta "
+TYPICAL_POWER_NOTICE = ("A potência usada é a típica da categoria (estimativa do grupo). Informe a da etiqueta "
                          "do aparelho para um valor mais preciso.")
 
 
@@ -83,7 +83,7 @@ def time_per_day(hours):
 
 def age_factor(age):
     if age < 0:
-        raise ValueError(tr("o ano de compra nao pode ser no futuro", "the year of purchase cannot be in the future"))
+        raise ValueError(tr("o ano de compra não pode ser no futuro", "the year of purchase cannot be in the future"))
     return next(factor for limit, factor in FI_RANGES if age <= limit)
 
 
@@ -130,15 +130,15 @@ def _by_label(model, info, frost_free, kwh_label, purchase_year, fi):
     if purchase_year >= NEW_LABEL_YEAR:
         base = kwh_label
         return {"kwh_mes": base * fi, "kwh_min": base * fi, "kwh_max": base * fi,
-                "metodo": tr(f"etiqueta {kwh_label:g} kWh/mes (metodologia atual) x Fi {fi:.2f}",
+                "metodo": tr(f"etiqueta {kwh_label:g} kWh/mês (metodologia atual) x Fi {fi:.2f}",
                              f"label {kwh_label:g} kWh/month (current method) x Fi {fi:.2f} (age wear)")}
     conversion = _conversion(model, info["tipo_inmetro"], frost_free)
     return {
         "kwh_mes": kwh_label * conversion["mediana"] * fi,
         "kwh_min": kwh_label * conversion["p25"] * fi,
         "kwh_max": kwh_label * conversion["p75"] * fi,
-        "metodo": tr(f"etiqueta {kwh_label:g} kWh/mes (metodologia antiga) x {conversion['mediana']:.2f} "
-                     f"(conversao para a metodologia atual) x Fi {fi:.2f}",
+        "metodo": tr(f"etiqueta {kwh_label:g} kWh/mês (metodologia antiga) x {conversion['mediana']:.2f} "
+                     f"(conversão para a metodologia atual) x Fi {fi:.2f}",
                      f"label {kwh_label:g} kWh/month (old method) x {conversion['mediana']:.2f} "
                      f"(conversion to the current method) x Fi {fi:.2f} (age wear)"),
     }
@@ -170,9 +170,9 @@ def _by_rule_2006(model, info, frost_free, volume_total_l, freezer_volume_l, pur
         "kwh_mes": ie_point * cp * conversion * fi,
         "kwh_min": ie_min * cp * conversion * fi,
         "kwh_max": ie_max * cp * conversion * fi,
-        "metodo": tr(f"consumo padrao {cp:.1f} kWh/mes ({category}, volume ajustado {av:.0f} L) x indice "
+        "metodo": tr(f"consumo padrão {cp:.1f} kWh/mês ({category}, volume ajustado {av:.0f} L) x índice "
                      f"{ie_point:.2f} ({era}, faixa {ie_min:.2f} a {ie_max:.2f}) x {conversion:.2f} "
-                     f"(conversao para a metodologia atual) x Fi {fi:.2f}",
+                     f"(conversão para a metodologia atual) x Fi {fi:.2f}",
                      f"standard consumption {cp:.1f} kWh/month ({t(category)}, adjusted volume {av:.0f} L) x index "
                      f"{ie_point:.2f} ({era}, range {ie_min:.2f} to {ie_max:.2f}) x {conversion:.2f} "
                      f"(conversion to the current method) x Fi {fi:.2f} (age wear)"),
@@ -187,8 +187,8 @@ def _by_current_model(model, info, frost_free, volume_total_l, fi):
         "kwh_mes": predicted * fi,
         "kwh_min": max(predicted - error, 0.0) * fi,
         "kwh_max": (predicted + error) * fi,
-        "metodo": tr(f"Random Forest com os modelos atuais do Inmetro: {predicted:.1f} kWh/mes "
-                     f"(erro medio {error:.1f}) x Fi {fi:.2f}",
+        "metodo": tr(f"Random Forest com os modelos atuais do Inmetro: {predicted:.1f} kWh/mês "
+                     f"(erro médio {error:.1f}) x Fi {fi:.2f}",
                      f"Random Forest with Inmetro's current models: {predicted:.1f} kWh/month "
                      f"(mean error {error:.1f}) x Fi {fi:.2f} (age wear)"),
     }
@@ -214,7 +214,7 @@ def estimated_refrigerator_consumption(kind, frost_free, volume_total_l, purchas
         notices, sources = [t(APPROXIMATE_NOTICE)], [ORDINANCE_SOURCE_2006, TABLE_SOURCE_2001, FI_SOURCE]
 
     if age > model["vida_util_anos"]:
-        notices.append(tr(f"Com {age} anos, o aparelho passou da vida util media de {model['vida_util_anos']} anos.",
+        notices.append(tr(f"Com {age} anos, o aparelho passou da vida útil média de {model['vida_util_anos']} anos.",
                          f"At {age} years old, the appliance is past the average lifespan of "
                          f"{model['vida_util_anos']} years."))
     name = t(info["nome"])
@@ -242,11 +242,11 @@ def resistive_consumption(default_value, power_w=None, daily_hours=None, days_pe
     hours = default_value["horas_dia"] if daily_hours is None else daily_hours
     days = default_value["dias_mes"] if days_per_month is None else days_per_month
     if power <= 0:
-        raise ValueError(tr("a potencia precisa ser maior que zero", "the power must be greater than zero"))
+        raise ValueError(tr("a potência precisa ser maior que zero", "the power must be greater than zero"))
     if not 0 <= hours <= 24:
         raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
-    if not 0 <= days <= 31:
-        raise ValueError(tr("dias de uso por mes precisa estar entre 0 e 31", "days of use per month must be between 0 and 31"))
+    if not 1 <= days <= 31:  # 0 dias nao e uso (igual ao ar-condicionado)
+        raise ValueError(tr("os dias de uso no mês precisam estar entre 1 e 31", "days of use per month must be between 1 and 31"))
 
     return {
         "kwh_mes": power / 1000 * hours * days,
@@ -256,6 +256,7 @@ def resistive_consumption(default_value, power_w=None, daily_hours=None, days_pe
         "nome": default_value["nome"],
         "detalhe": f"{default_value['nome']}, {power:g} W",
         "horas_dia": hours,
+        "dias_mes": days,
         "premissa": daily_hours is None or days_per_month is None,
         "aproximado": None in (power_w, daily_hours, days_per_month),
         "avisos": [] if power_w is not None else [t(TYPICAL_POWER_NOTICE)],
@@ -264,4 +265,4 @@ def resistive_consumption(default_value, power_w=None, daily_hours=None, days_pe
 
 
 def _origin(given):
-    return tr("informado", "entered") if given is not None else tr("padrao do grupo", "group default")
+    return tr("informado", "entered") if given is not None else tr("padrão do grupo", "group default")

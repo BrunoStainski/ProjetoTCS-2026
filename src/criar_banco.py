@@ -27,7 +27,7 @@ from tarifas_aneel import read_residential_tariffs
 QUERIES_SQL = Path(__file__).resolve().parent / "consultas_exemplo.sql"
 
 APPLIANCE_COLUMNS = [
-    "categoria", "marca", "modelo", "tipo", "capacidade", "unidade", "detalhe", "tensao",
+    "id", "categoria", "marca", "modelo", "tipo", "capacidade", "unidade", "detalhe", "tensao",
     "kwh_mes", "kwh_mes_baixa", "kwh_mes_media", "kwh_mes_alta", "kwh_ciclo",
     "potencia_w", "standby_kwh_mes", "fluxo_lm", "origem_dado", "arquivo_origem", "busca",
 ]
@@ -56,8 +56,23 @@ def _uf_valid(value):
     return uf if len(uf) == 2 and uf.isalpha() else None
 
 
+def stable_id(category, brand, model, volts):
+    """Id que nao muda quando o catalogo e recarregado: 48 bits do SHA-256 do nome do aparelho.
+    Antes era SERIAL e cada recarga mudava os ids (casas salvas e telas abertas apontavam para outro aparelho).
+    48 bits: cabem no numero do JavaScript (app na web) e a chance de dois aparelhos colidirem e desprezivel;
+    load_appliances confere mesmo assim."""
+    # exatamente como no banco (a chave unica e categoria + marca + modelo + tensao): o Inmetro tem a mesma marca
+    # escrita de dois jeitos ("Agratto" e "AGRATTO") em linhas diferentes
+    key = "".join(str(part) for part in (category, brand, model, volts))
+    return int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest()[:6], "big")
+
+
 def load_appliances(con):
     catalog = load_catalog().rename(columns={"arquivo": "arquivo_origem"})
+    catalog["id"] = [stable_id(*k) for k in zip(catalog["categoria"], catalog["marca"], catalog["modelo"],
+                                                catalog["tensao"])]
+    if catalog["id"].duplicated().any():  # dois nomes diferentes com o mesmo id: nao carrega errado
+        raise ValueError("ids repetidos no catalogo: " + ", ".join(map(str, catalog.loc[catalog["id"].duplicated(), "id"])))
     catalog[APPLIANCE_COLUMNS].to_sql("aparelhos", con, if_exists="append", index=False)
     for file, lines in catalog["arquivo_origem"].value_counts().sort_index().items():
         banco.run(con, "INSERT INTO cargas (arquivo, linhas) VALUES (?, ?)", (file, int(lines)))

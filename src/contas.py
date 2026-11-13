@@ -136,7 +136,7 @@ def _token_hash(token):
 def _clean_email(email):
     email = (email or "").strip().lower()
     if not _EMAIL.match(email) or len(email) > 254:
-        raise AccountError(tr("e-mail invalido", "invalid e-mail"))
+        raise AccountError(tr("e-mail inválido", "invalid e-mail"))
     return email
 
 
@@ -158,8 +158,9 @@ def _new_session(con, user_id):
     expires = datetime.now(timezone.utc) + timedelta(days=SESSION_DAYS)
     banco.run(con, "INSERT INTO sessoes (token_hash, usuario_id, expira_em) VALUES (?, ?, ?)",
               (_token_hash(token), user_id, expires))
-    # aproveita para limpar as sessoes vencidas dessa pessoa
-    banco.run(con, "DELETE FROM sessoes WHERE usuario_id = ? AND expira_em < now()", (user_id,))
+    # aproveita para limpar as sessoes vencidas de todo mundo (antes era so as dessa pessoa: conta abandonada
+    # deixava a sessao vencida no banco para sempre)
+    banco.run(con, "DELETE FROM sessoes WHERE expira_em < now()")
     return token
 
 
@@ -169,7 +170,7 @@ def _account(con, user_id):
     df = banco.query(con, "SELECT id, nome, email, criado_em, consentimento_em, versao_aviso "
                           "FROM usuarios WHERE id = ?", (user_id,))
     if df.empty:
-        raise AccountError(tr("conta nao existe", "account does not exist"), 404)
+        raise AccountError(tr("conta não existe", "account does not exist"), 404)
     row = df.iloc[0]
     return {"id": int(row["id"]), "nome": row["nome"], "email": row["email"],
             "criado_em": row["criado_em"].isoformat(), "consentimento_em": row["consentimento_em"].isoformat(),
@@ -183,7 +184,7 @@ def sign_up(con, name, email, password, accepted_privacy):
                               "you must accept the privacy notice to create an account"))
     name, email = _clean_name(name), _clean_email(email)
     _check_new_password(password)
-    in_use = AccountError(tr("ja existe uma conta com esse e-mail", "an account with this e-mail already exists"), 409)
+    in_use = AccountError(tr("já existe uma conta com esse e-mail", "an account with this e-mail already exists"), 409)
     if banco.run(con, "SELECT 1 FROM usuarios WHERE email = ?", (email,)).first():
         raise in_use
     try:
@@ -243,15 +244,21 @@ def account(con, user_id):
     return _account(con, user_id)
 
 
-def update_account(con, user_id, name=None, email=None):
-    """Corrige nome e/ou e-mail (direito de correcao da LGPD)."""
+def update_account(con, user_id, name=None, email=None, current_password=None):
+    """Corrige nome e/ou e-mail (direito de correcao da LGPD). Trocar o e-mail pede a senha atual: com o
+    e-mail se entra na conta, entao quem so pegou o token (celular destravado) nao consegue tomar a conta."""
+    if email is not None and _clean_email(email) != _account(con, user_id)["email"]:
+        stored = banco.run(con, "SELECT senha_hash FROM usuarios WHERE id = ?", (user_id,)).scalar_one()
+        if not check_password(current_password or "", stored):
+            raise AccountError(tr("para trocar o e-mail, digite a sua senha atual (a senha está errada ou faltando)",
+                                  "to change the e-mail, enter your current password (it is wrong or missing)"), 403)
     if name is not None:
         banco.run(con, "UPDATE usuarios SET nome = ? WHERE id = ?", (_clean_name(name), user_id))
     if email is not None:
         email = _clean_email(email)
         other = banco.run(con, "SELECT 1 FROM usuarios WHERE email = ? AND id <> ?", (email, user_id)).first()
         if other:
-            raise AccountError(tr("ja existe uma conta com esse e-mail", "an account with this e-mail already exists"),
+            raise AccountError(tr("já existe uma conta com esse e-mail", "an account with this e-mail already exists"),
                                409)
         banco.run(con, "UPDATE usuarios SET email = ? WHERE id = ?", (email, user_id))
     con.commit()
@@ -282,7 +289,7 @@ def _home(con, user_id, home_id, refresh_ids=False):
                           "WHERE id = ? AND usuario_id = ?", (home_id, user_id))
     if df.empty:
         # casa de outra pessoa responde igual a casa que nao existe
-        raise AccountError(tr("casa nao existe", "home does not exist"), 404)
+        raise AccountError(tr("casa não existe", "home does not exist"), 404)
     row = df.iloc[0]
     items = banco.query(con, "SELECT quantidade, categoria, kwh_mes, custo_mes, dados FROM itens_casa "
                              "WHERE casa_id = ? ORDER BY posicao", (home_id,))

@@ -91,7 +91,7 @@ def brand_models(con, category, brand, limit=BRAND_MODEL_LIMIT):
 def appliance_by_id(con, appliance_id):
     df = banco.query(con, "SELECT * FROM aparelhos WHERE id = ?", (int(appliance_id),))
     if df.empty:
-        raise ValueError(tr(f"aparelho {appliance_id} nao existe", f"appliance {appliance_id} does not exist"))
+        raise ValueError(tr(f"aparelho {appliance_id} não existe", f"appliance {appliance_id} does not exist"))
     return df.iloc[0]
 
 
@@ -157,7 +157,7 @@ def choose_tariff(con, distributor_id=None, manual_tariff=None):
     if manual_tariff is not None:
         if manual_tariff <= 0:
             raise ValueError(tr("a tarifa precisa ser maior que zero", "the rate must be greater than zero"))
-        return float(manual_tariff), "-", None, tr("informada pelo usuario (conta de luz)",
+        return float(manual_tariff), "-", None, tr("informada pelo usuário (conta de luz)",
                                                    "entered by the user (electricity bill)")
     if distributor_id is not None:
         in_force = tariff_by_id(con, distributor_id)
@@ -180,8 +180,8 @@ def calculate(con, appliance_id, distributor_id=None, manual_tariff=None,
                                  user_tariff=manual_tariff is not None)
     result["fonte_dados"] = "PostgreSQL"
     if register:
-        banco.register_query(con, result, daily_hours=daily_hours,
-                                 monthly_cycles=monthly_cycles, speed=speed)
+        banco.register_query(con, result, daily_hours=daily_hours, monthly_cycles=monthly_cycles, speed=speed,
+                             days_per_month=days_per_month if appliance["categoria"] in ASK_DAYS else None)
     return result
 
 
@@ -204,7 +204,8 @@ def calculate_estimated(con, consumption, distributor_id=None, manual_tariff=Non
         result["custo_min_mes"] = round(consumption["kwh_min"] * tariff, 2)
         result["custo_max_mes"] = round(consumption["kwh_max"] * tariff, 2)
     if register:
-        banco.register_query(con, result, daily_hours=consumption.get("horas_dia"))
+        banco.register_query(con, result, daily_hours=consumption.get("horas_dia"),
+                             days_per_month=consumption.get("dias_mes"))
     return result
 
 
@@ -224,7 +225,7 @@ def smallAppliance(con, category):
     df = banco.query(con, "SELECT categoria, nome, potencia_w, horas_dia, dias_mes, fonte FROM portateis "
                              "WHERE categoria = ?", (category,))
     if df.empty:
-        raise ValueError(tr(f"eletroportatil {category} nao existe", f"small appliance {category} does not exist"))
+        raise ValueError(tr(f"eletroportátil {category} não existe", f"small appliance {category} does not exist"))
     return _small_appliances_in_language(_records(df))[0]
 
 
@@ -304,10 +305,11 @@ def estimate_from_equivalents(con, category, kind=None, measure=None, label_valu
                              daily_hours=None, monthly_cycles=None, speed=None, label_field=None, days_per_month=None):
     config = ESTIMABLE.get(category)
     if config is None or config.get("especial"):
-        raise ValueError(tr(f"categoria {category} nao tem esta estimativa", f"category {category} has no such estimate"))
+        raise ValueError(tr(f"categoria {category} não tem esta estimativa", f"category {category} has no such estimate"))
     usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
              "days_per_month": days_per_month}  # vira **kwargs
-    base = {"categoria": category, "nome": t(config["nome"]), "tipo": kind or None}
+    base = {"categoria": category, "nome": t(config["nome"]), "tipo": kind or None,
+            "dias_mes": days_per_month if category in ASK_DAYS else None}
 
     if label_value is not None:
         shapes = {f["campo"]: _shape_in_language(f) for f in config["formas"]}
@@ -344,7 +346,7 @@ def estimate_from_equivalents(con, category, kind=None, measure=None, label_valu
             continue
         valid_items.append(c)
     if not valid_items:
-        raise ValueError(tr("nao ha modelos parecidos no catalogo para estimar; informe o valor escrito no aparelho",
+        raise ValueError(tr("não há modelos parecidos no catálogo para estimar; informe o valor escrito no aparelho",
                             "there are no similar models in the catalog to estimate from; "
                             "enter the value written on the appliance"))
     numbers = pd.DataFrame(valid_items)[NUM_COLUMNS].astype(float)
@@ -585,26 +587,26 @@ def compare_estimated(con, category, monthly_kwh, alternative_id, name=None, dis
 def _comparison(current, rewritten, new_price):
     allowed = EQUIVALENCE.get(current["categoria"], {}).get("categorias", [current["categoria"]])
     if rewritten["categoria"] not in allowed:
-        raise ValueError(tr("os dois aparelhos precisam fazer o mesmo servico para comparar",
+        raise ValueError(tr("os dois aparelhos precisam fazer o mesmo serviço para comparar",
                             "both appliances must do the same job to be compared"))
 
     monthly_savings = current["custo_mes"] - rewritten["custo_mes"]
     payback = None
     if new_price is not None:
         if new_price <= 0:
-            raise ValueError(tr("o preco precisa ser maior que zero", "the price must be greater than zero"))
+            raise ValueError(tr("o preço precisa ser maior que zero", "the price must be greater than zero"))
         payback = {"preco_novo": round(float(new_price), 2), "meses": None, "anos": None}
         if monthly_savings > 0:
             months = new_price / monthly_savings
             payback.update(meses=round(months, 1), anos=round(months / 12, 1))
             payback["texto"] = (
-                tr(f"A troca se paga em cerca de {months:.0f} meses ({months / 12:.1f} anos) so com a economia na conta de luz.",
+                tr(f"A troca se paga em cerca de {months:.0f} meses ({months / 12:.1f} anos) só com a economia na conta de luz.",
                    f"The replacement pays for itself in about {months:.0f} months ({months / 12:.1f} years) "
                    "from the electricity bill savings alone.")
-                if months >= 1 else tr("A troca se paga em menos de um mes.",
+                if months >= 1 else tr("A troca se paga em menos de um mês.",
                                       "The replacement pays for itself in less than a month."))
         else:
-            payback["texto"] = tr("O modelo novo nao gasta menos, entao a troca nao se paga pela conta de luz.",
+            payback["texto"] = tr("O modelo novo não gasta menos, então a troca não se paga pela conta de luz.",
                                   "The new model does not use less, so the replacement does not pay off "
                                   "through the electricity bill.")
     return {
@@ -615,7 +617,7 @@ def _comparison(current, rewritten, new_price):
         "economia_ano": round(monthly_savings * 12, 2),
         "payback": payback,
         "avisos": [
-            tr("Payback simples: preco do modelo novo dividido pela economia mensal, sem juros, "
+            tr("Payback simples: preço do modelo novo dividido pela economia mensal, sem juros, "
                "sem a venda do aparelho antigo e sem reajuste da tarifa.",
                "Simple payback: price of the new model divided by the monthly savings, without interest, "
                "without selling the old appliance and without rate increases."),

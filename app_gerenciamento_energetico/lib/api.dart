@@ -33,6 +33,11 @@ class SessionExpired extends ApiError {
   SessionExpired(super.message);
 }
 
+/// Sem resposta do servidor (sem internet, tempo esgotado): diferente de um "nao" do servidor.
+class ConnectionProblem extends ApiError {
+  ConnectionProblem(super.message);
+}
+
 double _real(dynamic v) => (v as num).toDouble();
 double? _realOrNull(dynamic v) => v == null ? null : (v as num).toDouble();
 
@@ -423,7 +428,7 @@ class Api {
     try {
       response = await call().timeout(limit);
     } catch (_) {
-      throw ApiError(
+      throw ConnectionProblem(
         tr(
           'Não consegui me conectar ao Iamp. Confira a internet e tente de novo.',
           'Could not connect to Iamp. Check your internet connection and try again.',
@@ -473,8 +478,8 @@ class Api {
   /// Dados da conta do token (ao abrir o app, confere se o login guardado ainda vale).
   static Future<Map<String, dynamic>> myAccount() async => await _get('/conta');
 
-  static Future<Map<String, dynamic>> updateAccount({String? name, String? email}) async =>
-      await _patch('/conta', {'nome': ?name, 'email': ?email});
+  static Future<Map<String, dynamic>> updateAccount({String? name, String? email, String? currentPassword}) async =>
+      await _patch('/conta', {'nome': ?name, 'email': ?email, 'senha_atual': ?currentPassword});
 
   static Future<void> deleteAccount() async => _delete('/conta');
 
