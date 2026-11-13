@@ -71,6 +71,35 @@ def test_air_conditioner_without_hours_uses_inmetro_and_with_hours_uses_power():
     assert monthly_consumption_kwh(ar, daily_hours=8)["kwh_mes"] == pytest.approx(1000 * 8 * 30 / 1000)
 
 
+def test_air_conditioner_uses_days_of_use_instead_of_30():
+    """Quem liga o ar so em alguns dias do mes: potencia x horas x dias informados."""
+    ar = appliance("ar_condicionado", kwh_mes=64.0, potencia_w=1000)
+    r = monthly_consumption_kwh(ar, daily_hours=8, days_per_month=10)
+    assert r["kwh_mes"] == pytest.approx(1000 * 8 * 10 / 1000)
+    assert "x 10 dias" in r["metodo"]
+    assert monthly_consumption_kwh(ar, daily_hours=8, days_per_month=None)["kwh_mes"] == pytest.approx(240.0)
+
+
+def test_air_conditioner_days_without_hours_rescale_inmetro_value():
+    ar = appliance("ar_condicionado", kwh_mes=60.0, potencia_w=1000)
+    r = monthly_consumption_kwh(ar, days_per_month=15)
+    assert r["kwh_mes"] == pytest.approx(30.0)
+    assert "15 dias de uso" in r["metodo"]
+
+
+@pytest.mark.parametrize("days", [0, -1, 31.5, 40])
+def test_days_outside_1_31_are_rejected(days):
+    with pytest.raises(ValueError, match="entre 1 e 31"):
+        monthly_consumption_kwh(appliance("ar_condicionado", potencia_w=1000), daily_hours=8, days_per_month=days)
+
+
+def test_days_are_ignored_outside_air_conditioner():
+    """Geladeira fica ligada o mes todo e o chuveiro segue com 30 dias: so o ar pergunta os dias."""
+    assert monthly_consumption_kwh(appliance("refrigerador", kwh_mes=30.5), days_per_month=10)["kwh_mes"] == 30.5
+    shower = monthly_consumption_kwh(appliance("chuveiro", potencia_w=5500), daily_hours=0.25, days_per_month=10)
+    assert shower["kwh_mes"] == pytest.approx(41.25)
+
+
 def test_tv_without_hours_uses_inmetro_and_with_hours_rescales_by_lab_test():
     """Ensaio da TV: 6,59 h/dia ligada. 12 kWh/mes a 3 h/dia -> 12 x 3 / 6,59."""
     tv = appliance("televisor", kwh_mes=12.0)

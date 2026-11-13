@@ -21,7 +21,7 @@ from idioma import measure as measure_in_language
 from idioma import t, tr, units
 from calculadora_residencial import (
     ESTIMATE_EXPANSIONS, EQUIVALENT_NOTICE, NUM_COLUMNS, MIN_SAVINGS, EQUIVALENCE, ESTIMABLE,
-    SUSPECT_FRACTION, OPTIONAL_HOURS, INMETRO_REFERENCE_HOURS, SEARCH_LIMIT, BRAND_MODEL_LIMIT,
+    SUSPECT_FRACTION, OPTIONAL_HOURS, ASK_DAYS, INMETRO_REFERENCE_HOURS, SEARCH_LIMIT, BRAND_MODEL_LIMIT,
     MIN_EQUIVALENTS, MIN_QUARTILES, TYPE_NAMES, ASSUMPTIONS, NO_SUGGESTION, ESTIMATE_TOLERANCE,
     monthly_consumption_kwh, build_result, normalize,
 )
@@ -99,7 +99,8 @@ def usage_data(con, appliance_id):
     """Diz o que a tela precisa perguntar antes de calcular.
     pergunta: None, "velocidade", "ciclos" ou "horas"; padrao: valor sugerido (estimativa do grupo);
     opcional: True quando o usuario pode deixar em branco e ficar com o valor do Inmetro;
-    perguntar_horas: True quando, depois da velocidade, tambem precisa das horas (ventiladores)."""
+    perguntar_horas: True quando, depois da velocidade, tambem precisa das horas (ventiladores);
+    perguntar_dias: True quando tambem pergunta em quantos dias do mes liga (opcional; ar-condicionado)."""
     a = appliance_by_id(con, appliance_id)
     required_hours = a["categoria"] in INMETRO_REFERENCE_HOURS and a["categoria"] not in OPTIONAL_HOURS
     speeds = [v for v in SPEEDS if pd.notna(a[f"kwh_mes_{v}"])]
@@ -110,7 +111,7 @@ def usage_data(con, appliance_id):
     if required_hours and pd.notna(a["kwh_mes"]):
         return {"pergunta": "horas", "padrao": None, "opcional": False}
     if a["categoria"] in OPTIONAL_HOURS and (pd.notna(a["kwh_mes"]) or pd.notna(a["potencia_w"])):
-        return {"pergunta": "horas", "padrao": None, "opcional": True}
+        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": a["categoria"] in ASK_DAYS}
     if pd.notna(a["kwh_mes"]):
         return {"pergunta": None}  # o Inmetro ja informa o consumo mensal
     assumption = ASSUMPTIONS.get(a["categoria"], {})
@@ -168,10 +169,11 @@ def choose_tariff(con, distributor_id=None, manual_tariff=None):
 # 3. Calculo --------------------------------------------------------------------
 
 def calculate(con, appliance_id, distributor_id=None, manual_tariff=None,
-             daily_hours=None, monthly_cycles=None, speed=None, register=True):
+             daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None, register=True):
     """Resultado final. Use distribuidora_id OU tarifa_manual (R$/kWh da conta de luz)."""
     appliance = appliance_by_id(con, appliance_id)
-    consumption = monthly_consumption_kwh(appliance, daily_hours=daily_hours, monthly_cycles=monthly_cycles, speed=speed)
+    consumption = monthly_consumption_kwh(appliance, daily_hours=daily_hours, monthly_cycles=monthly_cycles, speed=speed,
+                                          days_per_month=days_per_month)
     tariff, name, uf, origin = choose_tariff(con, distributor_id, manual_tariff)
 
     result = build_result(appliance, consumption, tariff, name, origin, uf, daily_hours,
@@ -230,7 +232,7 @@ def category_usage_question(category):
     if category in INMETRO_REFERENCE_HOURS and category not in OPTIONAL_HOURS:
         return {"pergunta": "velocidade", "opcoes": list(SPEEDS), "padrao": "media", "perguntar_horas": True}
     if category in OPTIONAL_HOURS:
-        return {"pergunta": "horas", "padrao": None, "opcional": True}
+        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": category in ASK_DAYS}
     assumption = ASSUMPTIONS.get(category, {})
     if "ciclos_mes" in assumption:
         return {"pergunta": "ciclos", "padrao": assumption["ciclos_mes"]}
@@ -299,11 +301,12 @@ def _equivalent(con, category, kind, measure):
 
 
 def estimate_from_equivalents(con, category, kind=None, measure=None, label_value=None,
-                             daily_hours=None, monthly_cycles=None, speed=None, label_field=None):
+                             daily_hours=None, monthly_cycles=None, speed=None, label_field=None, days_per_month=None):
     config = ESTIMABLE.get(category)
     if config is None or config.get("especial"):
         raise ValueError(tr(f"categoria {category} nao tem esta estimativa", f"category {category} has no such estimate"))
-    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed}  # vira **kwargs
+    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
+             "days_per_month": days_per_month}  # vira **kwargs
     base = {"categoria": category, "nome": t(config["nome"]), "tipo": kind or None}
 
     if label_value is not None:
@@ -431,18 +434,19 @@ def _summary(appliance):
 
 
 def suggest_alternatives(con, appliance_id, distributor_id=None, manual_tariff=None,
-                         daily_hours=None, monthly_cycles=None, speed=None, limit=5):
+                         daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None, limit=5):
     """Modelos equivalentes que gastam pelo menos 5% menos, com o mesmo uso e a mesma tarifa.
     O catalogo nao tem precos: o payback sai em comparar(), com o preco que o usuario digitar."""
     current = appliance_by_id(con, appliance_id)
-    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed}  # vira **kwargs
+    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
+             "days_per_month": days_per_month}  # vira **kwargs
     current_kwh = monthly_consumption_kwh(current, **usage)["kwh_mes"]
     return _suggest(con, current, current_kwh, usage, distributor_id, manual_tariff, limit)
 
 
 def suggest_for_estimated(con, category, capacity, monthly_kwh, kind=None, name=None, distributor_id=None,
-                          manual_tariff=None, daily_hours=None, monthly_cycles=None, speed=None, limit=5,
-                          by_similar=False):
+                          manual_tariff=None, daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None,
+                          limit=5, by_similar=False):
     """pelos_parecidos: o kwh_mes saiu da mediana dos modelos parecidos (sem o numero do aparelho), entao
     comparar com esses mesmos modelos e circular e a mensagem precisa dizer isso."""
     if monthly_kwh <= 0:
@@ -454,7 +458,8 @@ def suggest_for_estimated(con, category, capacity, monthly_kwh, kind=None, name=
     rule = EQUIVALENCE.get(category, {})
     if rule.get("medida") == "fluxo_lm" and capacity:
         current["fluxo_lm"] = float(capacity) * _luminous_efficiency(con, category)
-    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed}  # vira **kwargs
+    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
+             "days_per_month": days_per_month}  # vira **kwargs
     return _suggest(con, current, float(monthly_kwh), usage, distributor_id, manual_tariff, limit, by_similar)
 
 
@@ -545,23 +550,26 @@ def _suggest(con, current, current_kwh, usage, distributor_id, manual_tariff, li
 
 
 def compare(con, appliance_id, alternative_id, distributor_id=None, manual_tariff=None,
-             daily_hours=None, monthly_cycles=None, speed=None, new_price=None):
+             daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None, new_price=None):
     """Economia de trocar o aparelho atual pela alternativa e, com o preco, em quantos meses a troca se paga."""
     if int(appliance_id) == int(alternative_id):
         raise ValueError(tr("escolha um modelo diferente do atual para comparar",
                             "choose a model different from the current one to compare"))
-    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed}  # vira **kwargs
+    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
+             "days_per_month": days_per_month}  # vira **kwargs
     current = calculate(con, appliance_id, distributor_id, manual_tariff, register=False, **usage)
     rewritten = calculate(con, alternative_id, distributor_id, manual_tariff, register=False, **usage)
     return _comparison(current, rewritten, new_price)
 
 
 def compare_estimated(con, category, monthly_kwh, alternative_id, name=None, distributor_id=None,
-                      manual_tariff=None, daily_hours=None, monthly_cycles=None, speed=None, new_price=None):
+                      manual_tariff=None, daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None,
+                      new_price=None):
     if monthly_kwh <= 0:
         raise ValueError(tr("o consumo do aparelho precisa ser maior que zero",
                             "the appliance's consumption must be greater than zero"))
-    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed}  # vira **kwargs
+    usage = {"daily_hours": daily_hours, "monthly_cycles": monthly_cycles, "speed": speed,
+             "days_per_month": days_per_month}  # vira **kwargs
     rewritten = calculate(con, alternative_id, distributor_id, manual_tariff, register=False, **usage)
     tariff, distributor_name, uf, origin = choose_tariff(con, distributor_id, manual_tariff)
     appliance = {"categoria": category, "marca": name or t(ESTIMABLE.get(category, {}).get("nome", category)),

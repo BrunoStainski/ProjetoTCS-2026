@@ -140,7 +140,30 @@ def test_catalog_fan_asks_speed_and_hours(api, category_id):
 def test_air_conditioner_asks_optional_hours(api, category_id):
     """padrao=None com opcional=True: o app deve aceitar em branco (fica o valor do Inmetro)."""
     usage = api.get(f"/aparelhos/{category_id('ar_condicionado')}/uso").json()
-    assert usage == {"pergunta": "horas", "opcoes": None, "padrao": None, "opcional": True, "perguntar_horas": False}
+    assert usage == {"pergunta": "horas", "opcoes": None, "padrao": None, "opcional": True, "perguntar_horas": False,
+                     "perguntar_dias": True}
+
+
+@pytest.mark.banco
+def test_air_conditioner_days_of_use_change_cost_and_suggestions(api, category_id):
+    """dias_mes no /calcular e no /sugestoes: 15 dias = metade de 30 (mesma conta nos modelos sugeridos)."""
+    body = {"aparelho_id": category_id("ar_condicionado"), "tarifa_manual": 1.0, "horas_dia": 8}
+    month = api.post("/calcular", json={**body, "registrar": False}).json()["kwh_mes"]
+    half = api.post("/calcular", json={**body, "dias_mes": 15, "registrar": False}).json()["kwh_mes"]
+    assert half == pytest.approx(month / 2, rel=0.01)
+    assert api.post("/calcular", json={**body, "dias_mes": 0}).status_code == 422
+    current = api.post("/sugestoes", json={**body, "dias_mes": 15}).json()["atual"]["kwh_mes"]
+    assert current == pytest.approx(half, rel=0.01)
+
+
+@pytest.mark.banco
+def test_days_of_use_reach_the_estimate(api):
+    """Ar fora do catalogo, com a potencia da plaqueta: 1000 W x 8 h x 10 dias = 80 kWh."""
+    r = api.post("/calcular/estimado", json={"categoria": "ar_condicionado", "valor_etiqueta": 1000,
+                                             "campo_etiqueta": "potencia_w", "medida": 9000, "horas_dia": 8,
+                                             "dias_mes": 10, "tarifa_manual": 1.0, "registrar": False})
+    assert r.status_code == 200, r.text
+    assert r.json()["kwh_mes"] == pytest.approx(80.0)
 
 
 @pytest.mark.banco
