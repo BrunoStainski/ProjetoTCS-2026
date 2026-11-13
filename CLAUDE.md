@@ -452,6 +452,14 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
   O firewall do Windows já libera o `com.docker.backend.exe`. Redes de instituição (ex.: FIEP-CONV) podem
   isolar os aparelhos: teste `http://<ip>:8000/saude` no navegador do celular; se não abre, usar o roteador
   do celular, um túnel (ngrok com domínio fixo, não configurado) ou a API publicada no Render.
+- Versão web no ar: **https://brunostainski.github.io/ProjetoTCS-2026/** (GitHub Pages, branch `gh-pages`, só os
+  arquivos do build; usa a API do Render como o APK). Não atualiza sozinha: mudou o app, refazer e enviar:
+  `flutter clean` e depois (no Git Bash, com `MSYS_NO_PATHCONV=1`, senão o caminho vira "C:/Program Files/Git/...")
+  `flutter build web --release --base-href /ProjetoTCS-2026/ --dart-define=API_URL=https://iamp-api.onrender.com`;
+  copiar `build/web/` (+ `.nojekyll`) para a `gh-pages` (git worktree) e dar push. Sem o `flutter clean` o build saiu
+  sem `FontManifest.json`/`AssetManifest.bin`/`favicon.png`/`manifest.json` (ícones viram quadrados): conferir a lista.
+  O `flutter clean` apaga o `iamp.apk`: guardar antes. QR codes dos slides em `docs/qrcodes/` (APK = `releases/latest`,
+  web = o endereço acima; PNG com legenda + SVG; gerados com `segno`, correção de erro alta).
 - iOS: o APK não serve; gerar IPA exige Mac com Xcode (+ conta Apple para instalar) e liberar HTTP no
   `ios/Runner/Info.plist` (hoje sem exceção do ATS). Sem Mac, a alternativa é a versão web (`flutter build web`,
   a API já libera CORS) aberta no Safari.
