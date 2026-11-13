@@ -33,7 +33,7 @@ import rag
 import rag_agent
 import servico
 from calculadora_residencial import SEARCH_LIMIT, BRAND_MODEL_LIMIT
-from criar_banco import APPLIANCE_COLUMNS
+from criar_banco import APPLIANCE_COLUMNS, catalog_fingerprint
 
 
 # Contrato com o app: o JSON da API continua com os nomes em portugues (o app le essas chaves como
@@ -180,6 +180,10 @@ def database_loaded(con):
     columns = set(banco.query(con, sql)["column_name"])
     if not set(APPLIANCE_COLUMNS) <= columns:
         print("esquema do banco desatualizado", flush=True)
+        return False
+    # CSV ou regra de montagem do catalogo mudou (mesmas colunas, outro conteudo): recarrega
+    if not banco.run(con, "SELECT 1 FROM cargas WHERE arquivo = ?", (catalog_fingerprint(),)).first():
+        print("catalogo mudou desde a ultima carga", flush=True)
         return False
     return banco.run(con, "SELECT COUNT(*) FROM aparelhos").scalar_one() > 0
 

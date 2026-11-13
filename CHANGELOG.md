@@ -14,6 +14,9 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 - Lista de marcas: as versões 127 V e 220 V do mesmo modelo contam como um modelo.
 - Login: 5 senhas erradas em 15 minutos para o mesmo e-mail fazem esperar (429), contra chute de senha. Duas
   contas criadas ao mesmo tempo com o mesmo e-mail dão 409 (antes, erro 500).
+- Banco da nuvem: a API recarregava o catálogo só quando aparecia coluna nova. Mudança de conteúdo (limpeza
+  refeita, tensão de cada modelo) não chegava ao Neon. Agora cada carga grava em `cargas` uma impressão digital
+  dos CSVs e do código que monta o catálogo (`catalogo:<hash>`), e a API recarrega na subida quando ela muda.
 - Testes novos: separação por tensão, sugestão só da mesma tensão, id da outra tensão e limite de senha errada.
 
 ## App 2.1.0+7 / API 0.6.0

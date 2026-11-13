@@ -262,3 +262,12 @@ def test_suggestions_keep_the_same_voltage(api, con, copel):
     assert ids, "a maquina que mais gasta deveria ter sugestao"
     volts = banco.query(con, f"SELECT DISTINCT tensao FROM aparelhos WHERE id IN ({', '.join('?' for _ in ids)})", ids)
     assert set(volts["tensao"]) <= {"", "127"}
+
+
+@pytest.mark.banco
+def test_database_knows_which_catalog_it_has(con):
+    """Depois da carga, a impressao do catalogo esta em `cargas`: a API nao recarrega a toa."""
+    import main
+    from criar_banco import catalog_fingerprint
+    assert banco.run(con, "SELECT 1 FROM cargas WHERE arquivo = ?", (catalog_fingerprint(),)).first()
+    assert main.database_loaded(con)
