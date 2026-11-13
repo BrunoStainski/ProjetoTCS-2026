@@ -4,7 +4,7 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
-## Próxima versão (ainda sem número)
+## App 2.2.1+9 / API 0.6.0
 
 Correções da revisão completa do código (13/11/2026):
 - App: no máximo 10 casas e 100 aparelhos por casa, os mesmos limites do servidor. Antes o app deixava passar e a
