@@ -370,7 +370,9 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
     5 senhas erradas em 15 min para o mesmo e-mail -> 429 (`MAX_FAILURES`, memória do processo). E-mail repetido
     ao mesmo tempo -> 409 (`IntegrityError`). Trocar o e-mail não pede a senha (só o token): melhoria pendente.
     Itens da casa: colunas para consulta (categoria, kWh, R$) + `dados` JSONB com a pergunta e o resultado no formato
-    do app. Limites: 10 casas, 100 itens.
+    do app. Limites: 10 casas, 100 itens, 20 mil caracteres por item e na `ultima_tarifa`.
+    App: falha ao trazer as casas logo depois do login sai da conta sem apagar as casas do celular (`_endSession`;
+    `_endLocal` = sair + casa vazia, usado em sair, apagar e sessão vencida).
   - App: `casa.dart` tem `Homes` (lista + casa aberta, sempre ≥ 1) e `Home get home => homes.active`, então as telas
     usam `home` como antes; quem escuta mudanças escuta `homes` (repassa as de todas as casas). Cada `Home` tem
     `name`, `cloudId` e `version` (sobe a cada mudança que vai para a nuvem; perfil e plano não contam).

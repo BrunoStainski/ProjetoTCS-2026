@@ -271,3 +271,10 @@ def test_database_knows_which_catalog_it_has(con):
     from criar_banco import catalog_fingerprint
     assert banco.run(con, "SELECT 1 FROM cargas WHERE arquivo = ?", (catalog_fingerprint(),)).first()
     assert main.database_loaded(con)
+
+
+def test_absurd_tariff_or_cycles_are_refused(client):
+    """Tarifa ou ciclos absurdos davam custo vazio (null) e quebravam o app: agora a API recusa (422)."""
+    for body in [{"aparelho_id": 1, "tarifa_manual": 1e308, "horas_dia": 1},
+                 {"aparelho_id": 1, "tarifa_manual": 0.8, "ciclos_mes": 1e308}]:
+        assert client.post("/calcular", json=body).status_code == 422

@@ -18,8 +18,10 @@ from datetime import date
 from typing import Literal, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Response
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -267,6 +269,15 @@ class RequestLanguage:
 
 app.add_middleware(RequestLanguage)
 
+
+@app.exception_handler(RequestValidationError)
+async def invalid_input(request, error):
+    """422 sem devolver o valor enviado. O padrao do FastAPI ecoa a entrada: uma senha longa demais voltava inteira
+    na resposta, e um caractere Unicode invalido (um surrogate escapado no JSON) quebrava a resposta com erro 500."""
+    errors = [{k: v for k, v in e.items() if k not in ("input", "ctx", "url")} for e in error.errors()]
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")],
@@ -313,7 +324,7 @@ class Distributor(ApiModel):
 
 class Tariff(ApiModel):
     distributor_id: Optional[int] = Field(None, description="Id vindo de GET /distribuidoras.")
-    manual_tariff: Optional[float] = Field(None, gt=0, description="R$/kWh da conta de luz do usuario.")
+    manual_tariff: Optional[float] = Field(None, gt=0, le=10, description="R$/kWh da conta de luz do usuario (o app aceita ate 10).")
 
     @model_validator(mode="after")
     def require_tariff(self):
@@ -328,7 +339,7 @@ class Tariff(ApiModel):
 class UsageAndTariff(Tariff):
     """Campos comuns: como o aparelho e usado e qual tarifa vale."""
     daily_hours: Optional[float] = Field(None, ge=0, le=24)
-    monthly_cycles: Optional[float] = Field(None, ge=0)
+    monthly_cycles: Optional[float] = Field(None, ge=0, le=300)  # ~10 por dia; numero absurdo deixava o custo vazio
     speed: Optional[Literal["baixa", "media", "alta"]] = None
 
     def usage_and_tariff(self):
@@ -472,13 +483,14 @@ class Resistive(ApiModel):
 
 
 class ConsumptionItem(ApiModel):
-    category: str = Field(..., description="Categoria do aparelho (GET /categorias). Ex.: chuveiro")
+    category: str = Field(..., max_length=40, description="Categoria do aparelho (GET /categorias). Ex.: chuveiro")
     monthly_kwh: float = Field(..., ge=0, description="Consumo mensal, normalmente o kwh_mes de POST /calcular.")
 
 
 class ClassificationInput(ApiModel):
     residents: int = Field(..., ge=1, le=20)
-    items: list[ConsumptionItem] = Field(..., min_length=1, description="Aparelhos da casa com o consumo de cada um.")
+    items: list[ConsumptionItem] = Field(..., min_length=1, max_length=200,
+                                         description="Aparelhos da casa com o consumo de cada um.")
 
 
 class MeanComparison(ApiModel):
@@ -742,15 +754,16 @@ class ItemEco(ConsumptionItem):
 
 
 class EvaluatedSwap(ApiModel):
-    appliance: str = Field(..., description="Aparelho atual. Ex.: geladeira Brastemp BRM44")
-    alternative: str = Field(..., description="Modelo sugerido. Ex.: geladeira Electrolux TF39")
+    appliance: str = Field(..., max_length=120, description="Aparelho atual. Ex.: geladeira Brastemp BRM44")
+    alternative: str = Field(..., max_length=120, description="Modelo sugerido. Ex.: geladeira Electrolux TF39")
     monthly_savings: float = Field(..., description="R$/mes economizados (de POST /comparar).")
     payback_months: Optional[float] = Field(None, ge=0, description="Meses para a troca se pagar (de /comparar).")
 
 
 class EcoCoachInput(ApiModel):
     residents: int = Field(..., ge=1, le=20)
-    items: list[ItemEco] = Field(..., min_length=1, description="Aparelhos da casa com consumo (e custo).")
+    # limites: o texto vai para o Gemini (cota gratuita); o app manda bem menos que isso
+    items: list[ItemEco] = Field(..., min_length=1, max_length=200, description="Aparelhos da casa com consumo (e custo).")
     swaps: list[EvaluatedSwap] = Field(default_factory=list, max_length=5,
                                         description="Trocas ja calculadas no /comparar (opcional).")
 
