@@ -420,8 +420,8 @@ apply ok, `plan` sem mudanças, /saude, /calcular (chuveiro Copel = R$ 31,68) e 
 
 ## Versionamento e APK (passo a passo no README, seção 8)
 
-- Versão do app em `pubspec.yaml` (hoje `2.1.0+7`: nome + build; o build sobe a cada APK), da API em
-  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1` e `v2.1.0` no GitHub. Tag `vX.Y.Z`
+- Versão do app em `pubspec.yaml` (hoje `2.2.0+8`: nome + build; o build sobe a cada APK), da API em
+  `main.py` (`0.6.0`); histórico em `CHANGELOG.md`. Tags `v1.1.0`, `v1.1.1`, `v2.1.0` e `v2.2.0` no GitHub. Tag `vX.Y.Z`
   (no commit de merge da `main`: os PRs viram commit novo) + Release no GitHub com o APK (nunca no git).
   Commit de versão: "Adiciona a versão: X.Y.Z".
 - Roteiro: commit + versão + CHANGELOG -> push -> PR/merge (o usuário faz) -> API (se mudou:

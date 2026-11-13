@@ -4,7 +4,7 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
-## Próxima versão (ainda sem número)
+## App 2.2.0+8 / API 0.6.0
 
 - Continua logado: o app guarda o acesso da conta no celular, cifrado (`flutter_secure_storage`, Android
   Keystore), por até 30 dias. Ao abrir, confere na API e traz as casas; acesso vencido é apagado e, sem internet,
