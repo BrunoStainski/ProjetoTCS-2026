@@ -92,6 +92,10 @@ Recarregar o catálogo muda os ids: `contas.refresh_appliance_id` corrige o id d
    (`INMETRO_REFERENCE_HOURS`; TV: 6,59 h). Sem horas, o `metodo` diz que é o valor do ensaio.
 2. Informa kWh/ciclo -> kWh/ciclo x ciclos/mês (máquina de lavar)
 3. Só potência -> W x horas/dia x 30 / 1000 (+ stand-by). Chuveiro exige horas do usuário.
+Dias de uso (`ASK_DAYS`, hoje só ar-condicionado): `dias_mes` opcional (1–31, em branco = 30) troca os 30 dias da
+potência × horas ou, sem horas, reescala o kWh/mês do Inmetro (× dias / 30). Nas outras categorias o campo é
+ignorado. `GET /uso` manda `perguntar_dias`; o app pergunta na mesma tela das horas (`uso.dart`) e na estimativa
+(`estimar.dart`) e guarda em `Query.daysPerMonth` (vai no `toApi`, então sugestões e payback usam os mesmos dias).
 Premissas de uso padrão (`ASSUMPTIONS`) são do grupo, sem fonte — o app avisa que são estimativa.
 Tarifa: escolhida pela distribuidora (ANEEL) ou digitada pelo usuário (conta de luz).
 Valores **sem** ICMS, PIS/COFINS, bandeira e iluminação pública (aviso `DEFAULT_NOTICE`).

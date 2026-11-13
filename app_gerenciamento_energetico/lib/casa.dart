@@ -67,9 +67,18 @@ class Query {
   double? dailyHours;
   double? monthlyCycles;
   String? speed;
+  double? daysPerMonth; // dias de uso no mes (ar-condicionado); null = todos os dias (30)
   TariffChoice? tariff;
 
-  Query(this.appliance, {this.estimation, this.dailyHours, this.monthlyCycles, this.speed, this.tariff});
+  Query(
+    this.appliance, {
+    this.estimation,
+    this.dailyHours,
+    this.monthlyCycles,
+    this.speed,
+    this.daysPerMonth,
+    this.tariff,
+  });
 
   Query.fromJson(Map<String, dynamic> j)
     : appliance = Appliance.fromJson(j['aparelho']),
@@ -77,6 +86,7 @@ class Query {
       dailyHours = (j['horas_dia'] as num?)?.toDouble(),
       monthlyCycles = (j['ciclos_mes'] as num?)?.toDouble(),
       speed = j['velocidade'],
+      daysPerMonth = (j['dias_mes'] as num?)?.toDouble(),
       tariff = j['tarifa'] == null ? null : TariffChoice.fromJson(j['tarifa']);
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +95,7 @@ class Query {
     'horas_dia': dailyHours,
     'ciclos_mes': monthlyCycles,
     'velocidade': speed,
+    'dias_mes': daysPerMonth,
     'tarifa': tariff?.toJson(),
   };
 
@@ -98,6 +109,7 @@ class Query {
     dailyHours: dailyHours,
     monthlyCycles: monthlyCycles,
     speed: speed,
+    daysPerMonth: daysPerMonth,
     tariff: tariff,
   );
 
@@ -109,6 +121,7 @@ class Query {
     'horas_dia': dailyHours,
     'ciclos_mes': monthlyCycles,
     'velocidade': speed,
+    'dias_mes': daysPerMonth,
   };
 }
 
