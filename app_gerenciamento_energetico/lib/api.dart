@@ -98,13 +98,15 @@ class UsageQuestion {
   final dynamic defaults;
   final bool optional;
   final bool askHours; // ventiladores: depois da velocidade, pergunta as horas por dia
+  final bool askDays; // ar-condicionado: tambem pergunta em quantos dias do mes liga (opcional; vazio = 30)
 
   UsageQuestion.fromJson(Map<String, dynamic> j)
     : question = j['pergunta'],
       options = List<String>.from(j['opcoes'] ?? const []),
       defaults = j['padrao'],
       optional = j['opcional'] ?? false,
-      askHours = j['perguntar_horas'] ?? false;
+      askHours = j['perguntar_horas'] ?? false,
+      askDays = j['perguntar_dias'] ?? false;
 }
 
 class Distributor {

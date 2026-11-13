@@ -49,6 +49,7 @@ JSON_NAMES = {
     "appliance": "aparelho",
     "appliance_id": "aparelho_id",
     "approximate": "aproximado",
+    "ask_days": "perguntar_dias",
     "ask_hours": "perguntar_horas",
     "brand": "marca",
     "by_similar": "pelos_parecidos",
@@ -311,6 +312,7 @@ class UsageQuestion(ApiModel):
     default_value: Union[float, str, None] = Field(None, description="Valor sugerido. null = o usuario precisa informar.")
     optional: bool = Field(False, description="true = o usuario pode deixar em branco e fica o valor do Inmetro.")
     ask_hours: bool = Field(False, description="true = depois da velocidade, pergunta as horas por dia.")
+    ask_days: bool = Field(False, description="true = tambem pergunta em quantos dias do mes liga (opcional; vazio = 30).")
 
 
 class Distributor(ApiModel):
@@ -341,9 +343,12 @@ class UsageAndTariff(Tariff):
     daily_hours: Optional[float] = Field(None, ge=0, le=24)
     monthly_cycles: Optional[float] = Field(None, ge=0, le=300)  # ~10 por dia; numero absurdo deixava o custo vazio
     speed: Optional[Literal["baixa", "media", "alta"]] = None
+    days_per_month: Optional[float] = Field(
+        None, ge=1, le=31, description="Dias de uso no mes (so ar-condicionado; vazio = 30, nos outros e ignorado).")
 
     def usage_and_tariff(self):
-        return self.model_dump(include={"distributor_id", "manual_tariff", "daily_hours", "monthly_cycles", "speed"})
+        return self.model_dump(include={"distributor_id", "manual_tariff", "daily_hours", "monthly_cycles", "speed",
+                                        "days_per_month"})
 
 
 class CalculationInput(UsageAndTariff):
@@ -687,7 +692,7 @@ def calculate_estimated(payload: EstimatedInput, con=Depends(connection)):
     try:
         consumption = servico.estimate_from_equivalents(
             con, payload.category, payload.kind, payload.measure, payload.label_value,
-            payload.daily_hours, payload.monthly_cycles, payload.speed, payload.label_field)
+            payload.daily_hours, payload.monthly_cycles, payload.speed, payload.label_field, payload.days_per_month)
         return servico.calculate_estimated(con, consumption, brand=payload.brand, model=payload.model,
                                          register=payload.save_query, **payload.tariff())
     except ValueError as error:

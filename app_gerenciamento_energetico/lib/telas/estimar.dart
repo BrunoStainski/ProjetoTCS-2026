@@ -73,6 +73,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
   final _label = TextEditingController();
   final _time = TimeControl();
   final _cycles = TextEditingController();
+  final _useDays = TextEditingController(); // ar-condicionado: dias de uso no mes (vazio = todos)
   String? _speed;
   final _name = TextEditingController();
 
@@ -94,7 +95,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
 
   @override
   void dispose() {
-    for (final c in [_freezer, _year, _measure, _label, _cycles, _name, _power, _days]) {
+    for (final c in [_freezer, _year, _measure, _label, _cycles, _useDays, _name, _power, _days]) {
       c.dispose();
     }
     _time.dispose();
@@ -277,6 +278,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
       dailyHours: asksHours ? _time.dailyHours : null,
       monthlyCycles: c.usage.question == 'ciclos' ? readNumber(_cycles.text) : null,
       speed: c.usage.question == 'velocidade' && _withoutNumber ? _speed : null,
+      daysPerMonth: c.usage.askDays ? _optional(_useDays) : null,
     );
   }
 
@@ -624,8 +626,21 @@ class _EstimateScreenState extends State<EstimateScreen> {
       skipText: optional ? tr('Não sei, usar o valor do Inmetro', "I don't know, use Inmetro's value") : null,
       onSkip: _time.clear,
     );
+    final days = _Question(
+      tr('Em quantos dias do mês você liga?', 'On how many days a month do you turn it on?'),
+      help: tr(
+        'Ex.: só nos dias de calor, uns 15. Se liga todo dia, toque em "Todos os dias".',
+        'E.g.: only on hot days, about 15. If you turn it on every day, tap "Every day".',
+      ),
+      fields: [_field(_useDays, tr('Dias de uso no mês', 'Days of use per month'), suffix: tr('dias', 'days'), whole: true)],
+      validate: () => _invalid(_useDays, maximum: 31)
+          ? tr('Digite um número de dias entre 1 e 31.', 'Enter a number of days between 1 and 31.')
+          : null,
+      skipText: tr('Todos os dias (30)', 'Every day (30)'),
+      onSkip: _useDays.clear,
+    );
     return switch (usage.question) {
-      'horas' => [hours],
+      'horas' => [hours, if (usage.askDays) days],
       'ciclos' => [
         _Question(
           tr('Quantas vezes por mês você lava roupa?', 'How many loads of laundry do you do per month?'),

@@ -81,6 +81,7 @@ MockClient apiFake({List<Uri>? requests, List<String?>? languages}) => MockClien
       'padrao': 'media',
       'perguntar_horas': true,
     },
+    '/aparelhos/4/uso' => {'pergunta': 'horas', 'padrao': null, 'opcional': true, 'perguntar_dias': true},
     '/ufs' => ['PR', 'SP'],
     '/distribuidoras' => [
       {'id': 7, 'nome': 'COPEL-DIS', 'uf': 'PR', 'tarifa_kwh': 0.768},
@@ -1179,6 +1180,7 @@ void main() {
       'horas_dia': 0.25,
       'ciclos_mes': null,
       'velocidade': null,
+      'dias_mes': null,
     });
     // a copia com outro aparelho mantem o uso e a tarifa
     final replacement = c.copy(
@@ -1186,6 +1188,9 @@ void main() {
     );
     expect(replacement.toApi(), c.toApi());
     expect(replacement.appliance.id, 5);
+    // o modelo sugerido para o ar e comparado com os mesmos dias de uso
+    final ar = query('ar_condicionado')..daysPerMonth = 12;
+    expect(ar.copy(appliance: const Appliance(id: 6, category: 'ar_condicionado', brand: 'X', model: 'Y')).daysPerMonth, 12);
   });
 
   test('resultado aproximado traz a faixa e resultados antigos continuam funcionando', () {
@@ -1218,6 +1223,7 @@ void main() {
       'horas_dia': null,
       'ciclos_mes': null,
       'velocidade': null,
+      'dias_mes': null,
       'tipo': 'duplex',
       'volume_total_l': 407.0,
       'ano_compra': 2014,
@@ -1428,6 +1434,48 @@ void main() {
       }, apiFake);
       expect(c.speed, 'media');
       expect(c.dailyHours, 8);
+    });
+
+    testWidgets('ar-condicionado pergunta em quantos dias do mes liga e manda dias_mes', (tester) async {
+      tallScreen(tester);
+      final c = query('ar_condicionado', id: 4);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: c)));
+        await tester.pumpAndSettle();
+        expect(find.text('Em quantos dias do mês você liga?'), findsOneWidget);
+        await tester.enterText(find.widgetWithText(TextField, 'Horas'), '8');
+        await tester.enterText(find.widgetWithText(TextField, 'Dias de uso no mês'), '40');
+        await tap(tester, 'Continuar');
+        expect(find.textContaining('de 1 a 31'), findsOneWidget);
+        await tester.enterText(find.widgetWithText(TextField, 'Dias de uso no mês'), '15');
+        await tap(tester, 'Continuar');
+      }, apiFake);
+      expect(c.dailyHours, 8);
+      expect(c.daysPerMonth, 15);
+      expect(c.toApi()['dias_mes'], 15);
+      expect(Query.fromJson(c.toJson()).daysPerMonth, 15); // casa salva na nuvem guarda os dias
+    });
+
+    testWidgets('ar-condicionado com os dias em branco conta o mes inteiro', (tester) async {
+      tallScreen(tester);
+      final c = query('ar_condicionado', id: 4);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: c)));
+        await tester.pumpAndSettle();
+        await tap(tester, 'Não sei, usar o valor do Inmetro');
+      }, apiFake);
+      expect(c.dailyHours, isNull);
+      expect(c.daysPerMonth, isNull);
+    });
+
+    testWidgets('outros aparelhos nao perguntam os dias', (tester) async {
+      tallScreen(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: query('ventilador_de_mesa', id: 3))));
+        await tester.pumpAndSettle();
+        await tap(tester, 'Média');
+      }, apiFake);
+      expect(find.text('Em quantos dias do mês você liga?'), findsNothing);
     });
 
     testWidgets('chamada da busca abre a estimativa', (tester) async {

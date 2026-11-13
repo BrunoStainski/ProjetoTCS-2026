@@ -43,6 +43,10 @@ ASSUMPTIONS = {
 #    Sem as horas, o ventilador sairia como se ficasse ligado 1 h por dia, entao a resposta e obrigatoria.
 INMETRO_REFERENCE_HOURS = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
 OPTIONAL_HOURS = {"ar_condicionado", "televisor"}
+# Aparelhos em que o app pergunta em quantos dias do mes a pessoa liga (resposta opcional; em branco = 30).
+# Ar-condicionado: muita gente liga so no verao ou em alguns dias da semana; contar 30 dias exagerava o
+# gasto. Os dias multiplicam a potencia x horas ou, sem horas, reescalam o kWh/mes do Inmetro (x dias / 30).
+ASK_DAYS = {"ar_condicionado"}
 SPEED_NAMES = {"baixa": "baixa", "media": "média", "alta": "alta"}
 SPEED_NAMES_EN = {"baixa": "low", "media": "medium", "alta": "high"}
 
@@ -423,12 +427,19 @@ def keep_voltage_versions(catalog):
     return pd.concat([single, split]).sort_index()
 
 
-def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, speed=None, days=DAYS_PER_MONTH):
-    """Consumo em kWh/mes e como foi calculado. Ordem: tabela > ciclos > potencia x horas."""
+def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, speed=None, days_per_month=None):
+    """Consumo em kWh/mes e como foi calculado. Ordem: tabela > ciclos > potencia x horas.
+    days_per_month: dias de uso no mes, so nas categorias de ASK_DAYS (nas outras e ignorado; vazio = 30)."""
     assumption = ASSUMPTIONS.get(appliance["categoria"], {})
     reference = INMETRO_REFERENCE_HOURS.get(appliance["categoria"])
     if daily_hours is not None and not 0 <= daily_hours <= 24:
         raise ValueError(tr("horas por dia precisa estar entre 0 e 24", "hours per day must be between 0 and 24"))
+    if appliance["categoria"] not in ASK_DAYS:
+        days_per_month = None
+    if days_per_month is not None and not 1 <= days_per_month <= 31:
+        raise ValueError(tr("dias de uso por mes precisa estar entre 1 e 31",
+                            "days of use per month must be between 1 and 31"))
+    days = DAYS_PER_MONTH if days_per_month is None else days_per_month
     given = tr("informado", "entered")
     adjustment = tr("informe as horas de uso para ajustar", "enter the hours of use to adjust")
 
@@ -452,10 +463,10 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
         if appliance["categoria"] == "ar_condicionado" and pd.notna(appliance["potencia_w"]):
             return {"kwh_mes": float(appliance["potencia_w"]) * daily_hours * days / 1000,
                     "metodo": tr(f"{appliance['potencia_w']:g} W (potência em carga total) x "
-                                 f"{time_per_day(daily_hours)} x {days} dias (informado); valor máximo, "
+                                 f"{time_per_day(daily_hours)} x {days:g} dias (informado); valor máximo, "
                                  "o compressor não fica ligado o tempo todo",
                                  f"{appliance['potencia_w']:g} W (power at full load) x "
-                                 f"{time_per_day(daily_hours)} x {days} days (entered); maximum value, "
+                                 f"{time_per_day(daily_hours)} x {days:g} days (entered); maximum value, "
                                  "the compressor is not on all the time"),
                     "premissa": False}
         if reference and pd.notna(appliance["kwh_mes"]):
@@ -473,7 +484,12 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
                          f" ({time_per_day(reference)} in the test; {adjustment})")
         elif appliance["categoria"] in OPTIONAL_HOURS:
             method += tr(f" (uso padrão do ensaio; {adjustment})", f" (standard test use; {adjustment})")
-        return {"kwh_mes": float(appliance["kwh_mes"]), "metodo": method, "premissa": False}
+        kwh = float(appliance["kwh_mes"])
+        if days_per_month is not None:
+            kwh *= days_per_month / DAYS_PER_MONTH
+            method += tr(f", ajustado para {days_per_month:g} dias de uso no mês (informado)",
+                         f", adjusted to {days_per_month:g} days of use per month (entered)")
+        return {"kwh_mes": kwh, "metodo": method, "premissa": False}
 
     if pd.notna(appliance["kwh_ciclo"]):
         cycles = monthly_cycles if monthly_cycles is not None else assumption.get("ciclos_mes")
@@ -497,8 +513,8 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
         standby = appliance.get("standby_kwh_mes")
         standby = 0.0 if pd.isna(standby) else float(standby)
         origin = given if daily_hours is not None else tr("estimativa do grupo", "group estimate")
-        method = tr(f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days} dias ({origin})",
-                    f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days} days ({origin})")
+        method = tr(f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days:g} dias ({origin})",
+                    f"{appliance['potencia_w']:g} W x {time_per_day(hours)} x {days:g} days ({origin})")
         if standby:
             method += tr(f" + {standby:.2f} kWh de stand-by", f" + {standby:.2f} kWh of standby")
         return {"kwh_mes": float(appliance["potencia_w"]) * hours * days / 1000 + standby,

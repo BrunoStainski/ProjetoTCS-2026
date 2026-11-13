@@ -6,6 +6,11 @@ O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita 
 
 ## Próxima versão (ainda sem número)
 
+- Ar-condicionado: o app pergunta em quantos dias do mês a pessoa liga (opcional; em branco = 30). Antes a conta
+  usava sempre 30 dias e exagerava o gasto de quem liga só no calor ou em alguns dias da semana. Os dias multiplicam
+  a potência × horas ou, sem horas, reescalam o kWh/mês do Inmetro (× dias / 30). Vale no catálogo, na estimativa
+  (`dias_mes` em `/calcular`, `/calcular/estimado`, `/sugestoes` e `/comparar`) e nos modelos sugeridos, que são
+  comparados com os mesmos dias. A pergunta de uso (`GET /aparelhos/{id}/uso`) ganhou `perguntar_dias`.
 - Tensão: modelo vendido numa tensão só também guarda a tensão e mostra no detalhe ("12 kg · 220 V"). Antes ele
   ficava como "vale para as duas" e a troca podia sugerir a quem tem 127 V uma máquina que só existe em 220 V.
 - Casas salvas: com as versões 127 V e 220 V do mesmo modelo, o id salvo também é conferido pelo detalhe; antes,

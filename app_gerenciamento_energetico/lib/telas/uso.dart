@@ -20,6 +20,7 @@ class UsageScreen extends StatefulWidget {
 
 class _UsageScreenState extends State<UsageScreen> {
   final _value = TextEditingController();
+  final _days = TextEditingController(); // ar-condicionado: dias de uso no mes (vazio = todos)
   final _time = TimeControl();
   UsageQuestion? _question;
   String? _speed;
@@ -35,6 +36,7 @@ class _UsageScreenState extends State<UsageScreen> {
   @override
   void dispose() {
     _value.dispose();
+    _days.dispose();
     _time.dispose();
     super.dispose();
   }
@@ -79,7 +81,20 @@ class _UsageScreenState extends State<UsageScreen> {
 
   void _confirm({bool skip = false}) {
     final c = widget.query;
-    c.dailyHours = c.monthlyCycles = c.speed = null;
+    c.dailyHours = c.monthlyCycles = c.speed = c.daysPerMonth = null;
+    if (_question!.askDays && _days.text.trim().isNotEmpty) {
+      final days = readNumber(_days.text);
+      if (days == null || days < 1 || days > 31 || days != days.roundToDouble()) {
+        setState(
+          () => _error = tr(
+            'Informe em quantos dias do mês você liga, de 1 a 31. Ex.: 20. Se liga todo dia, deixe em branco.',
+            'Enter on how many days a month you turn it on, from 1 to 31. E.g.: 20. If every day, leave it blank.',
+          ),
+        );
+        return;
+      }
+      c.daysPerMonth = days;
+    }
     switch (_question!.question) {
       case 'velocidade':
         c.speed = _speed;
@@ -225,6 +240,26 @@ class _UsageScreenState extends State<UsageScreen> {
                     ),
             ),
             TimeField(control: _time, onConfirm: _confirm),
+            if (p.askDays) ...[
+              const SizedBox(height: Spacing.g),
+              QuestionHeader(
+                tr('Em quantos dias do mês você liga?', 'On how many days a month do you turn it on?'),
+                help: tr(
+                  'Ex.: só nos dias de calor, uns 15. Se liga todo dia, deixe em branco (contamos 30 dias).',
+                  'E.g.: only on hot days, about 15. If you turn it on every day, leave it blank (we count 30 days).',
+                ),
+              ),
+              TextField(
+                controller: _days,
+                keyboardType: TextInputType.number,
+                onSubmitted: (_) => _confirm(),
+                decoration: InputDecoration(
+                  labelText: tr('Dias de uso no mês', 'Days of use per month'),
+                  hintText: tr('Todos os dias (30)', 'Every day (30)'),
+                  suffixText: tr('dias', 'days'),
+                ),
+              ),
+            ],
           ],
           if (p?.question == 'ciclos') ...[
             QuestionHeader(
