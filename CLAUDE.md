@@ -268,7 +268,10 @@ lugar visível (app, web, Android, iOS).
   barra fica visível durante o cálculo. `goTo(AppTab, restart:, closeCurrent:)` troca de aba.
 - Boas-vindas (`telas/boas_vindas.dart`): abre por cima das abas (`initialRoute: '/boas-vindas'` monta
   '/' embaixo); só a `IampBrand(size: 120, nameSize: 56)` e o botão (sem texto, pedido do grupo);
-  "Comece a economizar" fecha e vai para Calcular etapa 1; voltar do Android nela fecha o app.
+  o botão principal depende de alguma casa já ter aparelho (`_hasAppliances`; escuta `homes`, então muda sozinho
+  quando as casas chegam da nuvem): primeira vez = "Comece a economizar" -> Calcular etapa 1; já tem aparelhos =
+  "Ver minha casa" -> aba Minha casa (UX: a casa é o centro do app; decidido em 15/11/2026). Voltar do Android nela
+  fecha o app.
   `IampApp(showWelcome: false)` nos testes das abas.
 - Etapa 2 com tipo escolhido (`ModelScreen`): lista de todas as marcas do tipo (`_BrandList`, GET /marcas)
   filtrada pelo texto digitado; cada marca é um `ExpansionTile` que só busca os modelos ao abrir (GET /modelos).

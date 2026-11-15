@@ -227,11 +227,12 @@ def test_source_without_section_becomes_none():
     assert cited == [{"n": 1, "documento": "D", "orgao": "O", "url": "u", "secao": None, "pagina": None}]
 
 
-def test_eco_coach_refuses_oversized_input(client):
+@pytest.mark.banco
+def test_eco_coach_refuses_oversized_input(api):
     """O texto vai para o Gemini: pedido gigante (gasta a cota gratuita) e recusado antes (422)."""
     item = {"categoria": "chuveiro", "kwh_mes": 10, "custo_mes": 8}
     too_many = {"moradores": 2, "itens": [item] * 201}
     long_name = {"moradores": 2, "itens": [item], "trocas": [{"aparelho": "x" * 121, "alternativa": "y", "economia_mes": 5}]}
     long_category = {"moradores": 2, "itens": [{**item, "categoria": "c" * 41}]}
     for body in [too_many, long_name, long_category]:
-        assert client.post("/eco-coach", json=body).status_code == 422
+        assert api.post("/eco-coach", json=body).status_code == 422

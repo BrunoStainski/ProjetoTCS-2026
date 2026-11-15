@@ -258,6 +258,33 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    testWidgets('quem já tem aparelhos: o botão vira "Ver minha casa" e abre a casa', (tester) async {
+      phoneScreen(tester);
+      home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68));
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsNothing);
+        await tester.tap(find.text('Ver minha casa'));
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(currentTab.value, AppTab.home);
+      expect(find.textContaining('por mês'), findsWidgets); // o total da conta de luz da casa
+    });
+
+    testWidgets('o botão das boas-vindas muda sozinho quando as casas chegam (login guardado)', (tester) async {
+      phoneScreen(tester);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(const IampApp());
+        await tester.pumpAndSettle();
+        expect(find.text('Comece a economizar'), findsOneWidget); // primeira vez
+        home.add(query('chuveiro'), result('chuveiro', 41.25, 31.68)); // como se as casas viessem da nuvem
+        await tester.pumpAndSettle();
+      }, apiFake);
+      expect(find.text('Ver minha casa'), findsOneWidget);
+      expect(find.text('Comece a economizar'), findsNothing);
+    });
+
     testWidgets('abre nas boas-vindas e "Comece a economizar" leva ao cálculo', (tester) async {
       phoneScreen(tester);
       await http.runWithClient(() async {
@@ -395,12 +422,12 @@ void main() {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
         await expectLater(tester, meetsGuideline(textContrastGuideline)); // boas-vindas
-        await tester.tap(find.text('Comece a economizar'));
-        await tester.pumpAndSettle();
-        await expectLater(tester, meetsGuideline(textContrastGuideline)); // etapa 1
-        await tester.tap(find.text('Minha casa'));
+        await tester.tap(find.text('Ver minha casa')); // ja tem aparelho: vai direto para a casa
         await tester.pumpAndSettle();
         await expectLater(tester, meetsGuideline(textContrastGuideline)); // minha casa com 1 aparelho
+        await tester.tap(find.text('Calcular'));
+        await tester.pumpAndSettle();
+        await expectLater(tester, meetsGuideline(textContrastGuideline)); // etapa 1
         await tester.tap(find.byTooltip('Menu'));
         await tester.pumpAndSettle();
         await expectLater(tester, meetsGuideline(textContrastGuideline)); // menu
@@ -467,7 +494,7 @@ void main() {
       await http.runWithClient(() async {
         await tester.pumpWidget(const IampApp());
         await tester.pumpAndSettle();
-        expect(find.text('Comece a economizar'), findsOneWidget); // continua dando para usar sem conta
+        expect(find.text('Ver minha casa'), findsOneWidget); // continua dando para usar sem conta (e a casa ja tem aparelho)
         await tester.tap(find.text('Entrar ou criar conta'));
         await tester.pumpAndSettle();
         expect(find.byType(SignUpScreen), findsOneWidget);

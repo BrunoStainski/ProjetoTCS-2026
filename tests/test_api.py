@@ -296,21 +296,23 @@ def test_database_knows_which_catalog_it_has(con):
     assert main.database_loaded(con)
 
 
-def test_absurd_tariff_or_cycles_are_refused(client):
+@pytest.mark.banco
+def test_absurd_tariff_or_cycles_are_refused(api):
     """Tarifa ou ciclos absurdos davam custo vazio (null) e quebravam o app: agora a API recusa (422)."""
     for body in [{"aparelho_id": 1, "tarifa_manual": 1e308, "horas_dia": 1},
                  {"aparelho_id": 1, "tarifa_manual": 0.8, "ciclos_mes": 1e308}]:
-        assert client.post("/calcular", json=body).status_code == 422
+        assert api.post("/calcular", json=body).status_code == 422
 
 
-def test_validation_errors_in_portuguese_with_the_field(client):
+@pytest.mark.banco
+def test_validation_errors_in_portuguese_with_the_field(api):
     """Erro de validacao vinha em ingles do Pydantic; em portugues, sai traduzido e com o nome do campo."""
-    r = client.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50})
+    r = api.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50})
     assert r.status_code == 422
     assert r.json()["detail"][0]["msg"] == "tarifa_manual: precisa ser no máximo 10"
-    r = client.post("/calcular", json={"tarifa_manual": 0.8})
+    r = api.post("/calcular", json={"tarifa_manual": 0.8})
     assert any(d["msg"] == "aparelho_id: campo obrigatório" for d in r.json()["detail"])
-    r = client.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50}, headers={"Accept-Language": "en"})
+    r = api.post("/calcular", json={"aparelho_id": 1, "tarifa_manual": 50}, headers={"Accept-Language": "en"})
     assert r.json()["detail"][0]["msg"].startswith("tarifa_manual: Input should be less than or equal to 10")
 
 
