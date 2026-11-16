@@ -4,6 +4,17 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
+## Próxima versão (ainda sem número)
+
+- Boas-vindas: quem já tem aparelhos em alguma casa (voltou com o login guardado, entrou na conta ou montou a casa)
+  vê "Ver minha casa" e vai direto para a aba Minha casa, com o total da conta. Na primeira vez continua
+  "Comece a economizar", que abre o cálculo. Antes ia sempre para o cálculo e parecia que a pessoa começava do zero.
+- Dias de uso no mês: além do ar-condicionado, ventiladores (de mesa e de teto), TV e chuveiro perguntam em quantos
+  dias do mês a pessoa liga (opcional; em branco = 30). Vale no cálculo, na estimativa, nas sugestões e no payback.
+  No ventilador a pergunta vem junto com as horas, depois da velocidade. Geladeira, lâmpadas e lavadora não mudam.
+- Testes: três testes que precisam do banco passam a ser marcados como testes de banco (sem Docker,
+  `pytest -m "not banco"` falhava neles).
+
 ## App 2.2.1+9 / API 0.6.0
 
 Correções da revisão completa do código (13/11/2026):

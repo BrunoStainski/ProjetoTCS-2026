@@ -1,10 +1,14 @@
 // Boas-vindas: primeira tela ao abrir o app (e pelo menu, em "Início").
-// So a marca (icone grande com o nome ao lado), o botao "Comece a economizar", que leva para o
-// calculo (aba Calcular, etapa 1), e o cadastro (opcional). Quem se cadastrou ve "Olá, <nome>".
+// So a marca (icone grande com o nome ao lado), o botao principal e o cadastro (opcional). Quem se cadastrou ve
+// "Olá, <nome>". O botao principal depende de a pessoa ja ter aparelhos (UX: a casa e o centro do app):
+// - primeira vez (nenhuma casa com aparelho): "Comece a economizar" -> aba Calcular, etapa 1;
+// - ja tem aparelhos (voltou com o login guardado, entrou na conta ou montou a casa): "Ver minha casa" -> aba
+//   Minha casa, com o total da conta. Antes ia sempre para o calculo e parecia que a pessoa comecava do zero.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../casa.dart';
 import '../conta.dart';
 import '../idioma.dart';
 import '../navegacao.dart';
@@ -18,8 +22,15 @@ class WelcomeScreen extends StatelessWidget {
 
   const WelcomeScreen({super.key, this.onOpen = false});
 
+  /// Alguma casa ja tem aparelho: nao e a primeira vez da pessoa.
+  static bool get _hasAppliances => homes.list.any((h) => !h.isEmpty);
+
   void _start(BuildContext context) {
-    goTo(AppTab.calculate, restart: true);
+    if (_hasAppliances) {
+      goTo(AppTab.home, restart: true);
+    } else {
+      goTo(AppTab.calculate, restart: true);
+    }
     Navigator.pop(context); // as abas ja estao embaixo desta tela
   }
 
@@ -95,10 +106,16 @@ class WelcomeScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      FilledButton.icon(
-                        onPressed: () => _start(context),
-                        icon: const Icon(Icons.bolt),
-                        label: Text(tr('Comece a economizar', 'Start saving')),
+                      // muda sozinho quando as casas chegam da nuvem (login guardado ou entrar na conta)
+                      ListenableBuilder(
+                        listenable: homes,
+                        builder: (context, _) => FilledButton.icon(
+                          onPressed: () => _start(context),
+                          icon: Icon(_hasAppliances ? Icons.home : Icons.bolt),
+                          label: Text(
+                            _hasAppliances ? tr('Ver minha casa', 'See my home') : tr('Comece a economizar', 'Start saving'),
+                          ),
+                        ),
                       ),
                       const SizedBox(height: Spacing.p),
                       // conta opcional (salva as casas na nuvem): quem nao quiser segue direto pelo botao de cima
