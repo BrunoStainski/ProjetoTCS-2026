@@ -151,7 +151,153 @@ fora.
 ## Fase 2 · Desenvolvimento (Claude Code)
 
 Na Fase 2 o contexto do projeto fica no `CLAUDE.md`: arquitetura, regras de cálculo, convenções e limitações.
-O agente lê esse arquivo em toda sessão, então os prompts podem ser curtos. Cada mudança passa por branch,
-testes e Pull Request revisado pelo grupo.
+O agente lê esse arquivo em toda sessão, então os prompts podem ser curtos e informais. As instruções que valem
+sempre ficam nas skills de `skills/` (estrutura do projeto, boas práticas de Python/FastAPI e de Flutter, regras
+de negócio do cálculo, da troca, do perfil e do Eco-Coach, ambiente virtual e requisitos do projeto final). Cada
+mudança passa por branch, testes e Pull Request revisado pelo grupo.
 
-*(Registros a adicionar.)*
+Os registros abaixo são das sessões do João (Claude Code no VS Code, de 06/11 a 16/11/2026). As sessões dos
+outros membros podem ser acrescentadas no mesmo formato.
+
+### 2.1 Regras de trabalho com o agente
+
+Combinados que apareceram nos próprios prompts e viraram padrão:
+
+- **Ler e aprovar antes de subir:** "não de o commit no github, espere eu ler e aprovar para subir". O agente
+  trabalha numa branch, explica o que fez e só faz commit/push quando pedido ("sobe ai chefe", "pode dar um push").
+- **Sincronizar antes de mexer:** muitos pedidos começam com "da um pull no projeto ai" ou "confira se precisa da
+  pull". O agente traz a `main`, resume o que os colegas mudaram e atualiza a própria branch antes de continuar.
+- **Perguntar ao agente o que falta:** "meu amigo, o que falta para finalizar o projeto?" virou o jeito de
+  revisar o projeto contra o guia do professor (a skill `requisitos-projeto-final`).
+- **Sem atribuição ao Claude nos commits:** regra do `CLAUDE.md`. Os commits saem em nome de quem pediu.
+
+### 2.2 Banco e ambiente
+
+**Prompt: erro ao carregar o banco** (06/11)
+> "quando eu dei python criar_banco.py deu erro, consegue concertar?"
+
+- **Resultado:** não era bug no código. O Docker Desktop estava fechado, então o PostgreSQL não respondia. O
+  agente abriu o Docker, subiu os containers e carregou o banco (24.155 aparelhos, 99 distribuidoras).
+- **Depois:** o agente avisou que o `.env.example` estava preparado para commit com a senha real do banco. A senha
+  voltou a ser um texto de exemplo. Ver também 2.8.
+
+**Prompt: instalar o Flutter** (09/11)
+> "procura o flutter e instala pra mim pfvr"
+
+- **Resultado:** o Flutter já estava baixado na pasta Downloads. O agente moveu para `C:\Users\joaol\flutter`,
+  pôs no PATH e abriu o app no Chrome ligado à API.
+
+### 2.3 Infraestrutura com Terraform
+
+**Prompt: quando fazer o Terraform** (06/11)
+> "voce acha que compensa ja fazer o terraform agora?"
+
+- **Resultado:** o agente recomendou esperar o RAG, porque ele mudava a infraestrutura (imagem do Postgres com
+  pgvector e a chave do LLM como segredo). O grupo seguiu essa ordem.
+
+**Prompt: Oracle Cloud** (06/11)
+> "vamos fazer o terraform ent? vamos usar o oracle gratuito para a nuvem"
+
+- **Resultado:** `infra/oracle/`: uma VM ARM gratuita rodando o próprio `docker-compose.yml`, rede própria e
+  firewall só com SSH e a porta da API. Passou no `terraform validate`, mas não foi aplicado: a conta da Oracle
+  pela instituição demora até duas semanas.
+
+**Prompt: Terraform local** (09/11)
+> "preciso fazer o terraform em um docker local, não vamos conseguir a conta oracle no momento, consegue fazer
+> tudo e depois me explicar brevemente o que foi feito? não de o commit no github, espere eu ler e aprovar para
+> subir"
+
+- **Resultado:** `infra/local/` com o provider Docker: rede, volume, PostgreSQL, imagem e container da API e a
+  carga do RAG, nas portas 8080 e 5435 para não brigar com o compose. Testado com `apply`, `/saude`, `/calcular`
+  e `/eco-coach`.
+- **Depois:** no Windows o build pelo provider travava; o agente trocou por um `docker build` chamado pelo
+  Terraform. Para a apresentação, a nuvem escolhida foi o Render + Neon (gratuitos), e a Oracle ficou pronta como
+  alternativa.
+
+### 2.4 Documentação e BPMN
+
+**Prompt: onde documentar** (10/11)
+> "com base em todos os contextos, tudo que foi produzido, precisamos fazer a documentação, é melhor fazer em um
+> documento separado?"
+
+- **Resultado:** o README ficou para quem roda o código e o `docs/documento_processo.md` para a banca (processo,
+  justificativas técnicas, ética e segurança), com o PDF gerado por `scripts/gerar_pdf_documento.py`.
+
+**Prompt: BPMN mais legível** (10/11)
+> "não tem como arrumar de alguma maneira o bpmn, para ele ficar visivelmente melhor para a banca da tcs?"
+
+- **Resultado:** o BPMN foi dividido em níveis: uma visão geral com subprocessos [+] e 5 diagramas de detalhe
+  (cálculo, troca e payback, perfil, Eco-Coach e treino offline), gerados por `scripts/gerar_bpmn_visoes.py` com
+  cores por tipo de tarefa. O diagrama completo do grupo foi para o Anexo A.
+
+**Prompt: revisar os documentos** (12/11)
+> "preciso que vc corrija os mds que estiverem inclompletos ou errados"
+
+- **Resultado:** README, documento do processo, `CLAUDE.md`, skills e o README do app (que ainda era o modelo
+  padrão do Flutter) foram conferidos contra o código: versões, rotas da API, embeddings do Gemini, Render + Neon,
+  modo claro, inglês, LGPD e número de testes.
+
+**Prompt: tirar o gás e as próximas etapas** (12/11)
+> "retire as proximas etapas de ambos os documentos, e retire o gas também, não vamos usar mais no projeto"
+
+- **Resultado:** saíram as seções de próximos passos do README e do documento do processo, e todas as menções ao
+  gás de cozinha (ANP, fogões), que o grupo tirou do escopo para focar em energia elétrica.
+
+### 2.5 Ouvir o professor: Eco-Coach mais curto
+
+**Prompt** (11/11)
+> "no nosso advisor, de como economizar e onde mostra aparelhos recomendados, o professor falou que tem muito
+> texto, tem como encurtar um pouco o texto?"
+
+- **Resultado:** o prompt do Gemini passou a pedir no máximo ~120 palavras no plano (1 frase de diagnóstico e
+  3 ações) e ~80 nas dicas por aparelho (antes ~250 e ~180). Avisos e mensagens de espera do app também ficaram
+  mais curtos. Os testes do RAG conferem o novo formato sem chamar o Gemini.
+
+### 2.6 Várias casas na mesma conta
+
+**Prompt** (12/11)
+> "seguinte preciso nesse momento, que no aplicativo o usuario consiga registrar uma ou mais casas na mesma
+> conta, como podemos fazer isso?"
+
+- **Resultado:** antes de escrever código, o agente mostrou como o estado da casa funcionava e perguntou onde as
+  casas seriam guardadas: só na memória, no celular ou no servidor.
+
+**Prompt de continuação**
+> "vai ficar salvo na nuvem, meu amigo ja adicionou essas questões da nuvem"
+
+- **Resultado:** o agente procurou no GitHub (a `main` e todas as branches) e não achou código de login ou de
+  contas. A "nuvem" pronta era a hospedagem (Render + Neon). Ele pediu para confirmar com o colega, para não fazerem
+  o mesmo trabalho duas vezes.
+- **Depois:** o colega confirmou que não tinha esse código ("ele disse que não tem"), e o agente fez a conta na
+  nuvem com várias casas:
+  - **API:** tabelas `usuarios`, `sessoes`, `casas` e `itens_casa`, senha guardada só como hash (scrypt), token de
+    sessão guardado só como hash, aceite do aviso de privacidade obrigatório e rotas para ver, corrigir e apagar
+    os dados (LGPD).
+  - **App:** criar, trocar, renomear e apagar casas; tela de conta; gravação automática na nuvem.
+  - **Testes:** 9 na API e 10 no app, mais o teste de ponta a ponta no Docker.
+- **Depois (colegas):** login mantido no celular (`flutter_secure_storage`), termo de consentimento e limite de
+  tentativas de senha.
+
+### 2.7 Apresentação
+
+**Prompt** (13/11)
+> "lembra do arquivo que te mandei da apresentação? consegue mandar um textinho para os dois primeiros topicos,
+> para eu utilizar na apresentação"
+
+- **Resultado:** o arquivo não estava na sessão (o agente não guarda conversas antigas). Ele avisou isso e usou o
+  roteiro do guia do professor (skill `requisitos-projeto-final`): textos para falar em "Contexto e problema" e
+  "Mapeamento e arquitetura", com os números do próprio documento (24 mil aparelhos, 99 distribuidoras, payback da
+  geladeira).
+- **Lição:** o agente não lembra arquivos de outras conversas; o que precisa durar vai para o repositório.
+
+### 2.8 O que aprendemos usando o agente
+
+- **Contexto escrito vale mais que prompt longo.** Com o `CLAUDE.md` e as skills atualizados, prompts de uma
+  linha ("da um pull", "sobe ai") bastam.
+- **Segredo não vai no prompt nem no git.** Numa sessão, uma chave de API foi colada no chat e depois colocada no
+  `.env.example`. A revisão antes do push barrou o arquivo, e a regra ficou: o `.env.example` só tem campos vazios
+  e chave exposta deve ser trocada. A chave não aparece neste registro.
+- **O agente confere antes de afirmar.** Ele roda os testes e chamadas reais à API e diz o que não conseguiu
+  verificar (por exemplo, o Terraform da Oracle sem conta).
+- **A decisão continua do grupo.** O agente propõe e explica as opções; quem decide é o grupo (ordem
+  RAG → Terraform, nuvem gratuita, onde guardar as casas).

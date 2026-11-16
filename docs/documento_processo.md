@@ -610,12 +610,10 @@ ao lado do plano e mostra as fontes para o usuário conferir.
   antes do *push* barrou o arquivo. A lição virou regra: o `.env.example` só tem campos vazios, e
   qualquer chave exposta em canal não seguro deve ser trocada.
 - **Contas:** as rotas da conta e das casas exigem o token; o login responde com a mesma mensagem
-  e no mesmo tempo para e-mail inexistente ou senha errada, para não revelar quem tem conta.
+  e no mesmo tempo para e-mail inexistente ou senha errada, para não revelar quem tem conta. Depois
+  de 5 senhas erradas em 15 minutos, o login daquele e-mail fica bloqueado por um tempo.
 - **Limitações assumidas do protótipo:** as rotas de cálculo são abertas, o CORS está aberto, não há
-  limite de tentativas de login nem confirmação do e-mail e, fora do Render (que entrega HTTPS), a
-  API roda em HTTP. Para produção: domínio com TLS (proxy reverso), CORS restrito, limite de
-  requisições (principalmente no login), confirmação do e-mail e *state* do Terraform num backend
-  remoto com controle de acesso.
+  confirmação do e-mail e, fora do Render (que entrega HTTPS), a API roda em HTTP.
 
 ### 8.6 Viabilidade
 
@@ -630,8 +628,6 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 
 ## 9. Métricas e resultados
 
-### 9.1 Métricas técnicas (medidas)
-
 | Item | Resultado |
 |---|---|
 | Catálogo | 24.228 aparelhos em 12 categorias; 99 distribuidoras com tarifa vigente |
@@ -642,15 +638,6 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 | Testes | Python: 168 (98 sem banco + 70 com banco); app: 76 testes de widget. Rodados em 12/11/2026: os do app e os de Python passam, exceto 7 do Eco-Coach com banco, que pedem a base vetorial atual (recarregar com `carregar_rag.py`) |
 | Exemplo de ROI | Geladeira de 2005 → modelo atual de 415 L: economia de R$ 32,66/mês, payback de 7,7 anos a R$ 3.000 |
 | Exemplo de referência | Chuveiro 5.500 W, 15 min/dia, Copel: 41,25 kWh = R$ 31,68/mês (conferido via API) |
-
-### 9.2 Métricas de sucesso propostas (para um piloto)
-
-- **Precisão:** diferença entre o consumo estimado pelo iamp e a conta real de famílias
-  voluntárias (meta inicial: dentro de ±20%).
-- **Engajamento:** porcentagem de usuários que cadastram 3 ou mais aparelhos em "Minha casa".
-- **Impacto:** economia mensal estimada nas trocas que o usuário marcou como feitas.
-- **Qualidade do Eco-Coach:** porcentagem de planos sem número inventado e com todas as dicas
-  citadas (auditoria por amostragem).
 
 ---
 
