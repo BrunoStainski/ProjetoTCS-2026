@@ -2,7 +2,7 @@
 
 **Documentação do Projeto Integrador de IA Aplicada (TCS 2026)**
 
-Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.0.0 / API 0.6.0
+Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.2.1 / API 0.6.0
 
 Integrantes: Bruno Stainski, Gianluca Graciano, João Lucas D'Almas, Matheus Gusmão
 
@@ -446,22 +446,30 @@ Decisões de usabilidade:
 - **Conta opcional e várias casas**: a pessoa pode ter mais de uma casa (ex.: a casa e a casa da
   praia), cada uma com os próprios aparelhos, moradores, perfil e plano, e troca de casa no topo de
   "Minha casa". Com conta (nome, e-mail e senha), as casas ficam salvas na nuvem e aparecem em
-  qualquer celular; cada mudança é gravada sozinha. Sem conta, o app funciona igual, com as casas só
-  no aparelho.
+  qualquer celular; cada mudança é gravada sozinha, e o app continua logado por até 30 dias. Sem
+  conta, o app funciona igual, com as casas só no aparelho até fechar o app (o cadastro e as
+  boas-vindas avisam isso). Quem já tem aparelhos em alguma casa vê "Ver minha casa" nas
+  boas-vindas e vai direto para o total da conta, em vez de recomeçar pelo cálculo.
+- **Uso mais próximo do real**: no ar-condicionado, nos ventiladores, na TV e no chuveiro, além das
+  horas por dia, o app pergunta em quantos dias do mês a pessoa liga (em branco = 30). Antes a conta
+  supunha uso todos os dias e exagerava o gasto de quem liga só no calor ou em alguns dias da semana.
+  Os dias valem no cálculo, na estimativa, nas sugestões e no payback. Modelos vendidos em 127 V e
+  220 V aparecem separados, com a tensão no nome.
 - **Transparência**: cada resultado mostra o método do cálculo, a fonte do dado e os avisos
   (estimativa, valor sem impostos, dado imputado, texto gerado por IA).
 
-Distribuição: APK Android assinado com a chave do projeto (Releases no GitHub) e versão web.
+Distribuição: APK Android assinado com a chave do projeto (Releases no GitHub) e versão web (GitHub
+Pages), com QR codes dos dois em `docs/qrcodes/` para abrir direto do celular na apresentação.
 
 ### 6.2 Boas práticas
 
 - **Separação de camadas:** regras de cálculo (`calculadora_residencial.py`), serviços
   (`servico.py`) e interface (API, terminal, app). As mesmas regras alimentam o app, a API e a
   geração dos dados de treino do ML.
-- **Testes automatizados:** 168 testes em Python (cálculo, API, contas, estimativa, idioma, ML,
-  RAG), dos quais 70 usam o banco e são pulados quando ele não está no ar, e 76 testes de widget no
-  app Flutter (fluxo completo com API falsa, conta e várias casas, contraste, tamanho de toque,
-  fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
+- **Testes automatizados:** 202 testes em Python (cálculo, limpeza, API, contas, estimativa,
+  idioma, ML, RAG), dos quais 87 usam o banco e são pulados quando ele não está no ar, e 97 testes
+  de widget no app Flutter (fluxo completo com API falsa, conta e várias casas, termo de
+  consentimento, contraste, tamanho de toque, fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
   R$ 31,68/mês) é conferido nos testes e na infraestrutura.
 - **Fluxo de Git:** branch por pessoa ou tarefa e merge na `main` por Pull Request.
 - **Versionamento semântico** do app e da API, com histórico em `CHANGELOG.md` e tags no GitHub.
@@ -548,7 +556,7 @@ e Eco-Coach funcionando, pico de 150 MB).
 | Horas de uso padrão e eletroportáteis são premissas do grupo, sem fonte oficial | Sinalizados no app como estimativa; o usuário pode informar o próprio uso |
 | Valores sem ICMS, PIS/COFINS, bandeira tarifária e iluminação pública | Aviso fixo em todo resultado; a conta real será maior |
 | Payback simples (sem juros, sem revenda do aparelho antigo, sem reajuste de tarifa) e com preço digitado pelo usuário | Explicado na tela de comparação |
-| Ar-condicionado usa a potência em carga total, que é um teto | Horas opcionais; em branco, usa o kWh/mês do Inmetro |
+| Ar-condicionado usa a potência em carga total, que é um teto | Horas e dias de uso opcionais; em branco, usa o kWh/mês do Inmetro (reescalado pelos dias, se informados) |
 
 ### 8.2 Viés
 
@@ -584,15 +592,21 @@ ao lado do plano e mostra as fontes para o usuário conferir.
   luz, e o histórico (`consultas`) guarda só aparelho, uso e resultado, sem ligação com a conta.
 - A **conta opcional** guarda nome e e-mail, que são dados pessoais; a LGPD vale mesmo num projeto
   de curso. Por isso a conta só foi para o banco junto com os cuidados que ela exige:
-  - **Aviso de privacidade e consentimento registrado:** antes de criar, o app mostra o que fica
-    guardado, para quê, onde (servidor nos Estados Unidos, Render e Neon) e como apagar. Sem o
-    aceite a API recusa o cadastro, e o banco grava a data e a versão do aviso aceito.
+  - **Termo de Consentimento e consentimento registrado:** antes de criar a conta, o app mostra o
+    resumo e o termo completo: quem cuida dos dados, quais dados, para quê, com quem, a
+    transferência para fora do Brasil (servidor nos Estados Unidos, Render e Neon, com consentimento
+    específico, art. 33), por quanto tempo, os direitos e o uso sem cadastro. A caixa "Li e concordo"
+    não vem marcada; sem o aceite a API recusa o cadastro, e o banco grava a data e a versão do
+    termo aceito. O termo também fica disponível em "Minha conta".
   - **Senha nunca gravada:** só o *hash* scrypt com sal (biblioteca padrão do Python), comparado em
     tempo constante. Do token de sessão o banco guarda só o SHA-256; a sessão vence em 30 dias.
   - **Direitos do titular:** ver tudo o que foi guardado (`GET /conta/dados`), corrigir nome e
-    e-mail (`PATCH /conta`) e apagar a conta com as casas (`DELETE /conta`, em cascata).
-  - **Minimização:** só nome, e-mail e as casas. O celular não guarda o token: fechar o app sai da
-    conta.
+    e-mail (`PATCH /conta`; trocar o e-mail pede a senha atual) e apagar a conta com as casas
+    (`DELETE /conta`, em cascata).
+  - **Minimização:** só nome, e-mail e as casas. No celular fica só o acesso da conta (o token),
+    cifrado pelo sistema (`flutter_secure_storage`, Android Keystore), por até 30 dias; sair ou
+    apagar a conta apaga esse acesso. O backup automático do Android foi desligado para o acesso
+    não ir parar em outro aparelho.
   - **Isolamento:** a casa de outra pessoa responde como se não existisse (404), e há teste para isso.
 - Para o Gemini vão apenas números de consumo, trechos de documentos públicos e as perguntas da
   busca vetorial (nomes de aparelhos).
@@ -612,6 +626,9 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 - **Contas:** as rotas da conta e das casas exigem o token; o login responde com a mesma mensagem
   e no mesmo tempo para e-mail inexistente ou senha errada, para não revelar quem tem conta. Depois
   de 5 senhas erradas em 15 minutos, o login daquele e-mail fica bloqueado por um tempo.
+- **Proteção da cota do Gemini e da entrada:** o Eco-Coach aceita no máximo 30 pedidos a cada 10
+  minutos por endereço, e os pedidos têm limite de tamanho (até 200 aparelhos, nomes curtos). Os
+  erros de validação não devolvem o valor enviado (uma senha longa demais não volta na resposta).
 - **Limitações assumidas do protótipo:** as rotas de cálculo são abertas, o CORS está aberto, não há
   confirmação do e-mail e, fora do Render (que entrega HTTPS), a API roda em HTTP.
 
@@ -635,7 +652,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |
 | Base do RAG | 5 documentos, 45 trechos com origem registrada |
-| Testes | Python: 168 (98 sem banco + 70 com banco); app: 76 testes de widget. Rodados em 12/11/2026: os do app e os de Python passam, exceto 7 do Eco-Coach com banco, que pedem a base vetorial atual (recarregar com `carregar_rag.py`) |
+| Testes | Python: 202 (115 sem banco + 87 com banco); app: 97 testes de widget. Todos aprovados em 16/11/2026 |
 | Exemplo de ROI | Geladeira de 2005 → modelo atual de 415 L: economia de R$ 32,66/mês, payback de 7,7 anos a R$ 3.000 |
 | Exemplo de referência | Chuveiro 5.500 W, 15 min/dia, Copel: 41,25 kWh = R$ 31,68/mês (conferido via API) |
 
