@@ -94,9 +94,11 @@ com id antigo (pelo nome e pelo detalhe); roda só ao ler as casas (`list_homes`
    (`INMETRO_REFERENCE_HOURS`; TV: 6,59 h). Sem horas, o `metodo` diz que é o valor do ensaio.
 2. Informa kWh/ciclo -> kWh/ciclo x ciclos/mês (máquina de lavar)
 3. Só potência -> W x horas/dia x 30 / 1000 (+ stand-by). Chuveiro exige horas do usuário.
-Dias de uso (`ASK_DAYS`, hoje só ar-condicionado): `dias_mes` opcional (1–31, em branco = 30) troca os 30 dias da
-potência × horas ou, sem horas, reescala o kWh/mês do Inmetro (× dias / 30). Nas outras categorias o campo é
-ignorado. `GET /uso` manda `perguntar_dias`; o app pergunta na mesma tela das horas (`uso.dart`) e na estimativa
+Dias de uso (`ASK_DAYS`: ar-condicionado, ventiladores de mesa e de teto, TV e chuveiro; desde 16/11/2026, antes só
+o ar): `dias_mes` opcional (1–31, em branco = 30) troca os 30 dias da potência × horas ou reescala o kWh/mês do
+Inmetro (× dias / 30), também na conta por velocidade e na regra de três do ensaio. Geladeira, lâmpadas, lavadora
+(ciclos/mês) e as demais ignoram o campo. `GET /uso` manda `perguntar_dias` junto com as horas (no ventilador, depois
+da velocidade); o app pergunta na mesma tela das horas (`uso.dart`, `_daysQuestion`) e na estimativa
 (`estimar.dart`) e guarda em `Query.daysPerMonth` (vai no `toApi`, então sugestões e payback usam os mesmos dias).
 Premissas de uso padrão (`ASSUMPTIONS`) são do grupo, sem fonte — o app avisa que são estimativa.
 Tarifa: escolhida pela distribuidora (ANEEL) ou digitada pelo usuário (conta de luz).
@@ -268,7 +270,10 @@ lugar visível (app, web, Android, iOS).
   barra fica visível durante o cálculo. `goTo(AppTab, restart:, closeCurrent:)` troca de aba.
 - Boas-vindas (`telas/boas_vindas.dart`): abre por cima das abas (`initialRoute: '/boas-vindas'` monta
   '/' embaixo); só a `IampBrand(size: 120, nameSize: 56)` e o botão (sem texto, pedido do grupo);
-  "Comece a economizar" fecha e vai para Calcular etapa 1; voltar do Android nela fecha o app.
+  o botão principal depende de alguma casa já ter aparelho (`_hasAppliances`; escuta `homes`, então muda sozinho
+  quando as casas chegam da nuvem): primeira vez = "Comece a economizar" -> Calcular etapa 1; já tem aparelhos =
+  "Ver minha casa" -> aba Minha casa (UX: a casa é o centro do app; decidido em 15/11/2026). Voltar do Android nela
+  fecha o app.
   `IampApp(showWelcome: false)` nos testes das abas.
 - Etapa 2 com tipo escolhido (`ModelScreen`): lista de todas as marcas do tipo (`_BrandList`, GET /marcas)
   filtrada pelo texto digitado; cada marca é um `ExpansionTile` que só busca os modelos ao abrir (GET /modelos).

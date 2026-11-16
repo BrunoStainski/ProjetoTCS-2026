@@ -100,24 +100,25 @@ def usage_data(con, appliance_id):
     pergunta: None, "velocidade", "ciclos" ou "horas"; padrao: valor sugerido (estimativa do grupo);
     opcional: True quando o usuario pode deixar em branco e ficar com o valor do Inmetro;
     perguntar_horas: True quando, depois da velocidade, tambem precisa das horas (ventiladores);
-    perguntar_dias: True quando tambem pergunta em quantos dias do mes liga (opcional; ar-condicionado)."""
+    perguntar_dias: True quando, junto com as horas, pergunta em quantos dias do mes liga (opcional; ASK_DAYS)."""
     a = appliance_by_id(con, appliance_id)
+    days = a["categoria"] in ASK_DAYS
     required_hours = a["categoria"] in INMETRO_REFERENCE_HOURS and a["categoria"] not in OPTIONAL_HOURS
     speeds = [v for v in SPEEDS if pd.notna(a[f"kwh_mes_{v}"])]
     if speeds:
         return {"pergunta": "velocidade", "opcoes": speeds,
                 "padrao": "media" if "media" in speeds else speeds[-1],
-                "perguntar_horas": required_hours}
+                "perguntar_horas": required_hours, "perguntar_dias": required_hours and days}
     if required_hours and pd.notna(a["kwh_mes"]):
-        return {"pergunta": "horas", "padrao": None, "opcional": False}
+        return {"pergunta": "horas", "padrao": None, "opcional": False, "perguntar_dias": days}
     if a["categoria"] in OPTIONAL_HOURS and (pd.notna(a["kwh_mes"]) or pd.notna(a["potencia_w"])):
-        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": a["categoria"] in ASK_DAYS}
+        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": days}
     if pd.notna(a["kwh_mes"]):
         return {"pergunta": None}  # o Inmetro ja informa o consumo mensal
     assumption = ASSUMPTIONS.get(a["categoria"], {})
     if pd.notna(a["kwh_ciclo"]):
         return {"pergunta": "ciclos", "padrao": assumption.get("ciclos_mes")}
-    return {"pergunta": "horas", "padrao": assumption.get("horas_dia")}
+    return {"pergunta": "horas", "padrao": assumption.get("horas_dia"), "perguntar_dias": days}
 
 
 # 2. Distribuidora --------------------------------------------------------------
@@ -230,14 +231,16 @@ def smallAppliance(con, category):
 
 
 def category_usage_question(category):
+    days = category in ASK_DAYS
     if category in INMETRO_REFERENCE_HOURS and category not in OPTIONAL_HOURS:
-        return {"pergunta": "velocidade", "opcoes": list(SPEEDS), "padrao": "media", "perguntar_horas": True}
+        return {"pergunta": "velocidade", "opcoes": list(SPEEDS), "padrao": "media", "perguntar_horas": True,
+                "perguntar_dias": days}
     if category in OPTIONAL_HOURS:
-        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": category in ASK_DAYS}
+        return {"pergunta": "horas", "padrao": None, "opcional": True, "perguntar_dias": days}
     assumption = ASSUMPTIONS.get(category, {})
     if "ciclos_mes" in assumption:
         return {"pergunta": "ciclos", "padrao": assumption["ciclos_mes"]}
-    return {"pergunta": "horas", "padrao": assumption.get("horas_dia")}
+    return {"pergunta": "horas", "padrao": assumption.get("horas_dia"), "perguntar_dias": days}
 
 
 def _type_name(kind):

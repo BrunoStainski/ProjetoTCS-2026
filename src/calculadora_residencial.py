@@ -44,9 +44,10 @@ ASSUMPTIONS = {
 INMETRO_REFERENCE_HOURS = {"televisor": 6.59, "ventilador_de_mesa": 1.0, "ventilador_de_teto": 1.0}
 OPTIONAL_HOURS = {"ar_condicionado", "televisor"}
 # Aparelhos em que o app pergunta em quantos dias do mes a pessoa liga (resposta opcional; em branco = 30).
-# Ar-condicionado: muita gente liga so no verao ou em alguns dias da semana; contar 30 dias exagerava o
-# gasto. Os dias multiplicam a potencia x horas ou, sem horas, reescalam o kWh/mes do Inmetro (x dias / 30).
-ASK_DAYS = {"ar_condicionado"}
+# Ar-condicionado e ventiladores: muita gente liga so no verao ou em alguns dias da semana; TV e chuveiro: casa de
+# fim de semana, quem viaja. Contar 30 dias exagerava o gasto. Os dias multiplicam a potencia x horas ou reescalam
+# o kWh/mes do Inmetro (x dias / 30). Geladeira (ligada o mes todo), lampadas e lavadora (ciclos/mes) nao perguntam.
+ASK_DAYS = {"ar_condicionado", "ventilador_de_mesa", "ventilador_de_teto", "televisor", "chuveiro"}
 SPEED_NAMES = {"baixa": "baixa", "media": "média", "alta": "alta"}
 SPEED_NAMES_EN = {"baixa": "low", "media": "medium", "alta": "high"}
 
@@ -440,6 +441,10 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
         raise ValueError(tr("os dias de uso no mês precisam estar entre 1 e 31",
                             "days of use per month must be between 1 and 31"))
     days = DAYS_PER_MONTH if days_per_month is None else days_per_month
+    scale = days / DAYS_PER_MONTH  # o kWh/mes do Inmetro e de 30 dias
+    days_note = "" if days_per_month is None else tr(
+        f", ajustado para {days_per_month:g} dias de uso no mês (informado)",
+        f", adjusted to {days_per_month:g} days of use per month (entered)")
     given = tr("informado", "entered")
     adjustment = tr("informe as horas de uso para ajustar", "enter the hours of use to adjust")
 
@@ -447,17 +452,18 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
         kwh = float(appliance[f"kwh_mes_{speed}"])
         name = tr(SPEED_NAMES.get(speed, speed), SPEED_NAMES_EN.get(speed, speed))
         if daily_hours is not None and reference:
-            return {"kwh_mes": kwh * daily_hours / reference,
+            return {"kwh_mes": kwh * daily_hours / reference * scale,
                     "metodo": tr(f"consumo do Inmetro na velocidade {name} ({kwh:g} kWh/mês para "
                                  f"{time_per_day(reference)}) ajustado para {time_per_day(daily_hours)} (informado)",
                                  f"Inmetro consumption at {name} speed ({kwh:g} kWh/month for "
-                                 f"{time_per_day(reference)}) adjusted to {time_per_day(daily_hours)} (entered)"),
+                                 f"{time_per_day(reference)}) adjusted to {time_per_day(daily_hours)} (entered)")
+                              + days_note,
                     "premissa": False}
         method = tr(f"consumo mensal do Inmetro, velocidade {name}", f"Inmetro monthly consumption, {name} speed")
         if reference:
             method += tr(f" ({time_per_day(reference)} no ensaio; {adjustment})",
                          f" ({time_per_day(reference)} in the test; {adjustment})")
-        return {"kwh_mes": kwh, "metodo": method, "premissa": False}
+        return {"kwh_mes": kwh * scale, "metodo": method + days_note, "premissa": False}
 
     if daily_hours is not None and (appliance["categoria"] in OPTIONAL_HOURS or reference):
         if appliance["categoria"] == "ar_condicionado" and pd.notna(appliance["potencia_w"]):
@@ -470,11 +476,11 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
                                  "the compressor is not on all the time"),
                     "premissa": False}
         if reference and pd.notna(appliance["kwh_mes"]):
-            return {"kwh_mes": float(appliance["kwh_mes"]) * daily_hours / reference,
+            return {"kwh_mes": float(appliance["kwh_mes"]) * daily_hours / reference * scale,
                     "metodo": tr(f"consumo mensal do Inmetro ({appliance['kwh_mes']:g} kWh para {reference:g} h/dia) "
                                  f"ajustado para {time_per_day(daily_hours)} (informado)",
                                  f"Inmetro monthly consumption ({appliance['kwh_mes']:g} kWh for {reference:g} h/day) "
-                                 f"adjusted to {time_per_day(daily_hours)} (entered)"),
+                                 f"adjusted to {time_per_day(daily_hours)} (entered)") + days_note,
                     "premissa": False}
 
     if pd.notna(appliance["kwh_mes"]):
@@ -484,12 +490,7 @@ def monthly_consumption_kwh(appliance, daily_hours=None, monthly_cycles=None, sp
                          f" ({time_per_day(reference)} in the test; {adjustment})")
         elif appliance["categoria"] in OPTIONAL_HOURS:
             method += tr(f" (uso padrão do ensaio; {adjustment})", f" (standard test use; {adjustment})")
-        kwh = float(appliance["kwh_mes"])
-        if days_per_month is not None:
-            kwh *= days_per_month / DAYS_PER_MONTH
-            method += tr(f", ajustado para {days_per_month:g} dias de uso no mês (informado)",
-                         f", adjusted to {days_per_month:g} days of use per month (entered)")
-        return {"kwh_mes": kwh, "metodo": method, "premissa": False}
+        return {"kwh_mes": float(appliance["kwh_mes"]) * scale, "metodo": method + days_note, "premissa": False}
 
     if pd.notna(appliance["kwh_ciclo"]):
         cycles = monthly_cycles if monthly_cycles is not None else assumption.get("ciclos_mes")

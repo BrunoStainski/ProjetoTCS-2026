@@ -103,7 +103,7 @@ class UsageQuestion {
   final dynamic defaults;
   final bool optional;
   final bool askHours; // ventiladores: depois da velocidade, pergunta as horas por dia
-  final bool askDays; // ar-condicionado: tambem pergunta em quantos dias do mes liga (opcional; vazio = 30)
+  final bool askDays; // ar, ventilador, TV e chuveiro: tambem pergunta em quantos dias do mes liga (opcional; vazio = 30)
 
   UsageQuestion.fromJson(Map<String, dynamic> j)
     : question = j['pergunta'],
