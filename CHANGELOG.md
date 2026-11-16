@@ -4,7 +4,10 @@ App = `version` em `app_gerenciamento_energetico/pubspec.yaml`. API = `version` 
 Regra: correção = 1.0.**1**, funcionalidade nova = 1.**1**.0, mudança grande = **2**.0.0.
 O número depois do `+` (build) sobe 1 a cada APK, senão o Android não aceita como atualização.
 
-## Próxima versão (ainda sem número)
+## App 2.3.0+10 / API 0.7.0
+
+Funcionalidade nova (16/11/2026). API 0.7.0: `GET /aparelhos/{id}/uso` e `GET /estimativa/categorias` mandam
+`perguntar_dias` também para ventiladores, TV e chuveiro (só acrescenta; APK antigo continua funcionando).
 
 - Boas-vindas: quem já tem aparelhos em alguma casa (voltou com o login guardado, entrou na conta ou montou a casa)
   vê "Ver minha casa" e vai direto para a aba Minha casa, com o total da conta. Na primeira vez continua

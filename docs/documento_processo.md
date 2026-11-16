@@ -2,7 +2,7 @@
 
 **Documentação do Projeto Integrador de IA Aplicada (TCS 2026)**
 
-Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.2.1 / API 0.6.0
+Repositório: github.com/BrunoStainski/ProjetoTCS-2026 · Versão documentada: app 2.3.0 / API 0.7.0
 
 Integrantes: Bruno Stainski, Gianluca Graciano, João Lucas D'Almas, Matheus Gusmão
 
