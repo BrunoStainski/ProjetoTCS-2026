@@ -83,6 +83,7 @@ MockClient apiFake({List<Uri>? requests, List<String?>? languages}) => MockClien
       'opcoes': ['baixa', 'media', 'alta'],
       'padrao': 'media',
       'perguntar_horas': true,
+      'perguntar_dias': true,
     },
     '/aparelhos/4/uso' => {'pergunta': 'horas', 'padrao': null, 'opcional': true, 'perguntar_dias': true},
     '/ufs' => ['PR', 'SP'],
@@ -1763,14 +1764,33 @@ void main() {
       expect(c.daysPerMonth, isNull);
     });
 
-    testWidgets('outros aparelhos nao perguntam os dias', (tester) async {
+    testWidgets('ventilador pergunta os dias depois da velocidade, junto com as horas', (tester) async {
       tallScreen(tester);
+      final c = query('ventilador_de_mesa', id: 3);
       await http.runWithClient(() async {
-        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: query('ventilador_de_mesa', id: 3))));
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: c)));
         await tester.pumpAndSettle();
+        expect(find.text('Em quantos dias do mês você liga?'), findsNothing); // primeiro so a velocidade
         await tap(tester, 'Média');
+        expect(find.text('Em quantos dias do mês você liga?'), findsOneWidget);
+        await tester.enterText(find.widgetWithText(TextField, 'Horas'), '8');
+        await tester.enterText(find.widgetWithText(TextField, 'Dias de uso no mês'), '12');
+        await tap(tester, 'Continuar');
+      }, apiFake);
+      expect(c.speed, 'media');
+      expect(c.dailyHours, 8);
+      expect(c.toApi()['dias_mes'], 12);
+    });
+
+    testWidgets('aparelho sem pergunta de uso (geladeira) nao pergunta os dias', (tester) async {
+      tallScreen(tester);
+      final c = query('refrigerador', id: 2);
+      await http.runWithClient(() async {
+        await tester.pumpWidget(MaterialApp(theme: iampTheme(), home: UsageScreen(query: c)));
+        await tester.pumpAndSettle();
       }, apiFake);
       expect(find.text('Em quantos dias do mês você liga?'), findsNothing);
+      expect(c.daysPerMonth, isNull);
     });
 
     testWidgets('chamada da busca abre a estimativa', (tester) async {

@@ -73,7 +73,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
   final _label = TextEditingController();
   final _time = TimeControl();
   final _cycles = TextEditingController();
-  final _useDays = TextEditingController(); // ar-condicionado: dias de uso no mes (vazio = todos)
+  final _useDays = TextEditingController(); // dias de uso no mes, quando a API pede (vazio = todos)
   String? _speed;
   final _name = TextEditingController();
 
@@ -629,8 +629,8 @@ class _EstimateScreenState extends State<EstimateScreen> {
     final days = _Question(
       tr('Em quantos dias do mês você liga?', 'On how many days a month do you turn it on?'),
       help: tr(
-        'Ex.: só nos dias de calor, uns 15. Se liga todo dia, toque em "Todos os dias".',
-        'E.g.: only on hot days, about 15. If you turn it on every day, tap "Every day".',
+        'Ex.: só nos dias de calor ou nos fins de semana, uns 10. Se liga todo dia, toque em "Todos os dias".',
+        'E.g.: only on hot days or at weekends, about 10. If you turn it on every day, tap "Every day".',
       ),
       fields: [_field(_useDays, tr('Dias de uso no mês', 'Days of use per month'), suffix: tr('dias', 'days'), whole: true)],
       validate: () => _invalid(_useDays, maximum: 31)
@@ -671,6 +671,7 @@ class _EstimateScreenState extends State<EstimateScreen> {
             ],
           ),
         if (usage.askHours) hours,
+        if (usage.askHours && usage.askDays) days,
       ],
       _ => const [],
     };

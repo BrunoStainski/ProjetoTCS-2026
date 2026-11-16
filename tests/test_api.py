@@ -145,6 +145,14 @@ def test_air_conditioner_asks_optional_hours(api, category_id):
 
 
 @pytest.mark.banco
+def test_fan_tv_and_shower_also_ask_days_but_fridge_does_not(api, category_id):
+    for category in ["ventilador_de_mesa", "ventilador_de_teto", "televisor", "chuveiro"]:
+        usage = api.get(f"/aparelhos/{category_id(category)}/uso").json()
+        assert usage["perguntar_dias"] is True, category
+    assert api.get(f"/aparelhos/{category_id('refrigerador')}/uso").json()["perguntar_dias"] is False
+
+
+@pytest.mark.banco
 def test_air_conditioner_days_of_use_change_cost_and_suggestions(api, category_id):
     """dias_mes no /calcular e no /sugestoes: 15 dias = metade de 30 (mesma conta nos modelos sugeridos)."""
     body = {"aparelho_id": category_id("ar_condicionado"), "tarifa_manual": 1.0, "horas_dia": 8}

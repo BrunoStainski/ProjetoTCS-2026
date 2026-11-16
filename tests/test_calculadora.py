@@ -93,11 +93,38 @@ def test_days_outside_1_31_are_rejected(days):
         monthly_consumption_kwh(appliance("ar_condicionado", potencia_w=1000), daily_hours=8, days_per_month=days)
 
 
-def test_days_are_ignored_outside_air_conditioner():
-    """Geladeira fica ligada o mes todo e o chuveiro segue com 30 dias: so o ar pergunta os dias."""
+def test_days_are_ignored_where_the_app_does_not_ask():
+    """Geladeira fica ligada o mes todo e lampada e usada todo dia: os dias nao mudam a conta."""
     assert monthly_consumption_kwh(appliance("refrigerador", kwh_mes=30.5), days_per_month=10)["kwh_mes"] == 30.5
-    shower = monthly_consumption_kwh(appliance("chuveiro", potencia_w=5500), daily_hours=0.25, days_per_month=10)
-    assert shower["kwh_mes"] == pytest.approx(41.25)
+    lamp = monthly_consumption_kwh(appliance("lampada_led", potencia_w=10), daily_hours=5, days_per_month=10)
+    assert lamp["kwh_mes"] == pytest.approx(1.5)
+
+
+def test_shower_uses_days_of_use():
+    """Chuveiro 5500 W, 15 min/dia: 30 dias = 41,25 kWh (caso de referencia); 10 dias = um terco."""
+    shower = appliance("chuveiro", potencia_w=5500)
+    assert monthly_consumption_kwh(shower, daily_hours=0.25)["kwh_mes"] == pytest.approx(41.25)
+    r = monthly_consumption_kwh(shower, daily_hours=0.25, days_per_month=10)
+    assert r["kwh_mes"] == pytest.approx(13.75)
+    assert "x 10 dias" in r["metodo"]
+
+
+def test_fan_speed_hours_and_days():
+    """Ventilador: kWh/mes do Inmetro e de 1 h/dia em 30 dias. 2 kWh x 8 h x 15/30 = 8 kWh."""
+    fan = appliance("ventilador_de_mesa", kwh_mes_media=2.0)
+    assert monthly_consumption_kwh(fan, daily_hours=8, speed="media")["kwh_mes"] == pytest.approx(16.0)
+    r = monthly_consumption_kwh(fan, daily_hours=8, speed="media", days_per_month=15)
+    assert r["kwh_mes"] == pytest.approx(8.0)
+    assert "15 dias de uso" in r["metodo"]
+    ceiling = appliance("ventilador_de_teto", kwh_mes=3.0)
+    assert monthly_consumption_kwh(ceiling, daily_hours=4, days_per_month=10)["kwh_mes"] == pytest.approx(4.0)
+
+
+def test_tv_days_with_and_without_hours():
+    """TV: com horas, regra de tres do ensaio x dias/30; sem horas, o kWh/mes do Inmetro x dias/30."""
+    tv = appliance("televisor", kwh_mes=12.0)
+    assert monthly_consumption_kwh(tv, daily_hours=6.59, days_per_month=15)["kwh_mes"] == pytest.approx(6.0)
+    assert monthly_consumption_kwh(tv, days_per_month=15)["kwh_mes"] == pytest.approx(6.0)
 
 
 def test_tv_without_hours_uses_inmetro_and_with_hours_rescales_by_lab_test():
