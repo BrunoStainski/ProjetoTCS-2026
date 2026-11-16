@@ -448,10 +448,13 @@ Decisões de usabilidade:
   "Minha casa". Com conta (nome, e-mail e senha), as casas ficam salvas na nuvem e aparecem em
   qualquer celular; cada mudança é gravada sozinha, e o app continua logado por até 30 dias. Sem
   conta, o app funciona igual, com as casas só no aparelho até fechar o app (o cadastro e as
-  boas-vindas avisam isso).
-- **Uso mais próximo do real**: no ar-condicionado, além das horas por dia, o app pergunta em quantos
-  dias do mês a pessoa liga (em branco = 30); antes a conta exagerava o gasto de quem liga só no
-  calor. Modelos vendidos em 127 V e 220 V aparecem separados, com a tensão no nome.
+  boas-vindas avisam isso). Quem já tem aparelhos em alguma casa vê "Ver minha casa" nas
+  boas-vindas e vai direto para o total da conta, em vez de recomeçar pelo cálculo.
+- **Uso mais próximo do real**: no ar-condicionado, nos ventiladores, na TV e no chuveiro, além das
+  horas por dia, o app pergunta em quantos dias do mês a pessoa liga (em branco = 30). Antes a conta
+  supunha uso todos os dias e exagerava o gasto de quem liga só no calor ou em alguns dias da semana.
+  Os dias valem no cálculo, na estimativa, nas sugestões e no payback. Modelos vendidos em 127 V e
+  220 V aparecem separados, com a tensão no nome.
 - **Transparência**: cada resultado mostra o método do cálculo, a fonte do dado e os avisos
   (estimativa, valor sem impostos, dado imputado, texto gerado por IA).
 
@@ -463,8 +466,8 @@ Pages), com QR codes dos dois em `docs/qrcodes/` para abrir direto do celular na
 - **Separação de camadas:** regras de cálculo (`calculadora_residencial.py`), serviços
   (`servico.py`) e interface (API, terminal, app). As mesmas regras alimentam o app, a API e a
   geração dos dados de treino do ML.
-- **Testes automatizados:** 198 testes em Python (cálculo, limpeza, API, contas, estimativa,
-  idioma, ML, RAG), dos quais 83 usam o banco e são pulados quando ele não está no ar, e 94 testes
+- **Testes automatizados:** 202 testes em Python (cálculo, limpeza, API, contas, estimativa,
+  idioma, ML, RAG), dos quais 87 usam o banco e são pulados quando ele não está no ar, e 97 testes
   de widget no app Flutter (fluxo completo com API falsa, conta e várias casas, termo de
   consentimento, contraste, tamanho de toque, fonte 2x, idioma). O exemplo de referência (chuveiro de 5.500 W, 15 min/dia, Copel = 41,25 kWh =
   R$ 31,68/mês) é conferido nos testes e na infraestrutura.
@@ -553,7 +556,7 @@ e Eco-Coach funcionando, pico de 150 MB).
 | Horas de uso padrão e eletroportáteis são premissas do grupo, sem fonte oficial | Sinalizados no app como estimativa; o usuário pode informar o próprio uso |
 | Valores sem ICMS, PIS/COFINS, bandeira tarifária e iluminação pública | Aviso fixo em todo resultado; a conta real será maior |
 | Payback simples (sem juros, sem revenda do aparelho antigo, sem reajuste de tarifa) e com preço digitado pelo usuário | Explicado na tela de comparação |
-| Ar-condicionado usa a potência em carga total, que é um teto | Horas opcionais; em branco, usa o kWh/mês do Inmetro |
+| Ar-condicionado usa a potência em carga total, que é um teto | Horas e dias de uso opcionais; em branco, usa o kWh/mês do Inmetro (reescalado pelos dias, se informados) |
 
 ### 8.2 Viés
 
@@ -649,7 +652,7 @@ ao lado do plano e mostra as fontes para o usuário conferir.
 | K-Means × perfil da geração (seed) | cerca de 73% de concordância |
 | Random Forest (geladeiras) | MAE 3,88 kWh/mês (escala 2025), validação por marca (GroupKFold) |
 | Base do RAG | 5 documentos, 45 trechos com origem registrada |
-| Testes | Python: 198 (115 sem banco + 83 com banco); app: 94 testes de widget. Todos aprovados em 16/11/2026 |
+| Testes | Python: 202 (115 sem banco + 87 com banco); app: 97 testes de widget. Todos aprovados em 16/11/2026 |
 | Exemplo de ROI | Geladeira de 2005 → modelo atual de 415 L: economia de R$ 32,66/mês, payback de 7,7 anos a R$ 3.000 |
 | Exemplo de referência | Chuveiro 5.500 W, 15 min/dia, Copel: 41,25 kWh = R$ 31,68/mês (conferido via API) |
 
