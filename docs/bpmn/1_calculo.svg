@@ -17,12 +17,12 @@
 <text x="338.0" y="170.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
 <polyline points="355.0,120.0 415.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <text x="360.0" y="112.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
-<polyline points="465.0,120.0 520.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="465.0,120.0 505.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <text x="470.0" y="112.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
-<polyline points="440.0,145.0 440.0,245.0 520.0,245.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="440.0,145.0 440.0,245.0 510.0,245.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <text x="448.0" y="170.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
-<polyline points="700.0,120.0 755.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
-<polyline points="700.0,245.0 780.0,245.0 780.0,145.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="715.0,120.0 755.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="710.0,245.0 780.0,245.0 780.0,145.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="805.0,120.0 825.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="975.0,120.0 1005.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="1155.0,120.0 1202.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
@@ -54,17 +54,19 @@
 <path d="M432,112 L448,128 M448,112 L432,128" stroke="#000" stroke-width="4"/>
 <text x="440.0" y="75.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Aparelho no</text>
 <text x="440.0" y="88.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">catálogo?</text>
-<rect x="520.0" y="80.0" width="180" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
-<text x="610.0" y="113.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Calcular kWh pelas regras</text>
-<text x="610.0" y="128.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">do Inmetro (kWh/mês,</text>
-<text x="610.0" y="143.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">kWh/ciclo ou W × horas)</text>
-<circle cx="535.0" cy="95.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="535.0" cy="95.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="535.0" cy="95.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
-<rect x="520.0" y="202.0" width="180" height="86" rx="10" fill="#DFF3E6" stroke="#000" stroke-width="1.8"/>
-<text x="610.0" y="230.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Estimar kWh fora do</text>
-<text x="610.0" y="245.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">catálogo (etiqueta,</text>
-<text x="610.0" y="260.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Portaria 2006 ou Random</text>
-<text x="610.0" y="275.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Forest)</text>
-<circle cx="535.0" cy="217.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="535.0" cy="217.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="535.0" cy="217.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="505.0" y="80.0" width="210" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>
+<text x="610.0" y="113.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Calcular kWh pelas regras do</text>
+<text x="610.0" y="128.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Inmetro (kWh/mês, kWh/ciclo ou</text>
+<text x="610.0" y="143.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">W × horas × dias)</text>
+<circle cx="520.0" cy="95.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="520.0" cy="95.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="520.0" cy="95.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
+<rect x="510.0" y="187.0" width="200" height="116" rx="10" fill="#DFF3E6" stroke="#000" stroke-width="1.8"/>
+<text x="610.0" y="215.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Estimar fora do catálogo:</text>
+<text x="610.0" y="230.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">geladeira (etiqueta,</text>
+<text x="610.0" y="245.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Portaria 2006 ou Random</text>
+<text x="610.0" y="260.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Forest); demais pela</text>
+<text x="610.0" y="275.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">etiqueta, plaqueta ou</text>
+<text x="610.0" y="290.5" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">modelos parecidos</text>
+<circle cx="525.0" cy="202.0" r="6.5" fill="none" stroke="#000" stroke-width="3.6" stroke-dasharray="2.6 1.9"/><circle cx="525.0" cy="202.0" r="4.6" fill="#fff" stroke="#000" stroke-width="1"/><circle cx="525.0" cy="202.0" r="1.8" fill="none" stroke="#000" stroke-width="1"/>
 <polygon points="780,95 805,120 780,145 755,120" fill="#fff" stroke="#000" stroke-width="1.8"/>
 <path d="M772,112 L788,128 M788,112 L772,128" stroke="#000" stroke-width="4"/>
 <rect x="825.0" y="80.0" width="150" height="80" rx="10" fill="#E3EEFA" stroke="#000" stroke-width="1.8"/>

@@ -1,6 +1,7 @@
 %% DER do banco do iamp (PostgreSQL 15 + pgvector). Fonte: src/banco.py (SCHEMA) e src/rag.py (RAG_SCHEMA).
 %% Linha cheia = chave estrangeira no banco. Linha tracejada = ligação lógica (mesmo valor, sem FK).
-%% Gerar a imagem: npx -p @mermaid-js/mermaid-cli mmdc -i docs/der.mmd -o docs/der.png -b white -s 2
+%% Gerar a imagem (contorno preto e texto escuro, legivel no slide):
+%%   npx -p @mermaid-js/mermaid-cli mmdc -i docs/der.mmd -o docs/der.png -b white -s 2 -c docs/der.config.json -C docs/der.css
 erDiagram
     distribuidoras ||--o{ tarifas : "tem (FK distribuidora_id)"
     distribuidoras ||..o| vw_tarifa_vigente : "view: tarifa válida hoje"
