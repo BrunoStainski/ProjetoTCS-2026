@@ -4,7 +4,7 @@
     <bpmn:participant id="P_App" name="Usuário (app iamp)" processRef="Proc_P_App" />
     <bpmn:participant id="P_Srv" name="Servidor iamp (API FastAPI + PostgreSQL + modelos de ML)" />
     <bpmn:participant id="P_Gem" name="Gemini API (Google, serviço externo)" />
-    <bpmn:messageFlow id="M_calc_P_Srv_220" name="POST /calcular" sourceRef="calc" targetRef="P_Srv" />
+    <bpmn:messageFlow id="M_calc_P_Srv_220" name="POST /calcular (ou /estimado, /resistivo)" sourceRef="calc" targetRef="P_Srv" />
     <bpmn:messageFlow id="M_P_Srv_calc_260" name="kWh, R$ e avisos" sourceRef="P_Srv" targetRef="calc" />
     <bpmn:messageFlow id="M_troca_P_Srv_520" name="POST /sugestoes e /comparar" sourceRef="troca" targetRef="P_Srv" />
     <bpmn:messageFlow id="M_P_Srv_troca_560" name="equivalentes, economia e payback" sourceRef="P_Srv" targetRef="troca" />
@@ -14,8 +14,11 @@
     <bpmn:messageFlow id="M_P_Srv_eco_1140" name="plano com fontes [n]" sourceRef="P_Srv" targetRef="eco" />
     <bpmn:messageFlow id="M_P_Srv_P_Gem_1200" name="prompt: regras + dados da casa + trechos oficiais" sourceRef="P_Srv" targetRef="P_Gem" />
     <bpmn:messageFlow id="M_P_Gem_P_Srv_1240" name="texto do plano" sourceRef="P_Gem" targetRef="P_Srv" />
-    <bpmn:textAnnotation id="N_privacidade"><bpmn:text>O Gemini recebe só números de consumo e trechos de documentos públicos: nenhum dado pessoal sai do iamp.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:messageFlow id="M_conta_P_Srv_1510" name="POST /contas ou /login; PUT /casas" sourceRef="conta" targetRef="P_Srv" />
+    <bpmn:messageFlow id="M_P_Srv_conta_1570" name="token e casas salvas" sourceRef="P_Srv" targetRef="conta" />
     <bpmn:textAnnotation id="N_legenda"><bpmn:text>[+] = subprocesso detalhado nas próximas páginas. Linhas tracejadas = mensagens (chamadas à API).</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_privacidade"><bpmn:text>O Gemini recebe só números de consumo e trechos de documentos públicos: nenhum dado pessoal sai do iamp.</bpmn:text></bpmn:textAnnotation>
+    <bpmn:textAnnotation id="N_conta"><bpmn:text>Conta opcional: sem ela a casa fica só no celular. O servidor guarda o aceite (data e versão do termo) e a senha só como hash (scrypt); apagar a conta apaga as casas em cascata.</bpmn:text></bpmn:textAnnotation>
   </bpmn:collaboration>
   <bpmn:process id="Proc_P_App" isExecutable="false">
     <bpmn:startEvent id="ini" name="Quer reduzir a conta de luz"><bpmn:outgoing>F_ini_calc</bpmn:outgoing></bpmn:startEvent>
@@ -26,8 +29,11 @@
     <bpmn:exclusiveGateway id="g_mais" name="Mais aparelhos?"><bpmn:incoming>F_g_junta_g_mais</bpmn:incoming><bpmn:outgoing>F_g_mais_calc</bpmn:outgoing><bpmn:outgoing>F_g_mais_perfil</bpmn:outgoing></bpmn:exclusiveGateway>
     <bpmn:subProcess id="perfil" name="Ver o perfil de consumo da casa"><bpmn:incoming>F_g_mais_perfil</bpmn:incoming><bpmn:outgoing>F_perfil_eco</bpmn:outgoing></bpmn:subProcess>
     <bpmn:subProcess id="eco" name="Pedir o plano ao Eco-Coach"><bpmn:incoming>F_perfil_eco</bpmn:incoming><bpmn:outgoing>F_eco_ler</bpmn:outgoing></bpmn:subProcess>
-    <bpmn:userTask id="ler" name="Ler o plano e conferir as fontes [n]"><bpmn:incoming>F_eco_ler</bpmn:incoming><bpmn:outgoing>F_ler_fim</bpmn:outgoing></bpmn:userTask>
-    <bpmn:endEvent id="fim" name="Plano de economia pronto"><bpmn:incoming>F_ler_fim</bpmn:incoming></bpmn:endEvent>
+    <bpmn:userTask id="ler" name="Ler o plano e conferir as fontes [n]"><bpmn:incoming>F_eco_ler</bpmn:incoming><bpmn:outgoing>F_ler_g_salvar</bpmn:outgoing></bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_salvar" name="Salvar a casa na nuvem?"><bpmn:incoming>F_ler_g_salvar</bpmn:incoming><bpmn:outgoing>F_g_salvar_conta</bpmn:outgoing><bpmn:outgoing>F_g_salvar_g_fim</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:userTask id="conta" name="Entrar ou criar conta (aceite do Termo de Consentimento, LGPD)"><bpmn:incoming>F_g_salvar_conta</bpmn:incoming><bpmn:outgoing>F_conta_g_fim</bpmn:outgoing></bpmn:userTask>
+    <bpmn:exclusiveGateway id="g_fim"><bpmn:incoming>F_g_salvar_g_fim</bpmn:incoming><bpmn:incoming>F_conta_g_fim</bpmn:incoming><bpmn:outgoing>F_g_fim_fim</bpmn:outgoing></bpmn:exclusiveGateway>
+    <bpmn:endEvent id="fim" name="Plano de economia pronto"><bpmn:incoming>F_g_fim_fim</bpmn:incoming></bpmn:endEvent>
     <bpmn:sequenceFlow id="F_ini_calc" sourceRef="ini" targetRef="calc" />
     <bpmn:sequenceFlow id="F_calc_g_troca" sourceRef="calc" targetRef="g_troca" />
     <bpmn:sequenceFlow id="F_g_troca_troca" name="sim" sourceRef="g_troca" targetRef="troca" />
@@ -38,12 +44,16 @@
     <bpmn:sequenceFlow id="F_g_mais_perfil" name="não" sourceRef="g_mais" targetRef="perfil" />
     <bpmn:sequenceFlow id="F_perfil_eco" sourceRef="perfil" targetRef="eco" />
     <bpmn:sequenceFlow id="F_eco_ler" sourceRef="eco" targetRef="ler" />
-    <bpmn:sequenceFlow id="F_ler_fim" sourceRef="ler" targetRef="fim" />
+    <bpmn:sequenceFlow id="F_ler_g_salvar" sourceRef="ler" targetRef="g_salvar" />
+    <bpmn:sequenceFlow id="F_g_salvar_conta" name="sim" sourceRef="g_salvar" targetRef="conta" />
+    <bpmn:sequenceFlow id="F_g_salvar_g_fim" name="não" sourceRef="g_salvar" targetRef="g_fim" />
+    <bpmn:sequenceFlow id="F_conta_g_fim" sourceRef="conta" targetRef="g_fim" />
+    <bpmn:sequenceFlow id="F_g_fim_fim" sourceRef="g_fim" targetRef="fim" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="Diag_visao_geral">
     <bpmndi:BPMNPlane id="Plane_visao_geral" bpmnElement="Colab_visao_geral">
-      <bpmndi:BPMNShape id="S_P_App" bpmnElement="P_App" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1500" height="300" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_P_Srv" bpmnElement="P_Srv" isHorizontal="true" color:background-color="#F5F8FC" color:border-color="#000000"><dc:Bounds x="10" y="430" width="1500" height="70" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_P_App" bpmnElement="P_App" isHorizontal="true" color:background-color="#FFFFFF" color:border-color="#000000"><dc:Bounds x="10" y="10" width="1780" height="300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_P_Srv" bpmnElement="P_Srv" isHorizontal="true" color:background-color="#F5F8FC" color:border-color="#000000"><dc:Bounds x="10" y="430" width="1780" height="70" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_P_Gem" bpmnElement="P_Gem" isHorizontal="true" color:background-color="#F8F3FD" color:border-color="#000000"><dc:Bounds x="860" y="620" width="650" height="60" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_ini" bpmnElement="ini"><dc:Bounds x="82" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="40" y="142" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_calc" bpmnElement="calc" isExpanded="false" color:background-color="#FFF4C2" color:border-color="#000000"><dc:Bounds x="160" y="80" width="160" height="80" /></bpmndi:BPMNShape>
@@ -54,9 +64,13 @@
       <bpmndi:BPMNShape id="S_perfil" bpmnElement="perfil" isExpanded="false" color:background-color="#FFF4C2" color:border-color="#000000"><dc:Bounds x="850" y="80" width="160" height="80" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_eco" bpmnElement="eco" isExpanded="false" color:background-color="#FFF4C2" color:border-color="#000000"><dc:Bounds x="1040" y="80" width="160" height="80" /></bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="S_ler" bpmnElement="ler" color:background-color="#FFF4C2" color:border-color="#000000"><dc:Bounds x="1225" y="80" width="150" height="80" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_fim" bpmnElement="fim"><dc:Bounds x="1422" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1380" y="142" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_N_privacidade" bpmnElement="N_privacidade"><dc:Bounds x="380" y="610" width="400" height="50" /></bpmndi:BPMNShape>
-      <bpmndi:BPMNShape id="S_N_legenda" bpmnElement="N_legenda"><dc:Bounds x="20" y="520" width="560" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_salvar" bpmnElement="g_salvar"><dc:Bounds x="1415" y="95" width="50" height="50" /><bpmndi:BPMNLabel><dc:Bounds x="1370" y="55" width="140" height="34" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_conta" bpmnElement="conta" color:background-color="#FFF4C2" color:border-color="#000000"><dc:Bounds x="1455" y="185" width="170" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_g_fim" bpmnElement="g_fim"><dc:Bounds x="1635" y="95" width="50" height="50" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_fim" bpmnElement="fim"><dc:Bounds x="1722" y="102" width="36" height="36" /><bpmndi:BPMNLabel><dc:Bounds x="1680" y="142" width="120" height="40" /></bpmndi:BPMNLabel></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_legenda" bpmnElement="N_legenda"><dc:Bounds x="20" y="515" width="820" height="35" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_privacidade" bpmnElement="N_privacidade"><dc:Bounds x="20" y="565" width="820" height="35" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_N_conta" bpmnElement="N_conta"><dc:Bounds x="20" y="615" width="820" height="50" /></bpmndi:BPMNShape>
       <bpmndi:BPMNEdge id="E_F_ini_calc" bpmnElement="F_ini_calc"><di:waypoint x="118" y="120" /><di:waypoint x="160" y="120" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_F_calc_g_troca" bpmnElement="F_calc_g_troca"><di:waypoint x="320" y="120" /><di:waypoint x="375" y="120" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_F_g_troca_troca" bpmnElement="F_g_troca_troca"><di:waypoint x="400" y="145" /><di:waypoint x="400" y="225" /><di:waypoint x="460" y="225" /><bpmndi:BPMNLabel><dc:Bounds x="406" y="156" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
@@ -67,7 +81,11 @@
       <bpmndi:BPMNEdge id="E_F_g_mais_perfil" bpmnElement="F_g_mais_perfil"><di:waypoint x="805" y="120" /><di:waypoint x="850" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="812" y="100" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_F_perfil_eco" bpmnElement="F_perfil_eco"><di:waypoint x="1010" y="120" /><di:waypoint x="1040" y="120" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_F_eco_ler" bpmnElement="F_eco_ler"><di:waypoint x="1200" y="120" /><di:waypoint x="1225" y="120" /></bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="E_F_ler_fim" bpmnElement="F_ler_fim"><di:waypoint x="1375" y="120" /><di:waypoint x="1422" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_ler_g_salvar" bpmnElement="F_ler_g_salvar"><di:waypoint x="1375" y="120" /><di:waypoint x="1415" y="120" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_salvar_conta" bpmnElement="F_g_salvar_conta"><di:waypoint x="1440" y="145" /><di:waypoint x="1440" y="225" /><di:waypoint x="1455" y="225" /><bpmndi:BPMNLabel><dc:Bounds x="1448" y="156" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_salvar_g_fim" bpmnElement="F_g_salvar_g_fim"><di:waypoint x="1465" y="120" /><di:waypoint x="1635" y="120" /><bpmndi:BPMNLabel><dc:Bounds x="1475" y="100" width="30" height="16" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_conta_g_fim" bpmnElement="F_conta_g_fim"><di:waypoint x="1625" y="225" /><di:waypoint x="1660" y="225" /><di:waypoint x="1660" y="145" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_F_g_fim_fim" bpmnElement="F_g_fim_fim"><di:waypoint x="1685" y="120" /><di:waypoint x="1722" y="120" /></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_M_calc_P_Srv_220" bpmnElement="M_calc_P_Srv_220"><di:waypoint x="220" y="160" /><di:waypoint x="220" y="430" /><bpmndi:BPMNLabel><dc:Bounds x="84" y="338" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_M_P_Srv_calc_260" bpmnElement="M_P_Srv_calc_260"><di:waypoint x="260" y="430" /><di:waypoint x="260" y="160" /><bpmndi:BPMNLabel><dc:Bounds x="266" y="383" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_M_troca_P_Srv_520" bpmnElement="M_troca_P_Srv_520"><di:waypoint x="520" y="265" /><di:waypoint x="520" y="430" /><bpmndi:BPMNLabel><dc:Bounds x="384" y="333" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
@@ -78,6 +96,8 @@
       <bpmndi:BPMNEdge id="E_M_P_Srv_eco_1140" bpmnElement="M_P_Srv_eco_1140"><di:waypoint x="1140" y="430" /><di:waypoint x="1140" y="160" /><bpmndi:BPMNLabel><dc:Bounds x="1146" y="383" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_M_P_Srv_P_Gem_1200" bpmnElement="M_P_Srv_P_Gem_1200"><di:waypoint x="1200" y="500" /><di:waypoint x="1200" y="620" /><bpmndi:BPMNLabel><dc:Bounds x="1064" y="533" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="E_M_P_Gem_P_Srv_1240" bpmnElement="M_P_Gem_P_Srv_1240"><di:waypoint x="1240" y="620" /><di:waypoint x="1240" y="500" /><bpmndi:BPMNLabel><dc:Bounds x="1246" y="553" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_conta_P_Srv_1510" bpmnElement="M_conta_P_Srv_1510"><di:waypoint x="1510" y="265" /><di:waypoint x="1510" y="430" /><bpmndi:BPMNLabel><dc:Bounds x="1374" y="338" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="E_M_P_Srv_conta_1570" bpmnElement="M_P_Srv_conta_1570"><di:waypoint x="1570" y="430" /><di:waypoint x="1570" y="265" /><bpmndi:BPMNLabel><dc:Bounds x="1576" y="383" width="130" height="30" /></bpmndi:BPMNLabel></bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
 </bpmn:definitions>

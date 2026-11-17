@@ -1,0 +1,17 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Arial, Helvetica, sans-serif",
+    "fontSize": "18px",
+    "primaryColor": "#FFF4C2",
+    "primaryBorderColor": "#000000",
+    "primaryTextColor": "#000000",
+    "secondaryColor": "#FFFFFF",
+    "tertiaryColor": "#F2F2F2",
+    "lineColor": "#000000",
+    "textColor": "#000000",
+    "attributeBackgroundColorOdd": "#FFFFFF",
+    "attributeBackgroundColorEven": "#F2F2F2"
+  },
+  "er": { "fontSize": 18, "useMaxWidth": false }
+}

@@ -1,0 +1,7 @@
+/* DER mais legivel no slide: linhas e contornos grossos, texto preto */
+.er.relationshipLine, .relationshipLine { stroke: #000 !important; stroke-width: 2.5px !important; }
+.er.entityBox, .entityBox, g.node rect, g.node path { stroke: #000 !important; stroke-width: 2px !important; }
+text, span, .label, .nodeLabel, .edgeLabel { color: #000 !important; fill: #000 !important; }
+.er.entityLabel, .entityLabel { font-weight: 700 !important; }
+.edgeLabel, .er.relationshipLabel { font-weight: 600 !important; }
+.edgeLabel, .edgeLabel span, .edgeLabel p, .er.relationshipLabel { font-size: 17px !important; }

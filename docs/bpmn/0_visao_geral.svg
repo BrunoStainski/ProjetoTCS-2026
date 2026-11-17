@@ -1,19 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 700" width="1520" height="700" font-family="Arial, Helvetica, sans-serif" font-size="12">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 700" width="1800" height="700" font-family="Arial, Helvetica, sans-serif" font-size="12">
 <defs><marker id="seta" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#000"/></marker><marker id="seta_msg" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="10" markerHeight="10" orient="auto"><path d="M0,1 L10,5 L0,9 z" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="bola_msg" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8"><circle cx="5" cy="5" r="4" fill="#fff" stroke="#000" stroke-width="1"/></marker><marker id="seta_dado" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,1 L10,5 L0,9" fill="none" stroke="#000" stroke-width="1.2"/></marker></defs>
-<rect width="1520" height="700" fill="#fff"/>
-<rect x="10" y="10" width="1500" height="300" fill="#FFFFFF" stroke="#000" stroke-width="1.5"/>
+<rect width="1800" height="700" fill="#fff"/>
+<rect x="10" y="10" width="1780" height="300" fill="#FFFFFF" stroke="#000" stroke-width="1.5"/>
 <line x1="40" y1="10" x2="40" y2="310" stroke="#000" stroke-width="1.5"/>
 <text transform="translate(29,160.0) rotate(-90)" text-anchor="middle" font-size="13" font-weight="bold">Usuário (app iamp)</text>
-<rect x="10" y="430" width="1500" height="70" fill="#F5F8FC" stroke="#000" stroke-width="1.5"/>
-<text x="760.0" y="470.0" text-anchor="middle" font-size="14" font-weight="bold" font-style="normal">Servidor iamp (API FastAPI + PostgreSQL + modelos de ML)</text>
+<rect x="10" y="430" width="1780" height="70" fill="#F5F8FC" stroke="#000" stroke-width="1.5"/>
+<text x="900.0" y="470.0" text-anchor="middle" font-size="14" font-weight="bold" font-style="normal">Servidor iamp (API FastAPI + PostgreSQL + modelos de ML)</text>
 <rect x="860" y="620" width="650" height="60" fill="#F8F3FD" stroke="#000" stroke-width="1.5"/>
 <text x="1185.0" y="655.0" text-anchor="middle" font-size="14" font-weight="bold" font-style="normal">Gemini API (Google, serviço externo)</text>
-<path d="M392,610 L380,610 L380,660 L392,660" fill="none" stroke="#000" stroke-width="1.3"/>
-<text x="388.0" y="626.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">O Gemini recebe só números de consumo e trechos de documentos</text>
-<text x="388.0" y="640.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">públicos: nenhum dado pessoal sai do iamp.</text>
-<path d="M32,520 L20,520 L20,570 L32,570" fill="none" stroke="#000" stroke-width="1.3"/>
-<text x="28.0" y="536.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">[+] = subprocesso detalhado nas próximas páginas. Linhas tracejadas = mensagens (chamadas à</text>
-<text x="28.0" y="550.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">API).</text>
+<path d="M32,515 L20,515 L20,550 L32,550" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="28.0" y="531.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">[+] = subprocesso detalhado nas próximas páginas. Linhas tracejadas = mensagens (chamadas à API).</text>
+<path d="M32,565 L20,565 L20,600 L32,600" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="28.0" y="581.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">O Gemini recebe só números de consumo e trechos de documentos públicos: nenhum dado pessoal sai do iamp.</text>
+<path d="M32,615 L20,615 L20,665 L32,665" fill="none" stroke="#000" stroke-width="1.3"/>
+<text x="28.0" y="631.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">Conta opcional: sem ela a casa fica só no celular. O servidor guarda o aceite (data e versão do termo) e a senha só como hash</text>
+<text x="28.0" y="645.0" text-anchor="start" font-size="11.5" font-weight="normal" font-style="normal">(scrypt); apagar a conta apaga as casas em cascata.</text>
 <polyline points="118.0,120.0 160.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="320.0,120.0 375.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="400.0,145.0 400.0,225.0 460.0,225.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
@@ -28,9 +29,16 @@
 <text x="812.0" y="112.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
 <polyline points="1010.0,120.0 1040.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="1200.0,120.0 1225.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
-<polyline points="1375.0,120.0 1422.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1375.0,120.0 1415.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1440.0,145.0 1440.0,225.0 1455.0,225.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="1448.0" y="168.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">sim</text>
+<polyline points="1465.0,120.0 1635.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<text x="1475.0" y="112.0" text-anchor="start" font-size="11" font-weight="normal" font-style="normal">não</text>
+<polyline points="1625.0,225.0 1660.0,225.0 1660.0,145.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
+<polyline points="1685.0,120.0 1722.0,120.0" fill="none" stroke="#000" stroke-width="1.6" marker-end="url(#seta)"/>
 <polyline points="220.0,160.0 220.0,430.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
-<text x="214.0" y="350.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">POST /calcular</text>
+<text x="214.0" y="350.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">POST /calcular (ou</text>
+<text x="214.0" y="363.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">/estimado, /resistivo)</text>
 <polyline points="260.0,430.0 260.0,160.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
 <text x="266.0" y="395.0" text-anchor="start" font-size="11" font-weight="normal" font-style="italic">kWh, R$ e avisos</text>
 <polyline points="520.0,265.0 520.0,430.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
@@ -53,6 +61,11 @@
 <text x="1194.0" y="571.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">oficiais</text>
 <polyline points="1240.0,620.0 1240.0,500.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
 <text x="1246.0" y="565.0" text-anchor="start" font-size="11" font-weight="normal" font-style="italic">texto do plano</text>
+<polyline points="1510.0,265.0 1510.0,430.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
+<text x="1504.0" y="350.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">POST /contas ou /login;</text>
+<text x="1504.0" y="363.0" text-anchor="end" font-size="11" font-weight="normal" font-style="italic">PUT /casas</text>
+<polyline points="1570.0,430.0 1570.0,265.0" fill="none" stroke="#000" stroke-dasharray="6 4" stroke-width="1.4" marker-start="url(#bola_msg)" marker-end="url(#seta_msg)"/>
+<text x="1576.0" y="395.0" text-anchor="start" font-size="11" font-weight="normal" font-style="italic">token e casas salvas</text>
 <circle cx="100" cy="120" r="18" fill="#fff" stroke="#000" stroke-width="1.8"/>
 <text x="100.0" y="152.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Quer reduzir a</text>
 <text x="100.0" y="165.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">conta de luz</text>
@@ -85,7 +98,18 @@
 <text x="1300.0" y="128.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">conferir as fontes</text>
 <text x="1300.0" y="143.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">[n]</text>
 <circle cx="1239.0" cy="91.0" r="4.5" fill="#fff" stroke="#000" stroke-width="1.2"/><path d="M1231.0,105.0 Q1231.0,96.0 1239.0,96.0 Q1247.0,96.0 1247.0,105.0 Z" fill="#fff" stroke="#000" stroke-width="1.2"/>
-<circle cx="1440" cy="120" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
-<text x="1440.0" y="152.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Plano de economia</text>
-<text x="1440.0" y="165.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">pronto</text>
+<polygon points="1440,95 1465,120 1440,145 1415,120" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<path d="M1432,112 L1448,128 M1448,112 L1432,128" stroke="#000" stroke-width="4"/>
+<text x="1440.0" y="75.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Salvar a casa na</text>
+<text x="1440.0" y="88.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">nuvem?</text>
+<rect x="1455.0" y="185.0" width="170" height="80" rx="10" fill="#FFF4C2" stroke="#000" stroke-width="1.8"/>
+<text x="1540.0" y="218.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Entrar ou criar conta</text>
+<text x="1540.0" y="233.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">(aceite do Termo de</text>
+<text x="1540.0" y="248.0" text-anchor="middle" font-size="12" font-weight="normal" font-style="normal">Consentimento, LGPD)</text>
+<circle cx="1469.0" cy="196.0" r="4.5" fill="#fff" stroke="#000" stroke-width="1.2"/><path d="M1461.0,210.0 Q1461.0,201.0 1469.0,201.0 Q1477.0,201.0 1477.0,210.0 Z" fill="#fff" stroke="#000" stroke-width="1.2"/>
+<polygon points="1660,95 1685,120 1660,145 1635,120" fill="#fff" stroke="#000" stroke-width="1.8"/>
+<path d="M1652,112 L1668,128 M1668,112 L1652,128" stroke="#000" stroke-width="4"/>
+<circle cx="1740" cy="120" r="18" fill="#fff" stroke="#000" stroke-width="4"/>
+<text x="1740.0" y="152.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">Plano de economia</text>
+<text x="1740.0" y="165.0" text-anchor="middle" font-size="11" font-weight="normal" font-style="normal">pronto</text>
 </svg>

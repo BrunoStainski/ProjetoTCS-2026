@@ -445,9 +445,9 @@ class Diagram:
 # Diagramas ---------------------------------------------------------------------------------
 
 def general_view():
-    d = Diagram("visao_geral", 1520, 700)
-    d.pool("P_App", "Usuário (app iamp)", 10, 10, 1500, 300)
-    d.pool("P_Srv", "Servidor iamp (API FastAPI + PostgreSQL + modelos de ML)", 10, 430, 1500, 70,
+    d = Diagram("visao_geral", 1800, 700)
+    d.pool("P_App", "Usuário (app iamp)", 10, 10, 1780, 300)
+    d.pool("P_Srv", "Servidor iamp (API FastAPI + PostgreSQL + modelos de ML)", 10, 430, 1780, 70,
            process=False, cor="pool_servidor")
     d.pool("P_Gem", "Gemini API (Google, serviço externo)", 860, 620, 650, 60, process=False, cor="pool_gemini")
     Y, Y2 = 120, 225
@@ -460,7 +460,10 @@ def general_view():
     d.no("P_App", "perfil", "sub", "Ver o perfil de consumo da casa", 930, Y, w=160)
     d.no("P_App", "eco", "sub", "Pedir o plano ao Eco-Coach", 1120, Y, w=160)
     d.no("P_App", "ler", "usuario", "Ler o plano e conferir as fontes [n]", 1300, Y, w=150)
-    d.no("P_App", "fim", "fim", "Plano de economia pronto", 1440, Y)
+    d.no("P_App", "g_salvar", "xor", "Salvar a casa na nuvem?", 1440, Y)
+    d.no("P_App", "conta", "usuario", "Entrar ou criar conta (aceite do Termo de Consentimento, LGPD)", 1540, Y2, w=170)
+    d.no("P_App", "g_fim", "xor", "", 1660, Y)
+    d.no("P_App", "fim", "fim", "Plano de economia pronto", 1740, Y)
     d.seq("ini", "calc")
     d.seq("calc", "g_troca")
     d.seq("g_troca", "troca", "sim", label=(406, Y + 48))
@@ -471,9 +474,13 @@ def general_view():
     d.seq("g_mais", "perfil", "não", label=(812, Y - 8))
     d.seq("perfil", "eco")
     d.seq("eco", "ler")
-    d.seq("ler", "fim")
+    d.seq("ler", "g_salvar")
+    d.seq("g_salvar", "conta", "sim", label=(1448, Y + 48))
+    d.seq("g_salvar", "g_fim", "não", label=(1475, Y - 8))
+    d.seq("conta", "g_fim")
+    d.seq("g_fim", "fim")
     srv_top = 430
-    d.msg("calc", "P_Srv", 220, "POST /calcular", (214, 350, "end"))
+    d.msg("calc", "P_Srv", 220, "POST /calcular (ou /estimado, /resistivo)", (214, 350, "end"))
     d.msg("P_Srv", "calc", 260, "kWh, R$ e avisos", (266, 395, "start"))
     d.msg("troca", "P_Srv", 520, "POST /sugestoes e /comparar", (514, 345, "end"))
     d.msg("P_Srv", "troca", 560, "equivalentes, economia e payback", (566, 395, "start"))
@@ -483,10 +490,15 @@ def general_view():
     d.msg("P_Srv", "eco", 1140, "plano com fontes [n]", (1146, 395, "start"))
     d.msg("P_Srv", "P_Gem", 1200, "prompt: regras + dados da casa + trechos oficiais", (1194, 545, "end"))
     d.msg("P_Gem", "P_Srv", 1240, "texto do plano", (1246, 565, "start"))
-    d.note("N_privacidade", "O Gemini recebe só números de consumo e trechos de documentos públicos: nenhum dado "
-           "pessoal sai do iamp.", 380, 610, 400, 50)
+    d.msg("conta", "P_Srv", 1510, "POST /contas ou /login; PUT /casas", (1504, 350, "end"))
+    d.msg("P_Srv", "conta", 1570, "token e casas salvas", (1576, 395, "start"))
     d.note("N_legenda", "[+] = subprocesso detalhado nas próximas páginas. Linhas tracejadas = mensagens "
-           "(chamadas à API).", 20, 520, 560, 50)
+           "(chamadas à API).", 20, 515, 820, 35)
+    d.note("N_privacidade", "O Gemini recebe só números de consumo e trechos de documentos públicos: nenhum dado "
+           "pessoal sai do iamp.", 20, 565, 820, 35)
+    d.note("N_conta", "Conta opcional: sem ela a casa fica só no celular. O servidor guarda o aceite (data e versão "
+           "do termo) e a senha só como hash (scrypt); apagar a conta apaga as casas em cascata.",
+           20, 615, 820, 50)
     return d
 
 
@@ -499,8 +511,9 @@ def calculation():
     d.no("P_Srv", "g_valido", "xor", "Dados válidos?", 330, Y)
     d.no("P_Srv", "erro", "fim_erro", "Erro 404 / 422", 330, Y2)
     d.no("P_Srv", "g_catalogo", "xor", "Aparelho no catálogo?", 440, Y)
-    d.no("P_Srv", "regras", "servico", "Calcular kWh pelas regras do Inmetro (kWh/mês, kWh/ciclo ou W × horas)", 610, Y, w=180)
-    d.no("P_Srv", "estimar", "ml", "Estimar kWh fora do catálogo (etiqueta, Portaria 2006 ou Random Forest)", 610, Y2, w=180)
+    d.no("P_Srv", "regras", "servico", "Calcular kWh pelas regras do Inmetro (kWh/mês, kWh/ciclo ou W × horas × dias)", 610, Y, w=210)
+    d.no("P_Srv", "estimar", "ml", "Estimar fora do catálogo: geladeira (etiqueta, Portaria 2006 ou Random Forest); "
+         "demais pela etiqueta, plaqueta ou modelos parecidos", 610, Y2, w=200)
     d.no("P_Srv", "g_junta", "xor", "", 780, Y)
     d.no("P_Srv", "tarifa", "servico", "Aplicar a tarifa B1 da ANEEL ou a da conta de luz", 900, Y, w=150)
     d.no("P_Srv", "registrar", "servico", "Registrar a consulta (sem dados pessoais)", 1080, Y, w=150)
